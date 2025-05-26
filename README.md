@@ -85,19 +85,24 @@ dggrs = {version = "0.1.0", git = git@gitlab.com/geoinsight/dggrs.git}
 In your `main.rs` add the following code. In this example the DGGRID generator service is instantiated using the path to the DGGRID executable `dggrid` and a path to the work directory `/dev/shm`. 
 
 ````
-use dggrs;
 use geo::geometry::Point;
+use geo_plegmata::dggrs;
 fn main() {
     let configs = vec![
+        // (
+        //     String::from("DGGRID"),
+        //     String::from("ISEA3H"),
+        //     String::from("03a000000000000000"),
+        // ),
+        // (
+        //     String::from("DGGRID"),
+        //     String::from("IGEO7"),
+        //     String::from("054710bfffffffffff"),
+        // ),
         (
-            String::from("DGGRID"),
-            String::from("ISEA3H"),
-            String::from("03a000000000000000"),
-        ),
-        (
-            String::from("DGGRID"),
-            String::from("IGEO7"),
-            String::from("054710bfffffffffff"),
+            String::from("H3O"),
+            String::from("H3"),
+            String::from("811fbffffffffff"),
         ),
     ];
 

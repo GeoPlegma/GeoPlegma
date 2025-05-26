@@ -7,3 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+pub struct H3oAdapter {}
+
+impl H3oAdapter {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for H3oAdapter {
+    fn default() -> Self {
+        Self {}
+    }
+}
