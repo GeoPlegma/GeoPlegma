@@ -27,7 +27,6 @@ use super::constants::COEF_GEOD_TO_AUTH_LAT;
 /// vgc - Vertex-oriented Great Circle projection.
 /// Based on the slice and dice approach from this article:
 /// http://dx.doi.org/10.1559/152304006779500687
-/// A chunk of the following is based on the DGGAL software implementation of the slice and dice projection: https://github.com/ecere/dggal
 pub struct Vgc;
 
 impl Projection for Vgc {
@@ -68,7 +67,7 @@ impl Projection for Vgc {
             // starting from here, you need:
             // - the 3d point that you want to project
             // - the 3d vertexes of the icosahedron
-            // - the 2d vertexes of the config 5x6
+            // - the 2d vertexes of the layout
             // Polyhedron faces
             let faces_length = polyhedron.faces();
             for index in 0..faces_length {
@@ -132,7 +131,7 @@ impl Projection for Vgc {
 #[cfg(test)]
 mod tests {
     use crate::{
-        layout::rhombic5x6::Rhombic5x6, models::common::PositionGeo,
+        layout::icosahedron_net::IcosahedronNet, models::common::PositionGeo,
         polyhedron::icosahedron::Icosahedron, traits::projection::Projection,
     };
 
@@ -145,6 +144,6 @@ mod tests {
         };
         let projection = Vgc;
 
-        let result = projection.forward(vec![position], Some(&Icosahedron {}), &Rhombic5x6 {});
+        let result = projection.forward(vec![position], Some(&Icosahedron {}), &IcosahedronNet {});
     }
 }

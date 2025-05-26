@@ -1,1 +1,1 @@
-pub mod rhombic5x6;
+pub mod icosahedron_net;
