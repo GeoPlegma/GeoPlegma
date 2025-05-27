@@ -8,7 +8,8 @@
 // except according to those terms
 
 use crate::models::position::Position2D;
-use crate::traits::layout::Layout;
+
+use super::traits::Layout;
 
 #[derive(Default, Debug)]
 pub struct IcosahedronNet {}

@@ -11,12 +11,9 @@
 pub mod adapters;
 pub mod dggrs;
 pub mod factory;
-pub mod layout;
 pub mod models;
-pub mod polyhedron;
 pub mod ports;
 pub mod projections;
-pub mod traits;
 
 /// This is the only re-export that is needed.
 pub use factory::dggrs_factory::get;

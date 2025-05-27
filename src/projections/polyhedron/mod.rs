@@ -7,6 +7,5 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-pub mod layout;
-pub mod projection;
-pub mod polyhedron;
+pub mod icosahedron;
+pub mod traits;

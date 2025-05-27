@@ -9,10 +9,8 @@
 
 use crate::{
     models::position::{Position2D, PositionGeo},
-    projections::constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR},
+    projections::{constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR}, layout::traits::Layout, polyhedron::traits::Polyhedron},
 };
-
-use super::{layout::Layout, polyhedron::Polyhedron};
 
 pub trait Projection {
     fn forward(

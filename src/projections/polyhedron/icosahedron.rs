@@ -7,12 +7,10 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::models::position::Position2D;
+use crate::{models::position::Position2D, projections::layout::traits::Layout};
 use crate::models::vector_3d::Vector3D;
-use crate::traits::layout::Layout;
-use crate::traits::polyhedron::Polyhedron;
 
-use crate::traits::polyhedron::ArcLengths;
+use super::traits::{ArcLengths, Polyhedron};
 
 pub const FACES: u8 = 20;
 

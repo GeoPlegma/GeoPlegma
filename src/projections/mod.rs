@@ -8,4 +8,6 @@
 // except according to those terms
 
 pub mod constants;
-pub mod vgc;
+pub mod layout;
+pub mod polyhedron;
+pub mod projections;

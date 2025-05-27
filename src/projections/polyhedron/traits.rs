@@ -7,9 +7,10 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::models::{position::Position2D, vector_3d::Vector3D};
-
-use super::layout::Layout;
+use crate::{
+    models::{position::Position2D, vector_3d::Vector3D},
+    projections::layout::traits::Layout,
+};
 
 pub trait Polyhedron {
     fn faces(&self) -> u8;
@@ -22,14 +23,8 @@ pub trait Polyhedron {
         face_vectors: Vec<Vector3D>,
         face_vertices: [(u8, u8); 3],
     ) -> ([Vector3D; 3], [Position2D; 3]);
-    fn triangle_arc_lengths(&self, triangle: [Vector3D; 3],
-        vector: Vector3D) -> ArcLengths;
-    fn face_center(
-        &self,
-        vector1: Vector3D,
-        vector2: Vector3D,
-        vector3: Vector3D,
-    ) -> Vector3D;
+    fn triangle_arc_lengths(&self, triangle: [Vector3D; 3], vector: Vector3D) -> ArcLengths;
+    fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D;
     fn is_point_in_triangle(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool;
     fn angle_between_unit(&self, u: Vector3D, v: Vector3D) -> f64;
 }

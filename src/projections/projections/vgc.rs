@@ -14,14 +14,13 @@ use crate::{
         position::{Position2D, PositionGeo},
         vector_3d::Vector3D,
     },
-    traits::{
-        layout::Layout,
-        polyhedron::{ArcLengths, Polyhedron},
-        projection::Projection,
+    projections::{
+        constants::COEF_GEOD_TO_AUTH_LAT,
+        layout::traits::Layout,
+        polyhedron::traits::{ArcLengths, Polyhedron},
+        projections::traits::Projection,
     },
 };
-
-use super::constants::COEF_GEOD_TO_AUTH_LAT;
 
 /// Implementation for Vertex Great Circle projection (or van Leeuwen Great Circle projection).
 /// vgc - Vertex-oriented Great Circle projection.
@@ -131,11 +130,14 @@ impl Projection for Vgc {
 #[cfg(test)]
 mod tests {
     use crate::{
-        layout::icosahedron_net::IcosahedronNet, models::position::PositionGeo,
-        polyhedron::icosahedron::Icosahedron, traits::projection::Projection,
+        models::position::PositionGeo,
+        projections::{
+            layout::icosahedron_net::IcosahedronNet, polyhedron::icosahedron::Icosahedron, projections::traits::Projection,
+        },
     };
 
     use super::Vgc;
+
 
     fn project_forward() {
         let position = PositionGeo {
