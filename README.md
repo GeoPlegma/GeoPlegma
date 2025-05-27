@@ -1,9 +1,9 @@
-GeoPlegmata
+GeoPlegma
 ===========
 
 Copyright
 ---------
-Copyright (c) 2025 contributors to the GeoPlegmata project. All rights reserved. Any use of this software constitutes full acceptance of all terms of its licence.
+Copyright (c) 2025 contributors to the GeoPlegma project. All rights reserved. Any use of this software constitutes full acceptance of all terms of its licence.
 
 Overview
 --------
@@ -12,11 +12,11 @@ This project aims to be an harbour for individuals, companies and other projects
 
 Ambitious? Certainly. Necessary? Absolutely. DGGS software has existed for more than twenty years, but is yet to have the impact on GIS (and GeoSciences at large) it should have. Dispersion of effort and objectives has been a major element in this delay.
 
-The abstractions proposed by GeoPlegmata are meant to not only accelerate development, but also facilitate the development of tools and interfaces to end users. Whereas so far the multitude of different DGGS and accompanying software have been a hurdle to anyone whishing to adopt them, GeoPlegmata intendens to create a common source code lexicon. Independently of the kind of DGGS the user wishes to use, or for what purpose, tools such as a Python API or a web-based display should present the same ease of access and use.
+The abstractions proposed by GeoPlegma are meant to not only accelerate development, but also facilitate the development of tools and interfaces to end users. Whereas so far the multitude of different DGGS and accompanying software have been a hurdle to anyone whishing to adopt them, GeoPlegma intendens to create a common source code lexicon. Independently of the kind of DGGS the user wishes to use, or for what purpose, tools such as a Python API or a web-based display should present the same ease of access and use.
 
 ### The name
 
-The term *geo* is Greek for Earth. Since DGGSs are primarilly concieved as grids on the Earth's surface, it seems appropriate to use the Greek term for grids, *plegmata*, to compose the name. *Plegmata* is plural for *plegma*, a grid. 
+The term *geo* is Greek for Earth. Since DGGSs are primarilly concieved as grids on the Earth's surface, it seems appropriate to use the Greek term for grid, *plegma*, to compose the name. In the begining of the project the term *plegmata*, plural for *plegma*, was used but dropped for simplicity. 
 
 Licence
 -------
@@ -26,7 +26,7 @@ This project is Licensed under the [Apache License, Version 2.0](http://www.apac
 The Pillars
 ===========
 
-GeoPlegmata starts by offering a collection of interfaces specifying the behaviour of programmes and code libraries wishing to "join in" the effort. They can be seen as an abstract layer setting a **contract** between different programmes. These interfaces are largely conformant to the [OGC API for DGGS](https://ogcapi.ogc.org/dggs/).
+GeoPlegma starts by offering a collection of interfaces specifying the behaviour of programmes and code libraries wishing to "join in" the effort. They can be seen as an abstract layer setting a **contract** between different programmes. These interfaces are largely conformant to the [OGC API for DGGS](https://ogcapi.ogc.org/dggs/).
 
 At present three pillars are part of the core design: (i) Discrete Global Grid Reference Systems (DGGRS), (ii) Data Structures and (iii) Encoding/Abstraction. The aim is for any programme implementing one of these pillars to benefit seamlessly from any functionality offered by any programme implementing one of the others.
 
@@ -42,7 +42,7 @@ The DGGRS interface is meant as the connection point to existing libraries, in p
 Data Strucutres
 ---------------
 
-Data structures based on a DGGS bring GeoPlegmata closer to what users may expect from a GIS.
+Data structures based on a DGGS bring GeoPlegma closer to what users may expect from a GIS.
 
 ### Coverage
 

@@ -1,4 +1,4 @@
-use geo_plegmata::types::{CellId, UnitPolyhedron};
+use geoplegma::types::{CellId, UnitPolyhedron};
 
 #[test]
 fn test_zone_id_small() {

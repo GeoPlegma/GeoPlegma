@@ -1,4 +1,4 @@
-// Copyright 2025 contributors to the GeoPlegmata project. 
+// Copyright 2025 contributors to the GeoPlegma project. 
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
