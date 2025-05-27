@@ -7,7 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::models::{common::Position2D, vector_3d::Vector3D};
+use crate::models::{position::Position2D, vector_3d::Vector3D};
 
 use super::layout::Layout;
 

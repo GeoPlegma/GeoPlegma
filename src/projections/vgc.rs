@@ -11,7 +11,7 @@ use std::f64::consts::{E, PI};
 
 use crate::{
     models::{
-        common::{Position2D, PositionGeo},
+        position::{Position2D, PositionGeo},
         vector_3d::Vector3D,
     },
     traits::{
@@ -131,7 +131,7 @@ impl Projection for Vgc {
 #[cfg(test)]
 mod tests {
     use crate::{
-        layout::icosahedron_net::IcosahedronNet, models::common::PositionGeo,
+        layout::icosahedron_net::IcosahedronNet, models::position::PositionGeo,
         polyhedron::icosahedron::Icosahedron, traits::projection::Projection,
     };
 

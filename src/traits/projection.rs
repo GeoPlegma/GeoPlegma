@@ -8,7 +8,7 @@
 // except according to those terms
 
 use crate::{
-    models::common::{Position2D, PositionGeo},
+    models::position::{Position2D, PositionGeo},
     projections::constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR},
 };
 
