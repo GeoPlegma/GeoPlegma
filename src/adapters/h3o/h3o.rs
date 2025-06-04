@@ -7,13 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![doc = include_str!("../README.md")]
-pub mod adapters;
-pub mod dggrs;
-pub mod factory;
-pub mod models;
-pub mod ports;
-pub mod projections;
+pub struct H3oAdapter {}
 
-/// This is the only re-export that is needed.
-pub use factory::dggrs_factory::get;
+impl H3oAdapter {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for H3oAdapter {
+    fn default() -> Self {
+        Self {}
+    }
+}
