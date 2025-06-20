@@ -3,3 +3,7 @@
 Cargo.lock
 *.gen
 #src/main.rs
+
+docs/node_modules/
+docs/.vitepress
+docs/pnpm-lock.yaml
