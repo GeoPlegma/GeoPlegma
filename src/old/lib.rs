@@ -1,6 +1,4 @@
-// Copyright 2025 contributors to the GeoPlegma project.
-//
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Copyright 2025 contributors to the GeoPlegma project. 
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,7 +6,4 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub mod common;
-pub mod position;
-pub mod vector_3d;
-//pub mod dggrid;
+pub mod types;
