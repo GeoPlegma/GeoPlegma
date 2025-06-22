@@ -7,8 +7,8 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::{models::position::Position2D, projections::layout::traits::Layout};
-use crate::models::vector_3d::Vector3D;
+use crate::{models::vector_3d::Vector3D, projections::layout::traits::Layout};
+use geo::Coord;
 
 use super::traits::{ArcLengths, Polyhedron};
 
@@ -39,7 +39,7 @@ impl Polyhedron for Icosahedron {
         _vector: Vector3D,
         _face_vectors: Vec<Vector3D>,
         _face_vertices: [(u8, u8); 3],
-    ) -> ([Vector3D; 3], [Position2D; 3]) {
+    ) -> ([Vector3D; 3], [Coord; 3]) {
         todo!()
     }
 

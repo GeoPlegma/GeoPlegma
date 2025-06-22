@@ -71,3 +71,48 @@ pub const COEF_GEOD_TO_AUTH_LAT: [f64; 21] = [
     -455935736.0 / 638512875.0,
     4210684958.0 / 1915538625.0,
 ];
+
+/// Default tolerance for coordinate comparisons (degrees)
+pub const DEFAULT_COORDINATE_TOLERANCE: f64 = 1e-9;
+
+/// Utility functions for geographic coordinates
+pub mod geo_utils {
+    use geo::Point;
+    use crate::models::vector_3d::Vector3D;
+    use super::DEFAULT_COORDINATE_TOLERANCE;
+
+    /// Convert geographic point to 3D Cartesian coordinates on unit sphere
+    pub fn point_to_cartesian(point: &Point) -> Vector3D {
+        let lat_rad = point.y().to_radians();
+        let lon_rad = point.x().to_radians();
+        let cos_lat = lat_rad.cos();
+        Vector3D {
+            x: cos_lat * lon_rad.cos(),
+            y: cos_lat * lon_rad.sin(),
+            z: lat_rad.sin(),
+        }
+    }
+
+    /// Normalize longitude to [-180, 180] range
+    pub fn normalize_longitude(lon: f64) -> f64 {
+        let normalized = ((lon + 180.0) % 360.0) - 180.0;
+        if normalized == -180.0 { 180.0 } else { normalized }
+    }
+
+    /// Create validated geographic point
+    pub fn create_point(lon: f64, lat: f64) -> Result<Point, String> {
+        if !(-90.0..=90.0).contains(&lat) {
+            return Err(format!("Latitude must be in range [-90, 90], got {}", lat));
+        }
+        if !(-180.0..=180.0).contains(&lon) {
+            return Err(format!("Longitude must be in range [-180, 180], got {}", lon));
+        }
+        Ok(Point::new(lon, lat))
+    }
+
+    /// Check if two points are approximately equal within tolerance
+    pub fn points_approx_eq(p1: &Point, p2: &Point, tolerance: Option<f64>) -> bool {
+        let tol = tolerance.unwrap_or(DEFAULT_COORDINATE_TOLERANCE);
+        (p1.x() - p2.x()).abs() < tol && (p1.y() - p2.y()).abs() < tol
+    }
+}

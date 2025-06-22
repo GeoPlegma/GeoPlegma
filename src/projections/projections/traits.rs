@@ -7,18 +7,20 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::{
-    models::position::{Position2D, PositionGeo},
-    projections::{constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR}, layout::traits::Layout, polyhedron::traits::Polyhedron},
+use crate::projections::{
+    constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR}, 
+    layout::traits::Layout, 
+    polyhedron::traits::Polyhedron
 };
+use geo::{Point, Coord};
 
 pub trait Projection {
     fn forward(
         &self,
-        positions: Vec<PositionGeo>,
+        positions: Vec<Point>,
         polyhedron: Option<&dyn Polyhedron>,
         layout: &dyn Layout,
-    ) -> Vec<Position2D>;
+    ) -> Vec<Coord>;
     fn inverse(&self) -> String;
 
     fn to_3d(lat: f64, lon: f64) -> [f64; 3] {
