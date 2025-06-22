@@ -7,10 +7,9 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::projections::{
-    constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR}, 
-    layout::traits::Layout, 
-    polyhedron::traits::Polyhedron
+use crate::{
+    constants::WGS84,
+    projections::{layout::traits::Layout, polyhedron::traits::Polyhedron}
 };
 use geo::{Point, Coord};
 
@@ -50,7 +49,7 @@ pub trait Projection {
     // ex: c1*n + c2*n² + c3*n³ + ... cn*n^n
     fn fourier_coefficients(c: [f64; 21]) -> Vec<f64> {
         // Third flattening of the ellipsoid
-        let n = (ELIPSOID_MAJOR - ELIPSOID_MINOR) / (ELIPSOID_MAJOR + ELIPSOID_MINOR);
+        let n = WGS84::THIRD_FLATTENING;
         let mut coef: Vec<f64> = Vec::with_capacity(6);
 
         coef.push(

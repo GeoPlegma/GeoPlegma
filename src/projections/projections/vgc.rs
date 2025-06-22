@@ -10,9 +10,9 @@
 use std::f64::consts::{E, PI};
 
 use crate::{
+    constants::KarneyCoefficients,
     models::vector_3d::Vector3D,
     projections::{
-        constants::COEF_GEOD_TO_AUTH_LAT,
         layout::traits::Layout,
         polyhedron::traits::{ArcLengths, Polyhedron},
         projections::traits::Projection,
@@ -37,7 +37,7 @@ impl Projection for Vgc {
         let polyhedron = polyhedron.unwrap();
 
         // Need the coeficcients to convert from geodetic to authalic
-        let coef_fourier_geod_to_auth = Self::fourier_coefficients(COEF_GEOD_TO_AUTH_LAT);
+        let coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
         // get 3d unit vectors of the icosahedron
         let ico_vectors = polyhedron.unit_vectors();
