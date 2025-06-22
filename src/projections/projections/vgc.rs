@@ -127,14 +127,7 @@ impl Projection for Vgc {
 
 #[cfg(test)]
 mod tests {
-    use crate::projections::{
-        layout::icosahedron_net::IcosahedronNet, 
-        polyhedron::icosahedron::Icosahedron, 
-        projections::traits::Projection,
-    };
     use geo::Point;
-
-    use super::Vgc;
 
 
     #[test]

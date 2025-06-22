@@ -14,6 +14,11 @@ pub mod factory;
 pub mod models;
 pub mod ports;
 pub mod projections;
+pub mod types {
+    pub use crate::old::types::*;
+}
+
+mod old;
 
 /// This is the only re-export that is needed.
 pub use factory::dggrs_factory::get;
