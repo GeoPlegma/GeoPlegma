@@ -3,6 +3,9 @@
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://geoplegma.github.io/GeoPlegma/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://geoplegma.github.io/GeoPlegma/dev/)
 [![Build Status](https://github.com/GeoPlegma/GeoPlegma/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/GeoPlegma/GeoPlegma/actions/workflows/CI.yml?query=branch%3Amaster)
+=======
+GeoPlegma
+===========
 
 ## Copyright
 
@@ -18,7 +21,8 @@ The abstractions proposed by GeoPlegma are meant to not only accelerate developm
 
 ### The name
 
-The term _geo_ is Greek for Earth. Since DGGSs are primarilly concieved as grids on the Earth's surface, it seems appropriate to use the Greek term for grid, _plegma_, to compose the name. In the begining of the project the term _plegmata_, plural for _plegma_, was used but dropped for simplicity.
+
+The term *geo* is Greek for Earth. Since DGGSs are primarilly concieved as grids on the Earth's surface, it seems appropriate to use the Greek term for grid, *plegma*, to compose the name. In the begining of the project the term *plegmata*, plural for *plegma*, was used but dropped for simplicity. 
 
 ## Licence
 
@@ -58,11 +62,14 @@ The Vector concept with DGGS is also similar to that in traditional GIS, a colle
 
 As with coverages, a Vector must identify in its meta-data the DGGRS and resolution determining its cell identifers.
 
-## Encoding/Abstraction
 
-These assets define behaviour allowing data structures to presist. The method signatures include the encoding and abstraction of meta-data and data segments. The meta-data must clearly identify the underlying DGGRS and if necessary data types. Data access is concieved in segmented form, considering the likely case of large datasets, either spaning large areas of the globe or expressed at a high spatial resolution.
+Encoding/Abstraction
+--------------------
 
-## How to use it
+These assets define behaviour allowing data structures to presist. The method signatures include the encoding and abstraction of meta-data and data segments. The meta-data must clearly identify the underlying DGGRS and if necessary data types. Data access is concieved in segmented form, considering the likely case of large datasets, either spaning large areas of the globe or expressed at a high spatial resolution.  
+
+How to use it
+-------------
 
 This library provides an interface to DGGRID (and potentinally other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
 
@@ -74,14 +81,15 @@ Make sure DGGRID is compiled and available on your system. Remember the path whe
 
 Create a new crate with `cargo new` and add this dependency in your `cargo.toml`. I expect to publish this to crates.io in the future, which will simplify this with `cargo add dggrs`.
 
-```
+
+````
 [dependencies]
 dggrs = {version = "0.1.0", git = git@gitlab.com/geoinsight/dggrs.git}
-```
+````
 
-In your `main.rs` add the following code. In this example the DGGRID generator service is instantiated using the path to the DGGRID executable `dggrid` and a path to the work directory `/dev/shm`.
+In your `main.rs` add the following code. In this example the DGGRID generator service is instantiated using the path to the DGGRID executable `dggrid` and a path to the work directory `/dev/shm`. 
 
-```
+````
 use geo::geometry::Point;
 use geo_plegmata::dggrs;
 fn main() {
@@ -155,6 +163,7 @@ fn main() {
         );
     }
 }
-```
+
+````
 
 Instead of printing out the length of `result.zones.len()` you can also print out the struct itself.
