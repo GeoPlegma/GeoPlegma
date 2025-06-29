@@ -8,17 +8,18 @@
 // except according to those terms
 
 use crate::{
-    models::position::{Position2D, PositionGeo},
-    projections::{constants::{ELIPSOID_MAJOR, ELIPSOID_MINOR}, layout::traits::Layout, polyhedron::traits::Polyhedron},
+    constants::WGS84,
+    projections::{layout::traits::Layout, polyhedron::traits::Polyhedron}
 };
+use geo::{Point, Coord};
 
 pub trait Projection {
     fn forward(
         &self,
-        positions: Vec<PositionGeo>,
+        positions: Vec<Point>,
         polyhedron: Option<&dyn Polyhedron>,
         layout: &dyn Layout,
-    ) -> Vec<Position2D>;
+    ) -> Vec<Coord>;
     fn inverse(&self) -> String;
 
     fn to_3d(lat: f64, lon: f64) -> [f64; 3] {
@@ -48,7 +49,7 @@ pub trait Projection {
     // ex: c1*n + c2*n² + c3*n³ + ... cn*n^n
     fn fourier_coefficients(c: [f64; 21]) -> Vec<f64> {
         // Third flattening of the ellipsoid
-        let n = (ELIPSOID_MAJOR - ELIPSOID_MINOR) / (ELIPSOID_MAJOR + ELIPSOID_MINOR);
+        let n = WGS84::THIRD_FLATTENING;
         let mut coef: Vec<f64> = Vec::with_capacity(6);
 
         coef.push(

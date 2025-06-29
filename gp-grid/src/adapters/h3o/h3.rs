@@ -120,7 +120,7 @@ impl DggrsPort for H3Impl {
             }
         };
 
-        let zone_res = zone.resolution();
+        let _zone_res = zone.resolution();
 
         cells_to_zones(vec![zone])
     }

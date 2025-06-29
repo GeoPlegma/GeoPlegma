@@ -10,17 +10,15 @@
 use std::f64::consts::{E, PI};
 
 use crate::{
-    models::{
-        position::{Position2D, PositionGeo},
-        vector_3d::Vector3D,
-    },
+    constants::KarneyCoefficients,
+    models::vector_3d::Vector3D,
     projections::{
-        constants::COEF_GEOD_TO_AUTH_LAT,
         layout::traits::Layout,
         polyhedron::traits::{ArcLengths, Polyhedron},
         projections::traits::Projection,
     },
 };
+use geo::{Point, Coord};
 
 /// Implementation for Vertex Great Circle projection (or van Leeuwen Great Circle projection).
 /// vgc - Vertex-oriented Great Circle projection.
@@ -31,15 +29,15 @@ pub struct Vgc;
 impl Projection for Vgc {
     fn forward(
         &self,
-        positions: Vec<PositionGeo>,
+        positions: Vec<Point>,
         polyhedron: Option<&dyn Polyhedron>,
         layout: &dyn Layout,
-    ) -> Vec<Position2D> {
-        let mut out: Vec<Position2D> = vec![];
+    ) -> Vec<Coord> {
+        let mut out: Vec<Coord> = vec![];
         let polyhedron = polyhedron.unwrap();
 
         // Need the coeficcients to convert from geodetic to authalic
-        let coef_fourier_geod_to_auth = Self::fourier_coefficients(COEF_GEOD_TO_AUTH_LAT);
+        let coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
         // get 3d unit vectors of the icosahedron
         let ico_vectors = polyhedron.unit_vectors();
@@ -55,9 +53,9 @@ impl Projection for Vgc {
         let v2d = layout.vertices();
 
         for position in positions {
-            let lon = position.lon.to_radians();
+            let lon = position.x().to_radians();
             let lat = Self::lat_geodetic_to_authalic(
-                position.lat.to_radians(),
+                position.y().to_radians(),
                 &coef_fourier_geod_to_auth,
             );
             // Calculate 3d unit vectors for point P
@@ -115,7 +113,7 @@ impl Projection for Vgc {
                     let p_x = pd_x + (pd_x - p1.x) * xy;
                     let p_y = pd_y + (pd_x - p1.y) * xy;
 
-                    out.push(Position2D { x: p_x, y: p_y });
+                    out.push(Coord { x: p_x, y: p_y });
                 }
             }
         }
@@ -129,23 +127,21 @@ impl Projection for Vgc {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        models::position::PositionGeo,
-        projections::{
-            layout::icosahedron_net::IcosahedronNet, polyhedron::icosahedron::Icosahedron, projections::traits::Projection,
-        },
-    };
-
-    use super::Vgc;
+    use geo::Point;
 
 
-    fn project_forward() {
-        let position = PositionGeo {
-            lat: 38.695125,
-            lon: -9.222154,
-        };
-        let projection = Vgc;
-
-        let result = projection.forward(vec![position], Some(&Icosahedron {}), &IcosahedronNet {});
+    #[test]
+    fn test_point_creation() {
+        let position = Point::new(-9.222154, 38.695125);
+        assert_eq!(position.x(), -9.222154);
+        assert_eq!(position.y(), 38.695125);
     }
+
+    // Forward projection test disabled until Icosahedron implementation is complete
+    // #[test]
+    // fn project_forward() {
+    //     let position = Point::new(-9.222154, 38.695125);
+    //     let projection = Vgc;
+    //     let result = projection.forward(vec![position], Some(&Icosahedron {}), &IcosahedronNet {});
+    // }
 }

@@ -8,9 +8,10 @@
 // except according to those terms
 
 use crate::{
-    models::{position::Position2D, vector_3d::Vector3D},
+    models::vector_3d::Vector3D,
     projections::layout::traits::Layout,
 };
+use geo::Coord;
 
 pub trait Polyhedron {
     fn faces(&self) -> u8;
@@ -22,7 +23,7 @@ pub trait Polyhedron {
         vector: Vector3D,
         face_vectors: Vec<Vector3D>,
         face_vertices: [(u8, u8); 3],
-    ) -> ([Vector3D; 3], [Position2D; 3]);
+    ) -> ([Vector3D; 3], [Coord; 3]);
     fn triangle_arc_lengths(&self, triangle: [Vector3D; 3], vector: Vector3D) -> ArcLengths;
     fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D;
     fn is_point_in_triangle(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool;
