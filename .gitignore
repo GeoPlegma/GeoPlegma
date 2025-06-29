@@ -1,5 +1,5 @@
 *.swp
-/target
+target/
 Cargo.lock
 *.gen
 #src/main.rs

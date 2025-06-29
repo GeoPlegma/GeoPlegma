@@ -7,7 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 pub mod adapters;
 pub mod constants;
 pub mod dggrs;
@@ -24,3 +24,4 @@ mod old;
 
 /// This is the only re-export that is needed.
 pub use factory::dggrs_factory::get;
+

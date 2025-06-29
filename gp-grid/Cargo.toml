@@ -1,0 +1,18 @@
+[package]
+name = "geoplegma"
+version = "0.2.0"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+readme = "README.md"
+
+[dependencies]
+geo = "0.30.0"
+rand = "0.8.5"
+tracing = "0.1.41"
+h3o = { version = "0.8.0", features = ["geo"] }
+
+[dev-dependencies]
+
+[lib]
+name = "geoplegma"
+path = "src/lib.rs"
