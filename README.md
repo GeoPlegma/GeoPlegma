@@ -161,3 +161,10 @@ fn main() {
 ````
 
 Instead of printing out the length of `result.zones.len()` you can also print out the struct itself.
+
+Dependencies
+------------
+clone the dggal-rust repo
+git submodule update --init --recursive
+git submodule update --recursive --remote
+

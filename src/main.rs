@@ -25,11 +25,13 @@ fn main() {
         lon: 12.3,
     };
 
-    let zone = dggrs.getZoneFromWGS84Centroid(12, &pnt);
+    let zone = dggrs.getZoneFromWGS84Centroid(8, &pnt);
     println!("{:?}", zone);
 
-    let kids = dggrs.getSubZones(zone, 1);
+    let neighbors = dggrs.getZoneNeighbors(zone, *mut [i32;6]);
+    println!("{:?}", neighbors);
 
+    let kids = dggrs.getSubZones(zone, 1);
     println!("{:?}", kids);
 
     let ll: GeoPoint = GeoPoint {
@@ -43,20 +45,21 @@ fn main() {
 
     let mut bbox = GeoExtent { ll, ur };
     println!("{:?}", bbox);
-    let mut options = HashMap::<&str, &str>::new();
+    // let mut options = HashMap::<&str, &str>::new();
 
-    let mut exit_code: i32 = 0;
+    // let mut exit_code: i32 = 0;
 
-    if parse_bbox(&options, &mut bbox) {
-        exit_code = 1
-    }
-    println!("{:?}", bbox);
+    // if parse_bbox(&options, &mut bbox) {
+    //     exit_code = 1
+    // }
+    // println!("{:?}", bbox);
     println!("{:?}", wholeWorld);
 
-    let zones = dggrs.listZones(2, &bbox);
-
-    // println!("{:?}", zones);
+    let zones = dggrs.listZones(2, &wholeWorld);
     println!("{:?}", zones.len());
+
+    let subzones = dggrs.getSubZones(zone, 5);
+    println!("{:?}", subzones.len());
 
     println!("here");
 
