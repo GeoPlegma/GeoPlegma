@@ -56,6 +56,6 @@ jobs:
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PAT }}
           publish_dir: ./deploy
           keep_files: true
