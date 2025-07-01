@@ -1,9 +1,6 @@
 extern crate ecrt;
-
 use ecrt::{Application, tokenizeWith};
-
 extern crate dggal;
-
 use dggal::{DGGAL, DGGRS, GeoExtent, GeoPoint, wholeWorld};
 use geo::geometry::Point;
 use geo_plegmata::dggrs;
@@ -15,7 +12,6 @@ use std::f64::consts::PI;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-
     let my_app = Application::new(&args);
     let dggal = DGGAL::new(&my_app);
     let dggrs: DGGRS = DGGRS::new(&dggal, "IVEA3H").expect("Unknown DGGRS");
@@ -145,7 +141,7 @@ fn main() {
         let generator = dggrs::get(&tool, &dggs);
 
         println!("Global");
-        let result = generator.zones_from_bbox(2, false, None);
+        let result = generator.zones_from_bbox(2, false, None); // NOTE: no bbox = global
         println!(
             "{:?} \nGenerated {} zones",
             result.zones,
