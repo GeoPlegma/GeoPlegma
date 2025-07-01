@@ -24,7 +24,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Build job
   build:
     runs-on: ubuntu-latest
     steps:
@@ -48,22 +47,15 @@ jobs:
         run: npm ci # or pnpm install / yarn install / bun install
         working-directory: docs
       - name: Build with VitePress
-        run: npm run docs:build # or pnpm docs:build / yarn docs:build / bun run docs:build
+        run: npm run docs:build
         working-directory: docs
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Prepare deployment folder
+        run: |
+          mkdir -p deploy/${GITHUB_REF_NAME##*/}
+          cp -r docs/.vitepress/dist/* deploy/${GITHUB_REF_NAME##*/}
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: docs/.vitepress/dist
-
-  # Deployment job
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    needs: build
-    runs-on: ubuntu-latest
-    name: Deploy
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy
+          keep_files: true
