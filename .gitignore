@@ -1,1 +1,7 @@
 *.swp
+/target
+Cargo.lock
+*.gen
+#src/main.rs
+
+docs/node_modules/

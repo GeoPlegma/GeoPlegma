@@ -1,23 +1,55 @@
+// Copyright 2025 contributors to the GeoPlegma project.
+// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+//
+// Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
+// discretion. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+use geo::{Point, Polygon};
+use std::fmt;
+
 #[derive(Debug)]
-pub struct PositionGeo {
-    pub lat: f64,
-    pub lon: f64,
+pub struct Zone {
+    pub id: ZoneID,
+    pub region: Polygon,
+    pub center: Point,
+    pub vertex_count: u32,
+    pub children: Option<Vec<String>>,
+    pub neighbors: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Position2D {
-    pub x: f64,
-    pub y: f64,
+#[derive(Debug)]
+pub struct Zones {
+    pub zones: Vec<Zone>,
 }
 
-impl Position2D {
-    pub fn from_tuple(t: (u8, u8)) -> Position2D {
-        Position2D { x: f64::from(t.0), y: f64::from(t.1) }
-    }
-    pub fn mid(a: Position2D, b: Position2D) -> Position2D {
-        Position2D {
-            x: (a.x + b.x) / 2.0,
-            y: (a.y + b.y) / 2.0,
+#[derive(Debug, Clone)]
+pub struct ZoneID {
+    pub id: String,
+}
+
+impl ZoneID {
+    pub fn new(id: &str) -> Result<Self, String> {
+        if (id.len() == 16 || id.len() == 18) && id.chars().all(|c| c.is_ascii_alphanumeric()) {
+            Ok(ZoneID { id: id.to_string() })
+        } else {
+            Err("ID must be exactly 16 or 18 alphanumeric characters.".to_string())
         }
+    }
+}
+
+impl Default for ZoneID {
+    fn default() -> Self {
+        ZoneID {
+            id: "0000000000000000".to_string(),
+        } // Some valid default ID
+    }
+}
+
+impl fmt::Display for ZoneID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.id)
     }
 }

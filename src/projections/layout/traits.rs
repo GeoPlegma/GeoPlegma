@@ -7,7 +7,9 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-pub mod constants;
-pub mod layout;
-pub mod polyhedron;
-pub mod projections;
+use crate::models::position::Position2D;
+pub trait Layout {
+    fn face_center(&self, vertices: [(u8, u8); 3]) -> Position2D;
+    fn grid_size(&self) -> (usize, usize);
+    fn vertices(&self) -> Vec<[(u8, u8); 3]>;
+}
