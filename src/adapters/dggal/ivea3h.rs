@@ -7,6 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::adapters::dggal::common::ids_to_zones;
 use crate::adapters::dggal::dggal::DggalAdapter;
 use crate::models::common::Zones;
 use crate::ports::dggrs::DggrsPort;
@@ -66,7 +67,8 @@ impl DggrsPort for Ivea3hImpl {
         );
 
         println!("test {:?}", max_depth);
-        todo!("Not done");
+
+        ids_to_zones(d, zones)
     }
     fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Zones {
         todo!("Not done");
