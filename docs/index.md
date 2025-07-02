@@ -3,23 +3,33 @@
 layout: home
 
 hero:
-  name: "GeoPlegma Documentation"
-  text: "This is the GeoPlegma Documentation"
-  tagline: My great project tagline
+  name: "GeoPlegma"
+  tagline: |
+    Implementations and abstractions for
+    Discrete Global Grid Systems in Rust
+
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: Get started
+      link: /get-started
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: docs.rs
+      link: https://docs.rs/geoplegma
+    - theme: alt
+      text: GitHub
+      link: https://github.com/GeoPlegma/GeoPlegma
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Less distortions
+    details: |
+      Discrete Global Grid Systems (DGGS) tesselate the surface of the earth into zones of equal area,
+      minimizing spatial distortions.
+  - title: Abstractions
+    details: GeoPlegma provides traits and APIs to implement DGGS in Rust.
+  - title: Available DGGS
+    details: |
+      GeoPlegma currently supports the following DGGS: DGGAL, DGGR
+  - title: Get involved
+    details: |
+      GeoPlegma is an evolving platform. Pull Requets are very welcome!
 ---
-
