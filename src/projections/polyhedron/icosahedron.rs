@@ -7,8 +7,8 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::{models::position::Position2D, projections::layout::traits::Layout};
-use crate::models::vector_3d::Vector3D;
+use crate::{models::vector_3d::Vector3D, projections::layout::traits::Layout};
+use geo::Coord;
 
 use super::traits::{ArcLengths, Polyhedron};
 
@@ -39,7 +39,7 @@ impl Polyhedron for Icosahedron {
         _vector: Vector3D,
         _face_vectors: Vec<Vector3D>,
         _face_vertices: [(u8, u8); 3],
-    ) -> ([Vector3D; 3], [Position2D; 3]) {
+    ) -> ([Vector3D; 3], [Coord; 3]) {
         todo!()
     }
 
@@ -71,13 +71,53 @@ impl Polyhedron for Icosahedron {
         }
     }
 
-    fn is_point_in_triangle(&self, _point: Vector3D, _triangle: Vec<Vector3D>) -> bool {
-        todo!()
+    fn is_point_in_triangle(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool {
+        if triangle.len() != 3 {
+            return false;
+        }
+        
+        // For spherical triangles on icosahedron, use barycentric coordinates
+        // adapted for the unit sphere
+        let v0 = triangle[0];
+        let v1 = triangle[1]; 
+        let v2 = triangle[2];
+        
+        // Convert to barycentric coordinates
+        let v0v1 = v1 - v0;
+        let v0v2 = v2 - v0;
+        let v0p = point - v0;
+
+        let dot00 = v0v2.dot(v0v2);
+        let dot01 = v0v2.dot(v0v1);
+        let dot02 = v0v2.dot(v0p);
+        let dot11 = v0v1.dot(v0v1);
+        let dot12 = v0v1.dot(v0p);
+
+        // Compute barycentric coordinates
+        let denom = dot00 * dot11 - dot01 * dot01;
+        if denom.abs() < 1e-10 {
+            return false; // Degenerate triangle
+        }
+        
+        let inv_denom = 1.0 / denom;
+        let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
+        let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
+
+        // Point is in triangle if all barycentric coordinates are non-negative
+        u >= 0.0 && v >= 0.0 && (u + v) <= 1.0
     }
 
     /// Numerically stable angle between two unit vectors
-    fn angle_between_unit(&self, _u: Vector3D, _v: Vector3D) -> f64 {
-        todo!()
+    /// Uses atan2 method for better numerical stability than acos
+    fn angle_between_unit(&self, u: Vector3D, v: Vector3D) -> f64 {
+        // For unit vectors, use the cross product magnitude and dot product
+        // with atan2 for numerical stability
+        let cross = u.cross(v);
+        let cross_magnitude = cross.length();
+        let dot = u.dot(v);
+        
+        // atan2 handles all quadrants correctly and is more stable than acos
+        cross_magnitude.atan2(dot)
     }
 
     fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D {

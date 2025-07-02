@@ -73,16 +73,16 @@ Make sure DGGRID is compiled and available on your system. Remember the path whe
 
 Create a new crate with `cargo new` and add this dependency in your `cargo.toml`. I expect to publish this to crates.io in the future, which will simplify this with `cargo add dggrs`.
 
-```
+```toml
 [dependencies]
 dggrs = {version = "0.1.0", git = git@gitlab.com/geoinsight/dggrs.git}
 ```
 
 In your `main.rs` add the following code. In this example the DGGRID generator service is instantiated using the path to the DGGRID executable `dggrid` and a path to the work directory `/dev/shm`.
 
-```
+```rust
 use geo::geometry::Point;
-use geo_plegmata::dggrs;
+use geoplegma::dggrs;
 fn main() {
     let configs = vec![
         // (

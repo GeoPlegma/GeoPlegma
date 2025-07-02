@@ -7,9 +7,10 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::models::position::Position2D;
+use geo::Coord;
+
 pub trait Layout {
-    fn face_center(&self, vertices: [(u8, u8); 3]) -> Position2D;
+    fn face_center(&self, vertices: [(u8, u8); 3]) -> Coord;
     fn grid_size(&self) -> (usize, usize);
     fn vertices(&self) -> Vec<[(u8, u8); 3]>;
 }

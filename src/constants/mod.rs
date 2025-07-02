@@ -7,6 +7,18 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-pub mod layout;
-pub mod polyhedron;
+//! Constants and parameters for discrete global grid systems
+//! 
+//! This module provides well-organized constants for:
+//! - Earth ellipsoid parameters (WGS84)
+//! - Projection transformation coefficients
+//! - Numerical tolerances for calculations
+
+pub mod earth;
 pub mod projections;
+pub mod tolerance;
+
+// Re-export commonly used constants for convenience
+pub use earth::WGS84;
+pub use projections::{KarneyCoefficients, IcosahedronConstants};
+pub use tolerance::Tolerance;

@@ -7,16 +7,15 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::models::position::Position2D;
-
 use super::traits::Layout;
+use geo::Coord;
 
 #[derive(Default, Debug)]
 pub struct IcosahedronNet {}
 
 impl Layout for IcosahedronNet {
-    fn face_center(&self, p: [(u8, u8); 3]) -> Position2D {
-        Position2D {
+    fn face_center(&self, p: [(u8, u8); 3]) -> Coord {
+        Coord {
             x: f64::from((p[0].0 + p[1].0 + p[2].0) / 3),
             y: f64::from((p[0].1 + p[1].1 + p[2].1) / 3),
         }

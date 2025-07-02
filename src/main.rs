@@ -1,6 +1,5 @@
 use geo::geometry::Point;
 use geoplegma::dggrs;
-
 fn main() {
     let configs = vec![
         // (

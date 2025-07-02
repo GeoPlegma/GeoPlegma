@@ -9,6 +9,5 @@
 // except according to those terms.
 
 pub mod common;
-pub mod position;
 pub mod vector_3d;
 //pub mod dggrid;
