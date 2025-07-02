@@ -1,7 +1,7 @@
 # GeoPlegma
 
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://geoplegma.github.io/GeoPlegma/master)
-[![Build Sitatus](https://github.com/GeoPlegma/GeoPlegma/actions/workflows/deploy-docs.yml/badge.svg?branch=master)](https://github.com/GeoPlegma/GeoPlegma/actions/workflows/CI.yml?query=branch%3Amaster)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://geoplegma.github.io/GeoPlegma)
+[![Build status](https://github.com/GeoPlegma/GeoPlegma/actions/workflows/deploy-docs.yml/badge.svg?branch=master)](https://github.com/GeoPlegma/GeoPlegma/actions/workflows/CI.yml?query=branch%3Amaster)
 
 ## Copyright
 
