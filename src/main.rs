@@ -30,6 +30,9 @@ fn main() {
     let zone_level = dggrs.getZoneLevel(zone);
     println!("The level of that Zone is: \n{:?}\n\n", zone_level);
 
+    let zone_center = dggrs.getZoneWGS84Centroid(zone);
+    println!("The center of that Zone is: \n{:?}\n\n", zone_center);
+
     let mut nb_types: [i32; 6] = [0; 6];
     let neighbors = dggrs.getZoneNeighbors(zone, &mut nb_types);
     println!("The neighbors of that zone: \n{:?}\n\n", neighbors);
@@ -105,6 +108,8 @@ fn main() {
     //println!("{:?}", ga);
 
     println!("here");
+
+    //std::process::exit(0);
 
     let configs = vec![
         (

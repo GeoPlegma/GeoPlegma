@@ -1,21 +1,54 @@
 use crate::models::common::{Zone, ZoneID, Zones};
-use dggal::{DGGRS, DGGRSZone};
+use dggal::{DGGRS, DGGRSZone, GeoPoint};
+use geo::LineString;
+use geo::Point;
+use geo::Polygon;
+use geo::coord;
 
-pub fn ids_to_zones(d: DGGRS, ids: Vec<DGGRSZone>) -> Zones {
+pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Zones {
     let zones = ids
         .into_iter()
         .map(|id| {
-            let count_edges = d.countZoneEdges(id);
+            let dggal_geo_points: Vec<GeoPoint> = dggrs.getZoneWGS84Vertices(id);
+            let region: Polygon<f64> = to_polygon(&dggal_geo_points);
+
+            let center_point = dggrs.getZoneWGS84Centroid(id);
+            let center: Point<f64> = to_point(&center_point);
+
+            let count_edges: u32 = dggrs.countZoneEdges(id).try_into().unwrap();
+
+            // TODO: Wrap the children and neighbors into an if statement if requested.
+            let children = dggrs.getSubZones(id, 1);
+            let mut nb_types: [i32; 6] = [0; 6];
+            let neighbors = dggrs.getZoneNeighbors(id, &mut nb_types);
+
             Zone {
                 id: ZoneID { id: id.to_string() },
                 region,
-                vertex_count,
-                center: center_point,
-                children: children_opt,
-                neighbors: neighbors_opt,
+                vertex_count: count_edges,
+                center,
+                children, // TODO: we need to make an enum for string and integer based indicies
+                neighbors,
             }
         })
         .collect();
 
     Zones { zones }
+}
+
+fn to_point(pt: &GeoPoint) -> Point<f64> {
+    Point::new(pt.lon, pt.lat)
+}
+
+fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
+    let mut coords: Vec<_> = points
+        .iter()
+        .map(|pt| coord! { x: pt.lon, y: pt.lat })
+        .collect();
+
+    if coords.first() != coords.last() {
+        coords.push(coords[0]);
+    }
+
+    Polygon::new(LineString::from(coords), vec![])
 }
