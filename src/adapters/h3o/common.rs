@@ -42,7 +42,8 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
     let zones = cells
         .into_iter()
         .map(|cell| {
-            let id = cell.to_string();
+            //let id = cell.to_string();
+            let id = ZoneID::StrID(cell.to_string());
 
             let center = LatLng::from(cell);
             let center_point = latlng_to_point(center); // geo::Point
@@ -54,8 +55,10 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
 
             let children_opt = match cell.resolution().succ() {
                 Some(child_res) => {
-                    let children: Vec<String> =
-                        cell.children(child_res).map(|c| c.to_string()).collect();
+                    let children: Vec<ZoneID> = cell
+                        .children(child_res)
+                        .map(|c| ZoneID::StrID(c.to_string()))
+                        .collect();
                     Some(children)
                 }
                 None => {
@@ -67,12 +70,12 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
             let neighbors_opt = Some(
                 cell.grid_disk::<Vec<_>>(1)
                     .into_iter()
-                    .map(|c| c.to_string())
+                    .map(|c| ZoneID::StrID(c.to_string()))
                     .collect(),
             );
 
             Zone {
-                id: ZoneID { id },
+                id,
                 region,
                 vertex_count,
                 center: center_point,

@@ -25,7 +25,7 @@ pub struct Zones {
     pub zones: Vec<Zone>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ZoneID {
     StrID(String),
     IntID(u64),

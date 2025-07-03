@@ -19,11 +19,28 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Zones {
 
             // TODO: Wrap the children and neighbors into an if statement if requested.
             let children = dggrs.getSubZones(id, 1);
+
+            let children: Option<Vec<ZoneID>> = Some(
+                dggrs
+                    .getSubZones(id, 1)
+                    .into_iter()
+                    .map(to_u64_zone_id)
+                    .collect(),
+            );
+
             let mut nb_types: [i32; 6] = [0; 6];
-            let neighbors = dggrs.getZoneNeighbors(id, &mut nb_types);
+            //let neighbors = dggrs.getZoneNeighbors(id, &mut nb_types);
+
+            let neighbors: Option<Vec<ZoneID>> = Some(
+                dggrs
+                    .getZoneNeighbors(id, &mut nb_types)
+                    .into_iter()
+                    .map(to_u64_zone_id)
+                    .collect(),
+            );
 
             Zone {
-                id: ZoneID { id: id.to_string() },
+                id: ZoneID::IntID(id),
                 region,
                 vertex_count: count_edges,
                 center,
@@ -51,4 +68,11 @@ fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
     }
 
     Polygon::new(LineString::from(coords), vec![])
+}
+fn to_u64_zone_id(id: DGGRSZone) -> ZoneID {
+    // If you later want to support both formats dynamically, you can expand this.
+    ZoneID::IntID(id)
+}
+fn to_string_zone_id(id: DGGRSZone) -> ZoneID {
+    ZoneID::StrID(id.to_string())
 }

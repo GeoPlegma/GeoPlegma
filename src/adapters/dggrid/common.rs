@@ -224,10 +224,21 @@ pub fn parse_neighbors(data: &String, depth: &u8) -> Vec<IdArray> {
 pub fn assign_field(zones: &mut Zones, data: Vec<IdArray>, field: &str) {
     for item in data {
         if let Some(ref id_str) = item.id {
-            if let Some(cell) = zones.zones.iter_mut().find(|c| c.id.to_string() == *id_str) {
+            let target_id = ZoneID::StrID(id_str.clone());
+            if let Some(cell) = zones.zones.iter_mut().find(|c| c.id == target_id) {
                 match field {
-                    "children" => cell.children = item.arr.clone(),
-                    "neighbors" => cell.neighbors = item.arr.clone(),
+                    "children" => {
+                        cell.children = item
+                            .arr
+                            .clone()
+                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
+                    }
+                    "neighbors" => {
+                        cell.neighbors = item
+                            .arr
+                            .clone()
+                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
+                    }
                     _ => panic!("Unknown field: {}", field),
                 }
             }
