@@ -105,12 +105,6 @@ fn main() {
         .collect();
     println!("getZoneWGS84Verticies() took {:.2?}", t0.elapsed());
 
-    //println!("{:?}", ga);
-
-    println!("here");
-
-    //std::process::exit(0);
-
     let configs = vec![
         (
             String::from("DGGAL"),
@@ -127,11 +121,11 @@ fn main() {
         //     String::from("IGEO7"),
         //     String::from("054710bfffffffffff"),
         // ),
-        // (
-        //     String::from("H3O"),
-        //     String::from("H3"),
-        //     String::from("811fbffffffffff"),
-        // ),
+        (
+            String::from("H3O"),
+            String::from("H3"),
+            String::from("811fbffffffffff"),
+        ),
     ];
 
     let bbox: Option<Vec<Vec<f64>>> = Some(vec![
@@ -154,7 +148,7 @@ fn main() {
         );
 
         println!("Global with Bbox");
-        let result = generator.zones_from_bbox(2, false, bbox.clone());
+        let result = generator.zones_from_bbox(7, false, bbox.clone());
         println!(
             "{:?} \nGenerated {} zones",
             result.zones,
