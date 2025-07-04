@@ -8,6 +8,36 @@ fn main() {
             String::from("IVEA3H"),
             String::from("1297036692682743552"),
         ),
+        (
+            String::from("DGGAL"),
+            String::from("IVEA9R"),
+            String::from("1297036692682743552"),
+        ),
+        (
+            String::from("DGGAL"),
+            String::from("ISEA3H"),
+            String::from("1297036692682743552"),
+        ),
+        (
+            String::from("DGGAL"),
+            String::from("ISEA9R"),
+            String::from("1297036692682743552"),
+        ),
+        (
+            String::from("DGGAL"),
+            String::from("RTEA3H"),
+            String::from("1297036692682743552"),
+        ),
+        (
+            String::from("DGGAL"),
+            String::from("RTEA9R"),
+            String::from("1297036692682743552"),
+        ),
+        // (
+        //     String::from("DGGAL"),
+        //     String::from("rHEALPix"),
+        //     String::from("1297036692682743552"),
+        // ),
         // (
         //     String::from("DGGRID"),
         //     String::from("ISEA3H"),

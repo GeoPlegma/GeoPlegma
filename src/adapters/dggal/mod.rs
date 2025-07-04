@@ -9,4 +9,4 @@
 
 pub mod common;
 pub mod dggal;
-pub mod ivea3h;
+pub mod grids;

@@ -18,22 +18,32 @@ use crate::adapters::dggal::common::{ids_to_zones, to_geo_extent, to_geo_point};
 use dggal::{DGGAL, DGGRS};
 use std::env;
 
-pub struct Ivea3hImpl {
+pub struct DggalImpl {
     pub adapter: DggalAdapter,
+    pub grid_name: String,
 }
 
-impl Ivea3hImpl {
-    pub fn new() -> Self {
+//impl Ivea3hImpl {
+//    pub fn new() -> Self {
+//        Self {
+//            adapter: DggalAdapter::new(),
+//        }
+//    }
+//}
+//
+//impl Default for Ivea3hImpl {
+//    fn default() -> Self {
+//        Self {
+//            adapter: DggalAdapter::default(),
+//        }
+//    }
+//}
+
+impl DggalImpl {
+    pub fn new(grid_name: &str) -> Self {
         Self {
             adapter: DggalAdapter::new(),
-        }
-    }
-}
-
-impl Default for Ivea3hImpl {
-    fn default() -> Self {
-        Self {
-            adapter: DggalAdapter::default(),
+            grid_name: grid_name.to_string(),
         }
     }
 }
@@ -44,11 +54,11 @@ pub struct DGGALContext {
     pub dggrs: DGGRS,
 }
 
-fn get_dggal_context() -> DGGALContext {
+fn get_dggal_context(grid_name: &str) -> DGGALContext {
     let args: Vec<String> = env::args().collect();
     let my_app = Application::new(&args);
     let dggal = DGGAL::new(&my_app);
-    let dggrs: DGGRS = DGGRS::new(&dggal, "IVEA3H").expect("Unknown DGGRS");
+    let dggrs: DGGRS = DGGRS::new(&dggal, grid_name).expect("Unknown DGGRS");
     DGGALContext {
         _app: my_app,
         _dggal: dggal,
@@ -56,13 +66,9 @@ fn get_dggal_context() -> DGGALContext {
     }
 }
 
-impl DggrsPort for Ivea3hImpl {
+impl DggrsPort for DggalImpl {
     fn zones_from_bbox(&self, depth: u8, densify: bool, bbox: Option<Vec<Vec<f64>>>) -> Zones {
-        let ctx = get_dggal_context();
-        //let args: Vec<String> = env::args().collect();
-        //let my_app = Application::new(&args);
-        //let dggal = DGGAL::new(&my_app);
-        //let dggrs: DGGRS = DGGRS::new(&dggal, "IVEA3H").expect("Unknown DGGRS");
+        let ctx = get_dggal_context(&self.grid_name);
         let max_depth = ctx.dggrs.getMaxDepth();
         let capped_depth = if depth as i32 > max_depth {
             max_depth
@@ -83,7 +89,7 @@ impl DggrsPort for Ivea3hImpl {
         ids_to_zones(ctx.dggrs, zones)
     }
     fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Zones {
-        let ctx = get_dggal_context();
+        let ctx = get_dggal_context(&self.grid_name);
         let zone = ctx
             .dggrs
             .getZoneFromWGS84Centroid(depth as i32, &to_geo_point(point));
@@ -91,7 +97,7 @@ impl DggrsPort for Ivea3hImpl {
         ids_to_zones(ctx.dggrs, zones)
     }
     fn zones_from_parent(&self, depth: u8, parent_zone_id: String, densify: bool) -> Zones {
-        let ctx = get_dggal_context();
+        let ctx = get_dggal_context(&self.grid_name);
         let max_depth = ctx.dggrs.getMaxDepth();
 
         let capped_depth = if depth as i32 > max_depth {
@@ -106,7 +112,7 @@ impl DggrsPort for Ivea3hImpl {
         ids_to_zones(ctx.dggrs, zones)
     }
     fn zone_from_id(&self, zone_id: String, densify: bool) -> Zones {
-        let ctx = get_dggal_context();
+        let ctx = get_dggal_context(&self.grid_name);
         let num: u64 = zone_id.parse::<u64>().expect("Invalid u64 string"); // FIX: parent_zone_id needs to be the ZoneID enum not String
         let zones = vec![num];
         ids_to_zones(ctx.dggrs, zones)
