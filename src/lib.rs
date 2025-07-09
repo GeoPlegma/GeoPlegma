@@ -10,6 +10,7 @@
 #![doc = include_str!("../README.md")]
 pub mod adapters;
 pub mod dggrs;
+pub mod error;
 pub mod factory;
 pub mod models;
 pub mod ports;

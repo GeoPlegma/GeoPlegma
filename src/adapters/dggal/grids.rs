@@ -7,15 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::adapters::dggal::common::{ids_to_zones, to_geo_extent, to_geo_point};
 use crate::adapters::dggal::dggal::DggalAdapter;
+use crate::error::port::PortError;
 use crate::models::common::Zones;
 use crate::ports::dggrs::DggrsPort;
-use geo::Point;
-extern crate ecrt;
-use ecrt::Application;
-extern crate dggal;
-use crate::adapters::dggal::common::{ids_to_zones, to_geo_extent, to_geo_point};
 use dggal::{DGGAL, DGGRS};
+use dggal_rust::dggal;
+use dggal_rust::ecrt;
+use ecrt::Application;
+use geo::Point;
 use std::env;
 
 pub struct DggalImpl {
@@ -67,7 +68,12 @@ fn get_dggal_context(grid_name: &str) -> DGGALContext {
 }
 
 impl DggrsPort for DggalImpl {
-    fn zones_from_bbox(&self, depth: u8, densify: bool, bbox: Option<Vec<Vec<f64>>>) -> Zones {
+    fn zones_from_bbox(
+        &self,
+        depth: u8,
+        densify: bool,
+        bbox: Option<Vec<Vec<f64>>>,
+    ) -> Result<Zones, PortError> {
         let ctx = get_dggal_context(&self.grid_name);
         let max_depth = ctx.dggrs.getMaxDepth();
         let capped_depth = if depth as i32 > max_depth {
@@ -79,24 +85,28 @@ impl DggrsPort for DggalImpl {
         let zones = if let Some(b) = bbox {
             ctx.dggrs.listZones(capped_depth, &to_geo_extent(Some(b)))
         } else {
-            println!("here");
             ctx.dggrs.listZones(
                 capped_depth,
-                &to_geo_extent(Some(vec![vec![-90.0, -180.0], vec![90.0, 180.0]])),
+                &to_geo_extent(Some(vec![vec![-90.0, -180.0], vec![90.0, 180.0]])), // FIX: Use the geo Rect struct
             )
         };
 
-        ids_to_zones(ctx.dggrs, zones)
+        Ok(ids_to_zones(ctx.dggrs, zones)?)
     }
-    fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Zones {
+    fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Result<Zones, PortError> {
         let ctx = get_dggal_context(&self.grid_name);
         let zone = ctx
             .dggrs
             .getZoneFromWGS84Centroid(depth as i32, &to_geo_point(point));
         let zones = vec![zone];
-        ids_to_zones(ctx.dggrs, zones)
+        Ok(ids_to_zones(ctx.dggrs, zones)?)
     }
-    fn zones_from_parent(&self, depth: u8, parent_zone_id: String, densify: bool) -> Zones {
+    fn zones_from_parent(
+        &self,
+        depth: u8,
+        parent_zone_id: String,
+        densify: bool,
+    ) -> Result<Zones, PortError> {
         let ctx = get_dggal_context(&self.grid_name);
         let max_depth = ctx.dggrs.getMaxDepth();
 
@@ -107,14 +117,15 @@ impl DggrsPort for DggalImpl {
         };
 
         let num: u64 = parent_zone_id.parse::<u64>().expect("Invalid u64 string"); // FIX: parent_zone_id needs to be the ZoneID enum not String
-        let zones = ctx.dggrs.getSubZones(num, 5);
+        let zones = ctx.dggrs.getSubZones(num, capped_depth);
 
-        ids_to_zones(ctx.dggrs, zones)
+        Ok(ids_to_zones(ctx.dggrs, zones)?)
     }
-    fn zone_from_id(&self, zone_id: String, densify: bool) -> Zones {
+    fn zone_from_id(&self, zone_id: String, densify: bool) -> Result<Zones, PortError> {
         let ctx = get_dggal_context(&self.grid_name);
         let num: u64 = zone_id.parse::<u64>().expect("Invalid u64 string"); // FIX: parent_zone_id needs to be the ZoneID enum not String
         let zones = vec![num];
-        ids_to_zones(ctx.dggrs, zones)
+
+        Ok(ids_to_zones(ctx.dggrs, zones)?)
     }
 }

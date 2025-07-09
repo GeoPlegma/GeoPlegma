@@ -1,12 +1,12 @@
+use crate::error::dggal::DggalError;
 use crate::models::common::{Zone, ZoneID, Zones};
-use dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
+use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
 use geo::LineString;
 use geo::Point;
 use geo::Polygon;
 use geo::coord;
-use std::f64::consts::PI;
 
-pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Zones {
+pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalError> {
     let zones = ids
         .into_iter()
         .map(|id| {
@@ -16,14 +16,22 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Zones {
             let center_point = dggrs.getZoneWGS84Centroid(id);
             let center: Point<f64> = to_point(&center_point);
 
-            let count_edges: u32 = dggrs.countZoneEdges(id).try_into().unwrap();
+            let count_edges: u32 = dggrs.countZoneEdges(id).try_into().unwrap(); // NOTE: Implement proper error ahndling in error.rs (to be created) and do pattern matching here. 
+            //
+            //
+            let count_edges: u32 = dggrs.countZoneEdges(id).try_into().map_err(|e| {
+                DggalError::EdgeCountConversion {
+                    zone_id: id.to_string(),
+                    source: e,
+                }
+            })?;
 
             // TODO: Wrap the children and neighbors into an if statement if requested.
             //let children = dggrs.getSubZones(id, 1);
 
             let children: Option<Vec<ZoneID>> = Some(
                 dggrs
-                    .getSubZones(id, 1)
+                    .getZoneChildren(id)
                     .into_iter()
                     .map(to_u64_zone_id)
                     .collect(),
@@ -40,18 +48,18 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Zones {
                     .collect(),
             );
 
-            Zone {
+            Ok(Zone {
                 id: ZoneID::IntID(id),
                 region,
                 vertex_count: count_edges,
                 center,
                 children, // TODO: we need to make an enum for string and integer based indicies
                 neighbors,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<Zone>, DggalError>>()?;
 
-    Zones { zones }
+    Ok(Zones { zones })
 }
 
 fn to_point(pt: &GeoPoint) -> Point<f64> {
@@ -61,7 +69,7 @@ fn to_point(pt: &GeoPoint) -> Point<f64> {
 fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
     let mut coords: Vec<_> = points
         .iter()
-        .map(|pt| coord! { x: rad_to_deg(pt.lon), y: rad_to_deg(pt.lat) })
+        .map(|pt| coord! { x: pt.lon.to_degrees(), y: pt.lat.to_degrees() })
         .collect();
 
     if coords.first() != coords.last() {
@@ -76,24 +84,10 @@ fn to_u64_zone_id(id: DGGRSZone) -> ZoneID {
     ZoneID::IntID(id)
 }
 
-fn to_string_zone_id(id: DGGRSZone) -> ZoneID {
-    ZoneID::StrID(id.to_string())
-}
-
-// NOTE: Place this somewhere else
-fn deg_to_rad(deg: f64) -> f64 {
-    deg * PI / 180.0
-}
-
-// NOTE: Place this somewhere else
-fn rad_to_deg(rad: f64) -> f64 {
-    rad * 180.0 / PI
-}
-
 pub fn to_geo_point(pt: Point) -> GeoPoint {
     GeoPoint {
-        lat: deg_to_rad(pt.y()),
-        lon: deg_to_rad(pt.x()),
+        lat: pt.y().to_radians(),
+        lon: pt.x().to_radians(),
     }
 }
 
@@ -101,15 +95,15 @@ pub fn to_geo_extent(bbox: Option<Vec<Vec<f64>>>) -> GeoExtent {
     match bbox {
         Some(coords) if coords.len() == 2 && coords[0].len() == 2 && coords[1].len() == 2 => {
             let ll = GeoPoint {
-                lat: deg_to_rad(coords[0][1]),
-                lon: deg_to_rad(coords[0][0]),
+                lat: coords[0][1].to_radians(),
+                lon: coords[0][0].to_radians(),
             };
             let ur = GeoPoint {
-                lat: deg_to_rad(coords[1][1]),
-                lon: deg_to_rad(coords[1][0]),
+                lat: coords[1][1].to_radians(),
+                lon: coords[1][0].to_radians(),
             };
             GeoExtent { ll, ur }
         }
-        _ => panic!("Invalid bounding box format"),
+        _ => panic!("Invalid bounding box format"), // FIX: remove panic. bbox: Option<Vec<Vec<f64>>> has to be replaced with geo::geometry::Rect here https://docs.rs/geo/latest/geo/geometry/struct.Rect.html
     }
 }
