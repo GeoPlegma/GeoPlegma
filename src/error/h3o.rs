@@ -14,6 +14,9 @@ pub enum H3oError {
     #[error("Invalid zone ID format: '{0}'")]
     InvalidZoneIdFormat(String),
 
+    #[error("Invalid H3 zone ID `{0}`: {1}")]
+    InvalidZoneID(String, #[source] h3o::error::InvalidCellIndex),
+
     #[error("Missing required zone data")]
     MissingZoneData,
 }

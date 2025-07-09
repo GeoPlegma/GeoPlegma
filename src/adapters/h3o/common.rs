@@ -1,4 +1,7 @@
-use crate::models::common::{Zone, ZoneID, Zones};
+use crate::{
+    error::h3o::H3oError,
+    models::common::{Zone, ZoneID, Zones},
+};
 use geo::{Coord, CoordsIter, LineString, Point, Polygon};
 use h3o::{Boundary, CellIndex, LatLng, Resolution};
 
@@ -38,8 +41,8 @@ pub fn latlng_to_point(latlng: LatLng) -> Point {
     Point::new(latlng.lng(), latlng.lat())
 }
 
-pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
-    let zones = cells
+pub fn cells_to_zones(cells: Vec<CellIndex>) -> Result<Zones, H3oError> {
+    let zones: Vec<Zone> = cells
         .into_iter()
         .map(|cell| {
             //let id = cell.to_string();
@@ -74,16 +77,16 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
                     .collect(),
             );
 
-            Zone {
+            Ok(Zone {
                 id,
                 region,
                 vertex_count,
                 center: center_point,
                 children: children_opt,
                 neighbors: neighbors_opt,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<Zone>, H3oError>>()?;
 
-    Zones { zones }
+    Ok(Zones { zones })
 }

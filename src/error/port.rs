@@ -11,8 +11,8 @@ pub enum PortError {
     #[error("DGGRID error: {0}")]
     Dggrid(#[from] DggridError),
 
-    #[error("H3 error: {0}")]
-    H3(#[from] H3oError),
+    #[error("H3o error: {0}")]
+    H3o(#[from] H3oError),
 
     #[error("Unsupported tool/grid combination: {tool}, {grid}")]
     UnsupportedCombo { tool: String, grid: String },

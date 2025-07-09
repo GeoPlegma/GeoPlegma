@@ -7,7 +7,7 @@ use geo::Polygon;
 use geo::coord;
 
 pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalError> {
-    let zones = ids
+    let zones: Vec<Zone> = ids
         .into_iter()
         .map(|id| {
             let dggal_geo_points: Vec<GeoPoint> = dggrs.getZoneWGS84Vertices(id);
