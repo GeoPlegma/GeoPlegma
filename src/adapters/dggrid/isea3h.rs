@@ -9,6 +9,7 @@
 
 use crate::adapters::dggrid::common;
 use crate::adapters::dggrid::dggrid::DggridAdapter;
+use crate::error::port::PortError;
 use crate::models::common::Zones;
 use crate::ports::dggrs::DggrsPort;
 use core::f64;
@@ -42,7 +43,12 @@ impl Default for Isea3hImpl {
 }
 
 impl DggrsPort for Isea3hImpl {
-    fn zones_from_bbox(&self, depth: u8, densify: bool, bbox: Option<Vec<Vec<f64>>>) -> Zones {
+    fn zones_from_bbox(
+        &self,
+        depth: u8,
+        densify: bool,
+        bbox: Option<Vec<Vec<f64>>>,
+    ) -> Result<Zones, PortError> {
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
             common::dggrid_setup(&self.adapter.workdir);
 
@@ -85,10 +91,10 @@ impl DggrsPort for Isea3hImpl {
             &neighbor_path,
             &bbox_path,
         );
-        result
+        Ok(result)
     }
 
-    fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Zones {
+    fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Result<Zones, PortError> {
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
             common::dggrid_setup(&self.adapter.workdir);
 
@@ -139,7 +145,7 @@ impl DggrsPort for Isea3hImpl {
             &bbox_path,
         );
         let _ = fs::remove_file(&input_path);
-        result
+        Ok(result)
     }
     fn zones_from_parent(
         &self,
@@ -147,7 +153,7 @@ impl DggrsPort for Isea3hImpl {
         parent_zone_id: String, // ToDo: needs validation function
         // clip_cell_res: u8,
         densify: bool,
-    ) -> Zones {
+    ) -> Result<Zones, PortError> {
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
             common::dggrid_setup(&self.adapter.workdir);
 
@@ -192,13 +198,13 @@ impl DggrsPort for Isea3hImpl {
             &neighbor_path,
             &bbox_path,
         );
-        result
+        Ok(result)
     }
     fn zone_from_id(
         &self,
         zone_id: String, // ToDo: needs validation function
         densify: bool,
-    ) -> Zones {
+    ) -> Result<Zones, PortError> {
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
             common::dggrid_setup(&self.adapter.workdir);
 
@@ -251,7 +257,7 @@ impl DggrsPort for Isea3hImpl {
             &neighbor_path,
             &bbox_path,
         );
-        result
+        Ok(result)
     }
 }
 
