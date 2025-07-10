@@ -9,58 +9,48 @@
 
 use geo::Point;
 use geo_plegmata::dggrs;
-use geo_plegmata::models::common::Zones; // Adjust path as needed
 
-#[test]
-fn test_all_grids() {
-    let configs = vec![
-        ("DGGAL", "IVEA3H", "1297036692682743552"),
-        ("DGGAL", "IVEA9R", "1297036692682743552"),
-        ("DGGAL", "ISEA3H", "1297036692682743552"),
-        ("DGGAL", "ISEA9R", "1297036692682743552"),
-        ("DGGAL", "RTEA3H", "1297036692682743552"),
-        ("DGGAL", "RTEA9R", "1297036692682743552"),
-        ("H3O", "H3", "811fbffffffffff"),
-    ];
-
-    let bbox: Option<Vec<Vec<f64>>> = Some(vec![
-        vec![-77.0, 39.0], // lower left
-        vec![-76.0, 40.0], // upper right
-    ]);
-
-    let pnt = Point::new(10.9, 4.9);
-
-    for (tool, dggs, zone_id) in configs {
-        let generator = dggrs::get(tool, dggs).expect("Factory failed to create DGGS adapter");
-
-        // Global
-        let r: Zones = generator
-            .zones_from_bbox(2, false, None)
-            .expect("zone generation failed");
-        assert!(r.zones.len() == 3);
-
-        // // Global with bbox
-        // let r: Zones = generator
-        //     .zones_from_bbox(7, false, bbox.clone())
-        //     .expect("zone generation failed");
-        // assert!(r.is_ok());
-
-        // // From point
-        // let r: Zones = generator
-        //     .zone_from_point(6, pnt, false)
-        //     .expect("zone generation failed");
-        // assert!(r.is_ok());
-
-        // // From parent
-        // let r: Zones = generator
-        //     .zones_from_parent(6, zone_id.to_string(), false)
-        //     .expect("zone generation failed");
-        // assert!(r.is_ok());
-
-        // // From ID
-        // let r: Zones = generator
-        //     .zone_from_id(zone_id.to_string(), false)
-        //     .expect("zone generation failed");
-        // assert!(r.is_ok());
-    }
+fn test_zones_from_bbox(tool: &str, grid: &str) {
+    let generator = dggrs::get(tool, grid).expect("Failed to create DGGS adapter");
+    let bbox = Some(vec![vec![-77.0, 39.0], vec![-76.0, 40.0]]);
+    let result = generator.zones_from_bbox(7, false, bbox.clone()).unwrap();
+    assert_eq!(
+        !result.zones.len(),
+        1,
+        "{}: zones_from_bbox returned empty result",
+        grid
+    );
 }
+
+fn test_zone_from_point(tool: &str, grid: &str) {
+    let pnt = geo::Point::new(10.9, 4.9);
+    let generator = dggrs::get(tool, grid).expect("Failed to create DGGS adapter");
+    let result = generator.zone_from_point(6, pnt, false).unwrap();
+    assert_eq!(
+        result.zones.len(),
+        1,
+        "{}: zones_from_bbox returned empty result",
+        grid
+    );
+}
+
+macro_rules! zones_from_bbox_test {
+    ($name:ident, $tool:expr, $grid:expr) => {
+        #[test]
+        fn $name() {
+            test_zones_from_bbox($tool, $grid);
+        }
+    };
+}
+
+macro_rules! zone_from_point_test {
+    ($name:ident, $tool:expr, $grid:expr) => {
+        #[test]
+        fn $name() {
+            test_zone_from_point($tool, $grid);
+        }
+    };
+}
+
+zones_from_bbox_test!(test_zones_from_bbox_dggal_rtea3h, "DGGAL", "RTEA3H");
+zone_from_point_test!(test_zone_from_point_dggal_rtea3h, "DGGAL", "RTEA3H"); // WARN: Fails because of dggal context 

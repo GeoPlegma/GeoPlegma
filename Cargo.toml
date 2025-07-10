@@ -14,8 +14,6 @@ dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "uni
 rayon = "1.10.0"
 thiserror = "2.0.12"
 
-[dev-dependencies]
-
 [lib]
 name = "geo_plegmata"
 path = "src/lib.rs"

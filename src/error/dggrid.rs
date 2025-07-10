@@ -7,6 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use std::io;
 use std::num::TryFromIntError;
 use thiserror::Error;
 
@@ -25,4 +26,11 @@ pub enum DggridError {
 
     #[error("Missing required zone data")]
     MissingZoneData,
+
+    #[error("Failed to read file {path}: {source}")]
+    FileRead {
+        path: String,
+        #[source]
+        source: io::Error,
+    },
 }
