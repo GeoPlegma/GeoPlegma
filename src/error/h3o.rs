@@ -28,6 +28,9 @@ pub enum H3oError {
         source: InvalidCellIndex,
     },
 
+    #[error("Invalid resolution for H3 zone ID {zone_id}")]
+    ResolutionLimitReached { zone_id: String },
+
     #[error("Missing required zone data")]
     MissingZoneData,
 }

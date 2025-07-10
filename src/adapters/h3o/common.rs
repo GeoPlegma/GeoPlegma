@@ -45,7 +45,6 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Result<Zones, H3oError> {
     let zones: Vec<Zone> = cells
         .into_iter()
         .map(|cell| {
-            //let id = cell.to_string();
             let id = ZoneID::StrID(cell.to_string());
 
             let center = LatLng::from(cell);
@@ -56,19 +55,18 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Result<Zones, H3oError> {
 
             let vertex_count = region.exterior().coords_count() as u32;
 
-            let children_opt = match cell.resolution().succ() {
-                Some(child_res) => {
-                    let children: Vec<ZoneID> = cell
-                        .children(child_res)
-                        .map(|c| ZoneID::StrID(c.to_string()))
-                        .collect();
-                    Some(children)
-                }
-                None => {
-                    eprintln!("Max resolution reached for cell {}", id); // TODO: use proper error handling and not eprintln
-                    None
-                }
-            };
+            let child_res = cell
+                .resolution()
+                .succ() // succ() returns an Option, therefore we can use ok_or_else in the next line and not map_err
+                .ok_or_else(|| H3oError::ResolutionLimitReached {
+                    zone_id: cell.to_string(),
+                })?;
+
+            let children_opt = Some(
+                cell.children(child_res)
+                    .map(|c| ZoneID::StrID(c.to_string()))
+                    .collect(),
+            );
 
             let neighbors_opt = Some(
                 cell.grid_disk::<Vec<_>>(1)
