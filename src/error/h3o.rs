@@ -1,3 +1,5 @@
+use h3o::error::InvalidCellIndex;
+use h3o::error::InvalidResolution;
 use std::num::TryFromIntError;
 use thiserror::Error;
 
@@ -11,11 +13,20 @@ pub enum H3oError {
         source: TryFromIntError,
     },
 
-    #[error("Invalid zone ID format: '{0}'")]
-    InvalidZoneIdFormat(String),
+    #[error("Depth {depth} for {zone_id} is to high: {source}")]
+    InvalidResolution {
+        zone_id: String,
+        depth: u8,
+        #[source]
+        source: InvalidResolution, // TODO: is this the right error from the h3o crate?
+    },
 
-    #[error("Invalid H3 zone ID `{0}`: {1}")]
-    InvalidZoneID(String, #[source] h3o::error::InvalidCellIndex),
+    #[error("Invalid H3 zone ID {zone_id}: {source}")]
+    InvalidZoneID {
+        zone_id: String,
+        #[source]
+        source: InvalidCellIndex,
+    },
 
     #[error("Missing required zone data")]
     MissingZoneData,

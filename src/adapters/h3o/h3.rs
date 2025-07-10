@@ -89,23 +89,23 @@ impl DggrsPort for H3Impl {
         zone_id: String, // ToDo: needs validation function
         _densify: bool,
     ) -> Result<Zones, PortError> {
-        let parent = match CellIndex::from_str(&zone_id) {
-            Ok(cell) => cell,
-            Err(_) => {
-                eprintln!("Invalid zone_id: {}", zone_id);
-                return Zones { zones: vec![] }; // or handle error differently
-            }
-        };
+        let parent = CellIndex::from_str(&zone_id).map_err(|e| {
+            PortError::H3o(H3oError::InvalidZoneID {
+                zone_id: zone_id.clone(),
+                source: e,
+            })
+        })?;
 
         let base_res = parent.resolution();
+        let next = u8::from(base_res) + depth;
 
-        let target_res = match Resolution::try_from(u8::from(base_res) + depth) {
-            Ok(res) => res,
-            Err(_) => {
-                eprintln!("Resolution exceeds max allowed (15)");
-                return Zones { zones: vec![] };
-            }
-        };
+        let target_res = Resolution::try_from(next).map_err(|e| {
+            PortError::H3o(H3oError::InvalidResolution {
+                zone_id: zone_id.clone(),
+                depth,
+                source: e,
+            })
+        })?;
 
         let children: Vec<CellIndex> = parent.children(target_res).collect();
 
@@ -116,8 +116,12 @@ impl DggrsPort for H3Impl {
         zone_id: String, // ToDo: needs validation function
         _densify: bool,
     ) -> Result<Zones, PortError> {
-        let cell = CellIndex::from_str(&zone_id)
-            .map_err(|e| PortError::H3o(H3oError::InvalidZoneID(zone_id.clone(), e)))?;
+        let cell = CellIndex::from_str(&zone_id).map_err(|e| {
+            PortError::H3o(H3oError::InvalidZoneID {
+                zone_id: zone_id.clone(),
+                source: e,
+            })
+        })?;
 
         Ok(cells_to_zones(vec![cell])?)
     }

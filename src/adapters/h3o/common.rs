@@ -65,7 +65,7 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Result<Zones, H3oError> {
                     Some(children)
                 }
                 None => {
-                    eprintln!("Max resolution reached for cell {}", id);
+                    eprintln!("Max resolution reached for cell {}", id); // TODO: use proper error handling and not eprintln
                     None
                 }
             };
