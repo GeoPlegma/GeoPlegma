@@ -25,4 +25,7 @@ pub enum DggalError {
 
     #[error("Missing required zone data")]
     MissingZoneData,
+
+    #[error("Unknown Grid: {grid_name}")]
+    UnknownGrid { grid_name: String },
 }

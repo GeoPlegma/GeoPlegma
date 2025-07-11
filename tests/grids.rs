@@ -26,6 +26,7 @@ fn test_zone_from_point(tool: &str, grid: &str) {
     let pnt = geo::Point::new(10.9, 4.9);
     let generator = dggrs::get(tool, grid).expect("Failed to create DGGS adapter");
     let result = generator.zone_from_point(6, pnt, false).unwrap();
+    println!("{}", result.zones.len());
     assert_eq!(
         result.zones.len(),
         1,
@@ -52,5 +53,6 @@ macro_rules! zone_from_point_test {
     };
 }
 
+// WARN: Fails because of dggal, run tests with RUST_TEST_THREADS=1 cargo test
 zones_from_bbox_test!(test_zones_from_bbox_dggal_rtea3h, "DGGAL", "RTEA3H");
-zone_from_point_test!(test_zone_from_point_dggal_rtea3h, "DGGAL", "RTEA3H"); // WARN: Fails because of dggal context 
+zone_from_point_test!(test_zone_from_point_dggal_rtea3h, "DGGAL", "RTEA3H");
