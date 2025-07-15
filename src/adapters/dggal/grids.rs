@@ -19,6 +19,15 @@ use ecrt::Application;
 use geo::Point;
 use std::env;
 
+// fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
+//     let args: Vec<String> = env::args().collect();
+//     let my_app = Application::new(&args);
+//     let dggal = DGGAL::new(&my_app);
+//     DGGRS::new(&dggal, grid_name).map_err(|_| DggalError::UnknownGrid {
+//         grid_name: grid_name.to_string(),
+//     })
+// }
+
 pub struct DggalImpl {
     pub grid_name: String,
 }
@@ -31,11 +40,11 @@ impl DggalImpl {
     }
 }
 
+use crate::adapters::dggal::context::GLOBAL_DGGAL;
+
 fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
-    let args: Vec<String> = env::args().collect();
-    let my_app = Application::new(&args);
-    let dggal = DGGAL::new(&my_app);
-    DGGRS::new(&dggal, grid_name).map_err(|_| DggalError::UnknownGrid {
+    let dggal = GLOBAL_DGGAL.lock().map_err(|_| DggalError::LockFailure)?;
+    DGGRS::new(&*dggal, grid_name).map_err(|_| DggalError::UnknownGrid {
         grid_name: grid_name.to_string(),
     })
 }

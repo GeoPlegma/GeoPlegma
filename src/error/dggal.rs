@@ -28,4 +28,7 @@ pub enum DggalError {
 
     #[error("Unknown Grid: {grid_name}")]
     UnknownGrid { grid_name: String },
+
+    #[error("Failed to acquire global lock")]
+    LockFailure,
 }
