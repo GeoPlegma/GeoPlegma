@@ -7,6 +7,12 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub mod common;
-pub mod h3;
-pub mod h3o;
+use std::num::TryFromIntError;
+use thiserror::Error;
+
+/// Error type for instantiating DggrsPort adapters via the factory.
+#[derive(Debug, Error)]
+pub enum FactoryError {
+    #[error("Unsupported combination: tool='{tool}', dggrs='{dggrs}'")]
+    UnsupportedCombination { tool: String, dggrs: String },
+}

@@ -7,6 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::error::dggrid::DggridError;
 use crate::models::common::{Zone, ZoneID, Zones};
 use core::f64;
 use geo::geometry::{LineString, Point, Polygon};
@@ -95,20 +96,20 @@ pub fn dggrid_parse(
     children_path: &PathBuf,
     neighbor_path: &PathBuf,
     depth: &u8,
-) -> Zones {
-    let aigen_data = read_file(&aigen_path);
-    let mut result = parse_aigen(&aigen_data, &depth);
-    let children_data = read_file(&children_path);
-    let children = parse_children(&children_data, &depth);
+) -> Result<Zones, DggridError> {
+    let aigen_data = read_file(&aigen_path)?;
+    let mut result = parse_aigen(&aigen_data, &depth)?;
+    let children_data = read_file(&children_path)?;
+    let children = parse_children(&children_data, &depth)?;
     assign_field(&mut result, children, "children");
 
-    let neighbor_data = read_file(&neighbor_path);
-    let neighbors = parse_neighbors(&neighbor_data, &depth);
+    let neighbor_data = read_file(&neighbor_path)?;
+    let neighbors = parse_neighbors(&neighbor_data, &depth)?;
     assign_field(&mut result, neighbors, "neighbors");
-    result
+    Ok(result)
 }
 
-pub fn parse_aigen(data: &String, depth: &u8) -> Zones {
+pub fn parse_aigen(data: &String, depth: &u8) -> Result<Zones, DggridError> {
     let mut zone_id = ZoneID::default();
     let mut zones = Zones { zones: Vec::new() };
 
@@ -166,7 +167,7 @@ pub fn parse_aigen(data: &String, depth: &u8) -> Zones {
             v_count = 0;
         }
     }
-    zones
+    Ok(zones)
 }
 pub fn dggrid_cleanup(
     meta_path: &PathBuf,
@@ -182,8 +183,9 @@ pub fn dggrid_cleanup(
     let _ = fs::remove_file(bbox_path);
 }
 
-pub fn parse_children(data: &String, depth: &u8) -> Vec<IdArray> {
-    data.lines()
+pub fn parse_children(data: &String, depth: &u8) -> Result<Vec<IdArray>, DggridError> {
+    Ok(data
+        .lines()
         .filter_map(|line| {
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.is_empty() {
@@ -199,10 +201,11 @@ pub fn parse_children(data: &String, depth: &u8) -> Vec<IdArray> {
 
             Some(IdArray { id, arr: Some(arr) })
         })
-        .collect()
+        .collect())
 }
-pub fn parse_neighbors(data: &String, depth: &u8) -> Vec<IdArray> {
-    data.lines()
+pub fn parse_neighbors(data: &String, depth: &u8) -> Result<Vec<IdArray>, DggridError> {
+    Ok(data
+        .lines()
         .filter_map(|line| {
             let parts: Vec<&str> = line.split_whitespace().collect();
             if parts.is_empty() {
@@ -218,16 +221,27 @@ pub fn parse_neighbors(data: &String, depth: &u8) -> Vec<IdArray> {
 
             Some(IdArray { id, arr: Some(arr) })
         })
-        .collect()
+        .collect())
 }
 
 pub fn assign_field(zones: &mut Zones, data: Vec<IdArray>, field: &str) {
     for item in data {
         if let Some(ref id_str) = item.id {
-            if let Some(cell) = zones.zones.iter_mut().find(|c| c.id.to_string() == *id_str) {
+            let target_id = ZoneID::StrID(id_str.clone());
+            if let Some(cell) = zones.zones.iter_mut().find(|c| c.id == target_id) {
                 match field {
-                    "children" => cell.children = item.arr.clone(),
-                    "neighbors" => cell.neighbors = item.arr.clone(),
+                    "children" => {
+                        cell.children = item
+                            .arr
+                            .clone()
+                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
+                    }
+                    "neighbors" => {
+                        cell.neighbors = item
+                            .arr
+                            .clone()
+                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
+                    }
                     _ => panic!("Unknown field: {}", field),
                 }
             }
@@ -244,18 +258,14 @@ pub fn print_file(file: PathBuf) {
     }
 }
 
-/// Read aigen file produced by DGGRID
-/// Todo: this is inefficient, use the read_lines function as in print_file
-/// https://doc.rust-lang.org/rust-by-example/std_misc/file/read_lines.html
-pub fn read_file(path: &Path) -> String {
-    let data = fs::read_to_string(path).unwrap_or_else(|e| {
-        panic!(
-            "Unable to read file {}: {}",
-            path.to_str().unwrap_or("unknown"),
-            e
-        )
-    });
-    data
+// Read aigen file produced by DGGRID
+// Todo: this is inefficient, use the read_lines function as in print_file
+// https://doc.rust-lang.org/rust-by-example/std_misc/file/read_lines.html
+pub fn read_file(path: &Path) -> Result<String, DggridError> {
+    fs::read_to_string(path).map_err(|e| DggridError::FileRead {
+        path: path.display().to_string(),
+        source: e,
+    })
 }
 
 pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>

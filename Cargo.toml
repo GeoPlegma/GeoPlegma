@@ -4,14 +4,18 @@ version = "0.2.0"
 license = "MIT OR Apache-2.0"
 edition = "2024"
 readme = "README.md"
+rust-version = "1.88"
 
 [dependencies]
 geo = "0.30.0"
 rand = "0.8.5"
 tracing = "0.1.41"
 h3o = { version = "0.8.0", features = ["geo"] }
-
-[dev-dependencies]
+dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/update-unified-crate"}
+#dggal-rust = {path = "../dggal-rust"}
+rayon = "1.10.0"
+thiserror = "2.0.12"
+once_cell = "1.21.3"
 
 [lib]
 name = "geoplegma"

@@ -7,27 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::ports::dggrs::DggrsPort;
+pub struct DggalAdapter {}
 
-pub struct DggalImpl;
+impl DggalAdapter {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
-impl DggrsPort for DggalImpl {
-    fn zones_from_bbox(
-        &self,
-        dggs_type: String,
-        depth: u8,
-        densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Zones {
-        // call dggal here and return Zones
-    }
-    fn zone_from_point(&self, dggs_type: String, depth: u8, point: Point, densify: bool) -> Zones {
-        // etc.
-    }
-    fn zones_from_parent(&self, ...) -> Zones {
-        // ...
-    }
-    fn zone_from_id(&self, ...) -> Zones {
-        // ...
+impl Default for DggalAdapter {
+    fn default() -> Self {
+        Self {}
     }
 }

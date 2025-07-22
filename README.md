@@ -80,16 +80,14 @@ Make sure DGGRID is compiled and available on your system. Remember the path whe
 ## Usage Example
 
 Create a new crate with `cargo new` and add this dependency in your `cargo.toml`. I expect to publish this to crates.io in the future, which will simplify this with `cargo add dggrs`.
-
-
-```toml
+````rust
 [dependencies]
 dggrs = {version = "0.1.0", git = git@gitlab.com/geoinsight/dggrs.git}
 ```
 
 In your `main.rs` add the following code. In this example the DGGRID generator service is instantiated using the path to the DGGRID executable `dggrid` and a path to the work directory `/dev/shm`. 
 
-```rust
+````rust
 use geo::geometry::Point;
 use geoplegma::dggrs;
 fn main() {
@@ -167,3 +165,11 @@ fn main() {
 ````
 
 Instead of printing out the length of `result.zones.len()` you can also print out the struct itself.
+
+Dependencies
+------------
+This crate depends on `dggal-rust` from https://github.com/GeoPlegma/dggal-rust.
+
+Testing
+-------
+There is a test setup for grids in `tests/grids` which you can run with `cargo test --test` (if you only run `cargo test` it will fail as it would also test the documentation and the code in this `README.md`

@@ -1,4 +1,16 @@
-use crate::models::common::{Zone, ZoneID, Zones};
+// Copyright 2025 contributors to the GeoPlegmata project.
+// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+//
+// Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
+// discretion. This file may not be copied, modified, or distributed
+// except according to those terms.
+
+use crate::{
+    error::h3o::H3oError,
+    models::common::{Zone, ZoneID, Zones},
+};
 use geo::{Coord, CoordsIter, LineString, Point, Polygon};
 use h3o::{Boundary, CellIndex, LatLng, Resolution};
 
@@ -38,11 +50,11 @@ pub fn latlng_to_point(latlng: LatLng) -> Point {
     Point::new(latlng.lng(), latlng.lat())
 }
 
-pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
-    let zones = cells
+pub fn cells_to_zones(cells: Vec<CellIndex>) -> Result<Zones, H3oError> {
+    let zones: Vec<Zone> = cells
         .into_iter()
         .map(|cell| {
-            let id = cell.to_string();
+            let id = ZoneID::StrID(cell.to_string());
 
             let center = LatLng::from(cell);
             let center_point = latlng_to_point(center); // geo::Point
@@ -52,35 +64,36 @@ pub fn cells_to_zones(cells: Vec<CellIndex>) -> Zones {
 
             let vertex_count = region.exterior().coords_count() as u32;
 
-            let children_opt = match cell.resolution().succ() {
-                Some(child_res) => {
-                    let children: Vec<String> =
-                        cell.children(child_res).map(|c| c.to_string()).collect();
-                    Some(children)
-                }
-                None => {
-                    eprintln!("Max resolution reached for cell {}", id);
-                    None
-                }
-            };
+            let child_res = cell
+                .resolution()
+                .succ() // succ() returns an Option, therefore we can use ok_or_else in the next line and not map_err
+                .ok_or_else(|| H3oError::ResolutionLimitReached {
+                    zone_id: cell.to_string(),
+                })?;
+
+            let children_opt = Some(
+                cell.children(child_res)
+                    .map(|c| ZoneID::StrID(c.to_string()))
+                    .collect(),
+            );
 
             let neighbors_opt = Some(
                 cell.grid_disk::<Vec<_>>(1)
                     .into_iter()
-                    .map(|c| c.to_string())
+                    .map(|c| ZoneID::StrID(c.to_string()))
                     .collect(),
             );
 
-            Zone {
-                id: ZoneID { id },
+            Ok(Zone {
+                id,
                 region,
                 vertex_count,
                 center: center_point,
                 children: children_opt,
                 neighbors: neighbors_opt,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<Zone>, H3oError>>()?;
 
-    Zones { zones }
+    Ok(Zones { zones })
 }
