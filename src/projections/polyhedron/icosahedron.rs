@@ -131,6 +131,8 @@ impl Polyhedron for Icosahedron {
         ]
     }
 
+    /// Aproximate spherical centroid
+    /// Fast, lies on the unit sphere, stable for icosahedral faces, hierachically consistent
     fn face_center(&self, face_id: usize) -> Vector3D {
         let indices = self.face_vertex_indices();
         let vertices = self.vertices();
@@ -142,7 +144,8 @@ impl Polyhedron for Icosahedron {
         let center = a + b + c;
         center.normalize()
     }
-
+    
+    /// Find the triangle face that contains the point on the sphere
     fn find_face(&self, point: Vector3D) -> Option<usize> {
         let vertices = self.vertices();
         for (face_idx, face) in self.face_vertex_indices().iter().enumerate() {
@@ -240,5 +243,39 @@ impl Polyhedron for Icosahedron {
 
         // atan2 handles all quadrants correctly and is more stable than acos
         cross_magnitude.atan2(dot)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_face_center() {
+        let ico = Icosahedron {};
+        let faces = ico.face_vertex_indices();
+
+        for (i, face) in faces.iter().enumerate() {
+            let v0 = ico.vertices()[face[0]];
+            let v1 = ico.vertices()[face[1]];
+            let v2 = ico.vertices()[face[2]];
+            let center = ico.face_center(i);
+
+            // Check if center it's on the unit sphere
+            let dot = center.dot(center);
+            assert!(
+                (dot - 1.0).abs() < 1e-5,
+                "Face center {} not normalized: norm = {:?}",
+                i,
+                center
+            );
+
+            // Check if center lies inside the triangle
+            assert!(
+                ico.is_point_in_face(center, [v0, v1, v2].to_vec()),
+                "Face center not inside triangle face {}",
+                i
+            );
+        }
     }
 }

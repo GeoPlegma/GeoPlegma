@@ -37,7 +37,7 @@ pub trait Polyhedron {
     fn face_arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths;
     // fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D;
     /// Classic spherical triangle containment test.
-    fn is_point_in_face(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool;
+    fn is_point_in_face(&self, point: Vector3D, face: Vec<Vector3D>) -> bool;
     /// Get angle (in radians) between two unit vectors.
     fn angle_between_unit(&self, u: Vector3D, v: Vector3D) -> f64;
 }
