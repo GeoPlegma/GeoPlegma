@@ -7,7 +7,10 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::{models::vector_3d::Vector3D, projections::layout::traits::Layout};
+use crate::{
+    models::vector_3d::Vector3D,
+    projections::{layout::traits::Layout, polyhedron::traits::VertexIndices},
+};
 use geo::Coord;
 
 use super::traits::{ArcLengths, Polyhedron};
@@ -21,27 +24,146 @@ pub const FACES: u8 = 20;
 pub struct Icosahedron {}
 
 impl Polyhedron for Icosahedron {
-    fn faces(&self) -> u8 {
-        FACES
+    // The 12 points are symmetrically arranged on the sphere and lie at the same distance from the origin, forming a regular icosahedron
+    // They are then nromalized in the sphere
+    // **Returns the actual 3D positions of the three vertices for each face.**
+    fn vertices(&self) -> Vec<Vector3D> {
+        let phi = (1.0 + 5.0f64.sqrt()) / 2.0; // golden ratio
+        vec![
+            Vector3D {
+                x: -1.0,
+                y: phi,
+                z: 0.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: 1.0,
+                y: phi,
+                z: 0.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: -1.0,
+                y: -phi,
+                z: 0.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: 1.0,
+                y: -phi,
+                z: 0.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: 0.0,
+                y: -1.0,
+                z: phi,
+            }
+            .normalize(),
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: phi,
+            }
+            .normalize(),
+            Vector3D {
+                x: 0.0,
+                y: -1.0,
+                z: -phi,
+            }
+            .normalize(),
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: -phi,
+            }
+            .normalize(),
+            Vector3D {
+                x: phi,
+                y: 0.0,
+                z: -1.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: phi,
+                y: 0.0,
+                z: 1.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: -phi,
+                y: 0.0,
+                z: -1.0,
+            }
+            .normalize(),
+            Vector3D {
+                x: -phi,
+                y: 0.0,
+                z: 1.0,
+            }
+            .normalize(),
+        ]
     }
 
-    fn indices(&self) -> Vec<[u8; 3]> {
-        todo!()
+    // **Returns the list of triangle faces as triplets of indices into the vertex array.**
+    fn face_vertex_indices(&self) -> Vec<Vec<usize>> {
+        vec![
+            vec![0, 11, 5],
+            vec![0, 5, 1],
+            vec![0, 1, 7],
+            vec![0, 7, 10],
+            vec![0, 10, 11],
+            vec![1, 5, 9],
+            vec![5, 11, 4],
+            vec![11, 10, 2],
+            vec![10, 7, 6],
+            vec![7, 1, 8],
+            vec![3, 9, 4],
+            vec![3, 4, 2],
+            vec![3, 2, 6],
+            vec![3, 6, 8],
+            vec![3, 8, 9],
+            vec![4, 9, 5],
+            vec![2, 4, 11],
+            vec![6, 2, 10],
+            vec![8, 6, 7],
+            vec![9, 8, 1],
+        ]
     }
 
-    fn unit_vectors(&self) -> Vec<Vector3D> {
-        todo!()
+    fn face_center(&self, face_id: usize) -> Vector3D {
+        let indices = self.face_vertex_indices();
+        let vertices = self.vertices();
+        let face = &indices[face_id];
+        let a = vertices[face[0]];
+        let b = vertices[face[1]];
+        let c = vertices[face[2]];
+
+        let center = a + b + c;
+        center.normalize()
     }
 
-    fn triangles(
-        &self,
-        _layout: &dyn Layout,
-        _vector: Vector3D,
-        _face_vectors: Vec<Vector3D>,
-        _face_vertices: [(u8, u8); 3],
-    ) -> ([Vector3D; 3], [Coord; 3]) {
-        todo!()
+    fn find_face(&self, point: Vector3D) -> Option<usize> {
+        let vertices = self.vertices();
+        for (face_idx, face) in self.face_vertex_indices().iter().enumerate() {
+            let triangle: Vec<Vector3D> = face.iter().map(|&i| vertices[i]).collect();
+
+            if self.is_point_in_face(point, triangle) {
+                return Some(face_idx);
+            }
+        }
+        None
     }
+
+    // fn triangles(
+    //     &self,
+    //     _layout: &dyn Layout,
+    //     _vector: Vector3D,
+    //     _face_vectors: Vec<Vector3D>,
+    //     _face_vertices: [(u8, u8); 3],
+    // ) -> ([Vector3D; 3], [Coord; 3]) {
+    //     todo!()
+    // }
 
     /// Procedure to calculate arc lengths of the `triangle` with a point P (`vector` arc). To 90 degrees right triangle.
     /// 1. Compute center 3D vector of face
@@ -54,7 +176,7 @@ impl Polyhedron for Icosahedron {
     /// 5. Test which sub-sub-triangle v is in (with vCenter + vMid + corner)
     /// 6. Set the triangle vertex indices: [va, vb, vc] = [0, 1, 2]
     /// 7. Normalize vCenter, vMid
-    fn triangle_arc_lengths(&self, triangle: [Vector3D; 3], vector: Vector3D) -> ArcLengths {
+    fn face_arc_lengths(&self, triangle: [Vector3D; 3], vector: Vector3D) -> ArcLengths {
         // Vertex indices are [0, 1, 2]
         // Vertices for the 3D triangle that we want (v_mid: B, corner.0: A, v_center: C)
         // let v3d = [v_mid, corner.0, vector_center];
@@ -71,17 +193,17 @@ impl Polyhedron for Icosahedron {
         }
     }
 
-    fn is_point_in_triangle(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool {
+    fn is_point_in_face(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool {
         if triangle.len() != 3 {
             return false;
         }
-        
+
         // For spherical triangles on icosahedron, use barycentric coordinates
         // adapted for the unit sphere
         let v0 = triangle[0];
-        let v1 = triangle[1]; 
+        let v1 = triangle[1];
         let v2 = triangle[2];
-        
+
         // Convert to barycentric coordinates
         let v0v1 = v1 - v0;
         let v0v2 = v2 - v0;
@@ -98,7 +220,7 @@ impl Polyhedron for Icosahedron {
         if denom.abs() < 1e-10 {
             return false; // Degenerate triangle
         }
-        
+
         let inv_denom = 1.0 / denom;
         let u = (dot11 * dot02 - dot01 * dot12) * inv_denom;
         let v = (dot00 * dot12 - dot01 * dot02) * inv_denom;
@@ -115,16 +237,8 @@ impl Polyhedron for Icosahedron {
         let cross = u.cross(v);
         let cross_magnitude = cross.length();
         let dot = u.dot(v);
-        
+
         // atan2 handles all quadrants correctly and is more stable than acos
         cross_magnitude.atan2(dot)
-    }
-
-    fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D {
-        Vector3D {
-            x: (vector1.x + vector2.x + vector3.x) / 3.0,
-            y: (vector1.y + vector2.y + vector3.y) / 3.0,
-            z: (vector1.z + vector2.z + vector3.z) / 3.0,
-        }
     }
 }
