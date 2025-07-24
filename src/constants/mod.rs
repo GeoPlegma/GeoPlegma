@@ -15,10 +15,12 @@
 //! - Numerical tolerances for calculations
 
 pub mod earth;
+pub mod polyhedron;
 pub mod projections;
 pub mod tolerance;
 
 // Re-export commonly used constants for convenience
 pub use earth::WGS84;
+pub use polyhedron::PolyhedronConstants;
 pub use projections::{KarneyCoefficients, IcosahedronConstants};
 pub use tolerance::Tolerance;

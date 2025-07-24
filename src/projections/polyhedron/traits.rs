@@ -25,6 +25,8 @@ pub trait Polyhedron {
     fn face_center(&self, face_id: usize) -> Vector3D;
     /// Given a point on the unit sphere, return the face index that contains it.
     fn find_face(&self, point: Vector3D) -> Option<usize>;
+
+    fn rotation_matrix(&self, ector:Vector3D, gama: f64, alpha: f64) -> Vector3D;
     // fn unit_vectors(&self) -> Vec<Vector3D>;
     // fn triangles(
     //     &self,

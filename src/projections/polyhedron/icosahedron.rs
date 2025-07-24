@@ -8,6 +8,7 @@
 // except according to those terms
 
 use crate::{
+    constants::PolyhedronConstants,
     models::vector_3d::Vector3D,
     projections::{layout::traits::Layout, polyhedron::traits::VertexIndices},
 };
@@ -28,7 +29,7 @@ impl Polyhedron for Icosahedron {
     // They are then nromalized in the sphere
     // **Returns the actual 3D positions of the three vertices for each face.**
     fn vertices(&self) -> Vec<Vector3D> {
-        let phi = (1.0 + 5.0f64.sqrt()) / 2.0; // golden ratio
+        let phi = PolyhedronConstants::GOLDEN_RATIO; // golden ratio
         vec![
             Vector3D {
                 x: -1.0,
@@ -144,7 +145,7 @@ impl Polyhedron for Icosahedron {
         let center = a + b + c;
         center.normalize()
     }
-    
+
     /// Find the triangle face that contains the point on the sphere
     fn find_face(&self, point: Vector3D) -> Option<usize> {
         let vertices = self.vertices();
@@ -158,6 +159,26 @@ impl Polyhedron for Icosahedron {
         None
     }
 
+    fn rotation_matrix(&self, vector:Vector3D, gama: f64, alpha: f64) -> Vector3D {
+        todo!()
+        // // Rotation around Z-axis (yaw)
+        // let rot_z: Vec<Vector3D> = [
+        //     [alpha.cos(), -alpha.sin(), 0.0],
+        //     [alpha.sin(), alpha.cos(), 0.0],
+        //     [0.0, 0.0, 1.0],
+        // ];
+
+        // // Rotation around X-axis (pitch)
+        // let rot_x: Vec<Vector3D> = [
+        //     [1.0, 0.0, 0.0],
+        //     [0.0, gama.cos(), -gama.sin()],
+        //     [0.0, gama.sin(), gama.cos()],
+        // ];
+
+        // rot_z[0] * (rot_x[0] * 
+
+        // yaw * pitch
+    }
     // fn triangles(
     //     &self,
     //     _layout: &dyn Layout,
