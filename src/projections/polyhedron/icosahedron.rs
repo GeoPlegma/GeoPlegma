@@ -7,6 +7,8 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
+use std::f64::consts::PI;
+
 use crate::{
     constants::PolyhedronConstants,
     models::vector_3d::Vector3D,
@@ -24,86 +26,61 @@ pub const FACES: u8 = 20;
 #[derive(Default, Debug)]
 pub struct Icosahedron {}
 
+/// This icosahedron implementation tries to has:
+/// - Almost no vertices on land, which reduces distortion for land-based DGGS queries
+/// by avoiding vertex-based singularities over populated areas.
+/// - Two vertices on the poles, which ensures better symmetry for polar areas and
+/// simplifies some projections.
+/// That means this icosahedron is not a standard implementation but a rotated implementation to fit equal-area projections.
+/// The other vertices are on northen and southern hemisphere in two equatorial rings, with alternating longitude.
 impl Polyhedron for Icosahedron {
     // The 12 points are symmetrically arranged on the sphere and lie at the same distance from the origin, forming a regular icosahedron
     // They are then nromalized in the sphere
     // **Returns the actual 3D positions of the three vertices for each face.**
     fn vertices(&self) -> Vec<Vector3D> {
+        let mut vertices = Vec::with_capacity(12);
         let phi = PolyhedronConstants::GOLDEN_RATIO; // golden ratio
-        vec![
-            Vector3D {
-                x: -1.0,
-                y: phi,
-                z: 0.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: 1.0,
-                y: phi,
-                z: 0.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: -1.0,
-                y: -phi,
-                z: 0.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: 1.0,
-                y: -phi,
-                z: 0.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: 0.0,
-                y: -1.0,
-                z: phi,
-            }
-            .normalize(),
-            Vector3D {
-                x: 0.0,
-                y: 1.0,
-                z: phi,
-            }
-            .normalize(),
-            Vector3D {
-                x: 0.0,
-                y: -1.0,
-                z: -phi,
-            }
-            .normalize(),
-            Vector3D {
-                x: 0.0,
-                y: 1.0,
-                z: -phi,
-            }
-            .normalize(),
-            Vector3D {
-                x: phi,
-                y: 0.0,
-                z: -1.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: phi,
-                y: 0.0,
-                z: 1.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: -phi,
-                y: 0.0,
-                z: -1.0,
-            }
-            .normalize(),
-            Vector3D {
-                x: -phi,
-                y: 0.0,
-                z: 1.0,
-            }
-            .normalize(),
-        ]
+        let z = 1.0 / (1.0 + phi.powi(2)).sqrt(); // Height (z) from center to top/bottom for the other 10 points
+        let r = (1.0 - z.powi(2)).sqrt(); // Radius of the ring
+
+        // === Vertex 0: North Pole ===
+        vertices.push(Vector3D {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+        });
+
+        // === Vertices 1–5: Upper ring ===
+        for i in 0..5 {
+            let angle = 2.0 * PI * (i as f64) / 5.0;
+            vertices.push(Vector3D {
+                x: r * angle.cos(),
+                y: r * angle.sin(),
+                z: z,
+            });
+        }
+
+        // === Vertices 6–10: Lower ring (rotated by 36°) ===
+        for i in 0..5 {
+            let angle = 2.0 * PI * (i as f64) / 5.0 + PI / 5.0; // 36° offset
+            vertices.push(Vector3D {
+                x: r * angle.cos(),
+                y: r * angle.sin(),
+                z: -z,
+            });
+        }
+
+        // === Vertex 11: South Pole ===
+        vertices.push(Vector3D {
+            x: 0.0,
+            y: 0.0,
+            z: -1.0,
+        });
+
+      
+        vertices
+
+     
     }
 
     // **Returns the list of triangle faces as triplets of indices into the vertex array.**
@@ -159,7 +136,7 @@ impl Polyhedron for Icosahedron {
         None
     }
 
-    fn rotation_matrix(&self, vector:Vector3D, gama: f64, alpha: f64) -> Vector3D {
+    fn rotation_matrix(&self, vector: Vector3D, gama: f64, alpha: f64) -> Vector3D {
         todo!()
         // // Rotation around Z-axis (yaw)
         // let rot_z: Vec<Vector3D> = [
@@ -175,7 +152,7 @@ impl Polyhedron for Icosahedron {
         //     [0.0, gama.sin(), gama.cos()],
         // ];
 
-        // rot_z[0] * (rot_x[0] * 
+        // rot_z[0] * (rot_x[0] *
 
         // yaw * pitch
     }
@@ -275,7 +252,7 @@ mod tests {
     fn test_face_center() {
         let ico = Icosahedron {};
         let faces = ico.face_vertex_indices();
-
+        println!("{:?}", ico.vertices());
         for (i, face) in faces.iter().enumerate() {
             let v0 = ico.vertices()[face[0]];
             let v1 = ico.vertices()[face[1]];
