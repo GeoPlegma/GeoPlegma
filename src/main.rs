@@ -31,43 +31,43 @@ fn main() {
         let generator = dggrs::get(&tool, &dggs);
 
         println!("Global");
-        let result = generator.zones_from_bbox(2, false, None);
-        println!(
-            "{:?} \nGenerated {} zones",
-            result.zones,
-            result.zones.len()
-        );
+        // let result = generator.zones_from_bbox(2, false, None);
+        // println!(
+        //     "{:?} \nGenerated {} zones",
+        //     result.zones,
+        //     result.zones.len()
+        // );
 
-        println!("Global with Bbox");
-        let result = generator.zones_from_bbox(2, false, bbox.clone());
-        println!(
-            "{:?} \nGenerated {} zones",
-            result.zones,
-            result.zones.len()
-        );
+        // println!("Global with Bbox");
+        // let result = generator.zones_from_bbox(2, false, bbox.clone());
+        // println!(
+        //     "{:?} \nGenerated {} zones",
+        //     result.zones,
+        //     result.zones.len()
+        // );
 
-        println!("Point");
-        let result = generator.zone_from_point(6, pnt, false);
-        println!(
-            "{:?} \nGenerated {} zones",
-            result.zones,
-            result.zones.len()
-        );
+        // println!("Point");
+        // let result = generator.zone_from_point(6, pnt, false);
+        // println!(
+        //     "{:?} \nGenerated {} zones",
+        //     result.zones,
+        //     result.zones.len()
+        // );
 
-        println!("Subzones of {}", zone_id);
-        let result = generator.zones_from_parent(6, zone_id.clone(), false);
-        println!(
-            "{:?} \nGenerated {} zones",
-            result.zones,
-            result.zones.len()
-        );
+        // println!("Subzones of {}", zone_id);
+        // let result = generator.zones_from_parent(6, zone_id.clone(), false);
+        // println!(
+        //     "{:?} \nGenerated {} zones",
+        //     result.zones,
+        //     result.zones.len()
+        // );
 
-        println!("Single Zone {}", zone_id.clone());
-        let result = generator.zone_from_id(zone_id.clone(), false);
-        println!(
-            "{:?} \nGenerated {} zones",
-            result.zones,
-            result.zones.len()
-        );
+        // println!("Single Zone {}", zone_id.clone());
+        // let result = generator.zone_from_id(zone_id.clone(), false);
+        // println!(
+        //     "{:?} \nGenerated {} zones",
+        //     result.zones,
+        //     result.zones.len()
+        // );
     }
 }
