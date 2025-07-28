@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 use crate::{
     constants::PolyhedronConstants,
     models::vector_3d::Vector3D,
-    projections::{layout::traits::Layout, polyhedron::traits::VertexIndices},
+    projections::{layout::traits::Layout, polyhedron::traits::{Face, VertexIndices}},
 };
 use geo::Coord;
 
@@ -173,32 +173,32 @@ impl Polyhedron for Icosahedron {
         //                 y: 0.0,
         //                 z: 1.0,
         //             }.normalize().roll(roll).yaw(yaw),
-        //         ]
+        //         ])
     }
     // Vector3D { x: 0.4472139186657891, y: 0.5257311121191336, z: 0.7236065980224116 }, Vector3D { x: 0.4472139186657892, y: -0.5257311121191336, z: 0.7236065980224116 }, Vector3D { x: -0.4472139186657892, y: 0.5257311121191336, z: -0.7236065980224116 }, Vector3D { x: -0.4472139186657891, y: -0.5257311121191336, z: -0.7236065980224116 }, Vector3D { x: -0.9999999999999003, y: -6.123233995736156e-17, z: 4.466042563544548e-7 }, Vector3D { x: -0.4472131960449229, y: -2.7383910453643627e-17, z: 0.8944273907273219 }, Vector3D { x: 0.4472131960449229, y: 2.7383910453643627e-17, z: -0.8944273907273219 }, Vector3D { x: 0.9999999999999003, y: 6.123233995736156e-17, z: -4.466042563544548e-7 }, Vector3D { x: 0.44721347206153284, y: -0.85065080835204, z: -0.2763934019774887 }, Vector3D { x: -0.4472134720615327, y: -0.85065080835204, z: 0.2763934019774887 }, Vector3D { x: 0.4472134720615327, y: 0.85065080835204, z: -0.2763934019774887 }, Vector3D { x: -0.44721347206153284, y: 0.85065080835204, z: 0.2763934019774887 }
     // **Returns the list of triangle faces as triplets of indices into the vertex array.**
-    fn face_vertex_indices(&self) -> Vec<Vec<usize>> {
+    fn face_vertex_indices(&self) -> Vec<Face> {
         vec![
-            vec![0, 11, 5],
-            vec![0, 5, 1],
-            vec![0, 1, 7],
-            vec![0, 7, 10],
-            vec![0, 10, 11],
-            vec![1, 5, 9],
-            vec![5, 11, 4],
-            vec![11, 10, 2],
-            vec![10, 7, 6],
-            vec![7, 1, 8],
-            vec![3, 9, 4],
-            vec![3, 4, 2],
-            vec![3, 2, 6],
-            vec![3, 6, 8],
-            vec![3, 8, 9],
-            vec![4, 9, 5],
-            vec![2, 4, 11],
-            vec![6, 2, 10],
-            vec![8, 6, 7],
-            vec![9, 8, 1],
+            Face::Triangle([0, 11, 5]),
+            Face::Triangle([0, 5, 1]),
+            Face::Triangle([0, 1, 7]),
+            Face::Triangle([0, 7, 10]),
+            Face::Triangle([0, 10, 11]),
+            Face::Triangle([1, 5, 9]),
+            Face::Triangle([5, 11, 4]),
+            Face::Triangle([11, 10, 2]),
+            Face::Triangle([10, 7, 6]),
+            Face::Triangle([7, 1, 8]),
+            Face::Triangle([3, 9, 4]),
+            Face::Triangle([3, 4, 2]),
+            Face::Triangle([3, 2, 6]),
+            Face::Triangle([3, 6, 8]),
+            Face::Triangle([3, 8, 9]),
+            Face::Triangle([4, 9, 5]),
+            Face::Triangle([2, 4, 11]),
+            Face::Triangle([6, 2, 10]),
+            Face::Triangle([8, 6, 7]),
+            Face::Triangle([9, 8, 1]),
         ]
     }
 

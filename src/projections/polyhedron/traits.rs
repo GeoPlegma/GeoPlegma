@@ -7,26 +7,27 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::{models::vector_3d::Vector3D, projections::layout::traits::Layout};
-use geo::Coord;
+use crate::models::vector_3d::Vector3D;
 
-pub enum VertexIndices {
-    Triangles(Vec<[usize; 3]>),
-    Cubes(Vec<[usize; 4]>),
-    Pentagons(Vec<[usize; 5]>),
+pub enum Face {
+    Triangle([usize; 3]),
+    Quad([usize; 4]),
+    Pentagon([usize; 5]),
+    Hexagon([usize; 6]),
+    Polygon(Vec<usize>), // for rare or irregular faces
 }
 
 pub trait Polyhedron {
     /// Return the actual 3D vertices of each face.
     fn vertices(&self) -> Vec<Vector3D>;
     /// Return index triplets of the icosahedron faces.
-    fn face_vertex_indices(&self) -> Vec<Vec<usize>>;
+    fn face_vertex_indices(&self) -> Vec<Face>;
     /// Compute the centroid of a triangle face.
     fn face_center(&self, face_id: usize) -> Vector3D;
     /// Given a point on the unit sphere, return the face index that contains it.
     fn find_face(&self, point: Vector3D) -> Option<usize>;
 
-    fn rotation_matrix(&self, ector:Vector3D, gama: f64, alpha: f64) -> Vector3D;
+    fn rotation_matrix(&self, ector: Vector3D, gama: f64, alpha: f64) -> Vector3D;
     // fn unit_vectors(&self) -> Vec<Vector3D>;
     // fn triangles(
     //     &self,
