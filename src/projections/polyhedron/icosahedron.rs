@@ -43,6 +43,8 @@ impl Polyhedron for Icosahedron {
         let z = 1.0 / (1.0 + phi.powi(2)).sqrt(); // Height (z) from center to top/bottom for the other 10 points
         let r = (1.0 - z.powi(2)).sqrt(); // Radius of the ring
 
+        // // North pole
+
         // === Vertex 0: North Pole ===
         vertices.push(Vector3D {
             x: 0.0,
@@ -77,12 +79,103 @@ impl Polyhedron for Icosahedron {
             z: -1.0,
         });
 
-      
+        // // North Hemisphere
+        // vertices.push(Vector3D {
+        //     x: r * 0.0f64.cos(),
+        //     y: r * 0.0f64.sin(),
+        //     z: z,
+        // });
+        // poes nos polos e depois fazes a rotação, depois ves no site se os pontos encaixam
         vertices
 
-     
-    }
+        // // 5 around +26.57° latitude
+        // [0.850651, 0.0, 0.525731],
+        // [0.262866, 0.809017, 0.525731],
+        // [-0.688191, 0.500000, 0.525731],
+        // [-0.688191, -0.500000, 0.525731],
+        // [0.262866, -0.809017, 0.525731],
 
+        // // 5 around -26.57° latitude
+        // [0.688191, 0.500000, -0.525731],
+        // [-0.262866, 0.809017, -0.525731],
+        // [-0.850651, 0.0, -0.525731],
+        // [-0.262866, -0.809017, -0.525731],
+        // [0.688191, -0.500000, -0.525731],
+        // let roll =58.2825f64.to_radians();
+        // let yaw =-90f64.to_radians();
+        //         vec![
+        //             Vector3D {
+        //                 x: -1.0,
+        //                 y: phi,
+        //                 z: 0.0,
+        //             }.normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: 1.0,
+        //                 y: phi,
+        //                 z: 0.0,
+        //             }.normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: -1.0,
+        //                 y: -phi,
+        //                 z: 0.0,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: 1.0,
+        //                 y: -phi,
+        //                 z: 0.0,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: 0.0,
+        //                 y: -1.0,
+        //                 z: phi,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: 0.0,
+        //                 y: 1.0,
+        //                 z: phi,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: 0.0,
+        //                 y: -1.0,
+        //                 z: -phi,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: 0.0,
+        //                 y: 1.0,
+        //                 z: -phi,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: phi,
+        //                 y: 0.0,
+        //                 z: -1.0,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: phi,
+        //                 y: 0.0,
+        //                 z: 1.0,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: -phi,
+        //                 y: 0.0,
+        //                 z: -1.0,
+        //             }
+        //             .normalize().roll(roll).yaw(yaw),
+        //             Vector3D {
+        //                 x: -phi,
+        //                 y: 0.0,
+        //                 z: 1.0,
+        //             }.normalize().roll(roll).yaw(yaw),
+        //         ]
+    }
+    // Vector3D { x: 0.4472139186657891, y: 0.5257311121191336, z: 0.7236065980224116 }, Vector3D { x: 0.4472139186657892, y: -0.5257311121191336, z: 0.7236065980224116 }, Vector3D { x: -0.4472139186657892, y: 0.5257311121191336, z: -0.7236065980224116 }, Vector3D { x: -0.4472139186657891, y: -0.5257311121191336, z: -0.7236065980224116 }, Vector3D { x: -0.9999999999999003, y: -6.123233995736156e-17, z: 4.466042563544548e-7 }, Vector3D { x: -0.4472131960449229, y: -2.7383910453643627e-17, z: 0.8944273907273219 }, Vector3D { x: 0.4472131960449229, y: 2.7383910453643627e-17, z: -0.8944273907273219 }, Vector3D { x: 0.9999999999999003, y: 6.123233995736156e-17, z: -4.466042563544548e-7 }, Vector3D { x: 0.44721347206153284, y: -0.85065080835204, z: -0.2763934019774887 }, Vector3D { x: -0.4472134720615327, y: -0.85065080835204, z: 0.2763934019774887 }, Vector3D { x: 0.4472134720615327, y: 0.85065080835204, z: -0.2763934019774887 }, Vector3D { x: -0.44721347206153284, y: 0.85065080835204, z: 0.2763934019774887 }
     // **Returns the list of triangle faces as triplets of indices into the vertex array.**
     fn face_vertex_indices(&self) -> Vec<Vec<usize>> {
         vec![

@@ -39,84 +39,84 @@ impl Projection for Vgc {
         // Need the coeficcients to convert from geodetic to authalic
         let coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
-        // // get 3d unit vectors of the icosahedron
-        // let ico_vectors = polyhedron.unit_vectors();
-        // let triangles_ids = polyhedron.indices();
+        // // get 3d vertices of the icosahedron
+        let ico_vectors = polyhedron.vertices();
+        let triangles_ids = polyhedron.face_vertex_indices();
 
-        // // ABC
-        // let angle_beta: f64 = 36.0f64.to_radians();
-        // // BCA
-        // let angle_gamma: f64 = 60.0f64.to_radians();
-        // // BAC
-        // // let angle_alpha: f64 = PI / 2.0;
+        // ABC
+        let angle_beta: f64 = 36.0f64.to_radians();
+        // BCA
+        let angle_gamma: f64 = 60.0f64.to_radians();
+        // BAC
+        let angle_alpha: f64 = PI / 2.0;
 
-        // let v2d = layout.vertices();
+        let v2d = layout.vertices();
 
-        // for position in positions {
-        //     let lon = position.x().to_radians();
-        //     let lat = Self::lat_geodetic_to_authalic(
-        //         position.y().to_radians(),
-        //         &coef_fourier_geod_to_auth,
-        //     );
-        //     // Calculate 3d unit vectors for point P
-        //     let vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
+        for position in positions {
+            let lon = position.x().to_radians();
+            let lat = Self::lat_geodetic_to_authalic(
+                position.y().to_radians(),
+                &coef_fourier_geod_to_auth,
+            );
+            // Calculate 3d unit vectors for point P
+            let vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
 
-        //     // starting from here, you need:
-        //     // - the 3d point that you want to project
-        //     // - the 3d vertexes of the icosahedron
-        //     // - the 2d vertexes of the layout
-        //     // Polyhedron faces
-        //     let faces_length = polyhedron.faces();
-        //     for index in 0..faces_length {
-        //         let face = usize::from(index);
-        //         let ids = triangles_ids[face];
+            // starting from here, you need:
+            // - the 3d point that you want to project
+            // - the 3d vertexes of the icosahedron
+            // - the 2d vertexes of the layout
+            // Polyhedron faces
+            let faces_length = polyhedron.faces();
+            for index in 0..faces_length {
+                let face = usize::from(index);
+                let ids = triangles_ids[face];
 
-        //         let triangle_3d = vec![
-        //             ico_vectors[ids[0] as usize],
-        //             ico_vectors[ids[1] as usize],
-        //             ico_vectors[ids[2] as usize],
-        //         ];
-        //         if polyhedron.is_point_in_triangle(vector_3d, triangle_3d.clone()) {
-        //             let (triangle_3d, triangle_2d) =
-        //                 polyhedron.triangles(layout, vector_3d, triangle_3d, v2d[face]);
-        //             let ArcLengths { ab, bp, ap, .. } =
-        //                 polyhedron.triangle_arc_lengths(triangle_3d, vector_3d);
+                let triangle_3d = vec![
+                    ico_vectors[ids[0] as usize],
+                    ico_vectors[ids[1] as usize],
+                    ico_vectors[ids[2] as usize],
+                ];
+                if polyhedron.is_point_in_triangle(vector_3d, triangle_3d.clone()) {
+                    let (triangle_3d, triangle_2d) =
+                        polyhedron.triangles(layout, vector_3d, triangle_3d, v2d[face]);
+                    let ArcLengths { ab, bp, ap, .. } =
+                        polyhedron.triangle_arc_lengths(triangle_3d, vector_3d);
 
-        //             // angle ρ
-        //             let rho: f64 =
-        //                 f64::acos(ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin());
+                    // angle ρ
+                    let rho: f64 =
+                        f64::acos(ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin());
 
-        //             // 1. Calculate delta (δ)
-        //             let delta = f64::acos(rho.sin() * ab.cos());
+                    // 1. Calculate delta (δ)
+                    let delta = f64::acos(rho.sin() * ab.cos());
 
-        //             // 2. Calculate u
-        //             let uv = (angle_beta + angle_gamma - rho - delta)
-        //                 / (angle_beta + angle_gamma - PI / 2.0);
+                    // 2. Calculate u
+                    let uv = (angle_beta + angle_gamma - rho - delta)
+                        / (angle_beta + angle_gamma - PI / 2.0);
 
-        //             let cos_xp_y;
-        //             if rho <= E.powi(-9) {
-        //                 cos_xp_y = ab.cos();
-        //             } else {
-        //                 cos_xp_y = 1.0 / (rho.tan() * delta.tan())
-        //             }
+                    let cos_xp_y;
+                    if rho <= E.powi(-9) {
+                        cos_xp_y = ab.cos();
+                    } else {
+                        cos_xp_y = 1.0 / (rho.tan() * delta.tan())
+                    }
 
-        //             let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
+                    let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
 
-        //             // Triangle vertexes
-        //             let (p0, p1, p2) = (&triangle_2d[0], &triangle_2d[1], &triangle_2d[2]);
+                    // Triangle vertexes
+                    let (p0, p1, p2) = (&triangle_2d[0], &triangle_2d[1], &triangle_2d[2]);
 
-        //             // Between A e o C it gives point D
-        //             let pd_x = p2.x + (p0.x - p2.x) * uv;
-        //             let pd_y = p2.y + (p0.y - p2.y) * uv;
+                    // Between A e o C it gives point D
+                    let pd_x = p2.x + (p0.x - p2.x) * uv;
+                    let pd_y = p2.y + (p0.y - p2.y) * uv;
 
-        //             // Between D and B it gives point P
-        //             let p_x = pd_x + (pd_x - p1.x) * xy;
-        //             let p_y = pd_y + (pd_x - p1.y) * xy;
+                    // Between D and B it gives point P
+                    let p_x = pd_x + (pd_x - p1.x) * xy;
+                    let p_y = pd_y + (pd_x - p1.y) * xy;
 
-        //             out.push(Coord { x: p_x, y: p_y });
-        //         }
-        //     }
-        // }
+                    out.push(Coord { x: p_x, y: p_y });
+                }
+            }
+        }
 
         out
     }
