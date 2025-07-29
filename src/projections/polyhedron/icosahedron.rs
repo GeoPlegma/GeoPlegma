@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 use crate::{
     constants::PolyhedronConstants,
     models::vector_3d::Vector3D,
-    projections::{layout::traits::Layout, polyhedron::traits::{Face, VertexIndices}},
+    projections::{layout::traits::Layout, polyhedron::traits::Face},
 };
 use geo::Coord;
 
@@ -26,7 +26,7 @@ pub const FACES: u8 = 20;
 #[derive(Default, Debug)]
 pub struct Icosahedron {}
 
-/// This icosahedron implementation tries to has:
+/// This icosahedron implementation tries to have:
 /// - Almost no vertices on land, which reduces distortion for land-based DGGS queries
 /// by avoiding vertex-based singularities over populated areas.
 /// - Two vertices on the poles, which ensures better symmetry for polar areas and
@@ -34,16 +34,14 @@ pub struct Icosahedron {}
 /// That means this icosahedron is not a standard implementation but a rotated implementation to fit equal-area projections.
 /// The other vertices are on northen and southern hemisphere in two equatorial rings, with alternating longitude.
 impl Polyhedron for Icosahedron {
-    // The 12 points are symmetrically arranged on the sphere and lie at the same distance from the origin, forming a regular icosahedron
-    // They are then nromalized in the sphere
-    // **Returns the actual 3D positions of the three vertices for each face.**
+    /// The 12 points are symmetrically arranged on the sphere and lie at the same distance from the origin, forming a regular icosahedron
+    /// They are then nromalized in the sphere
+    /// **Returns the actual 3D positions of the three vertices for each face.**
     fn vertices(&self) -> Vec<Vector3D> {
         let mut vertices = Vec::with_capacity(12);
         let phi = PolyhedronConstants::GOLDEN_RATIO; // golden ratio
         let z = 1.0 / (1.0 + phi.powi(2)).sqrt(); // Height (z) from center to top/bottom for the other 10 points
         let r = (1.0 - z.powi(2)).sqrt(); // Radius of the ring
-
-        // // North pole
 
         // === Vertex 0: North Pole ===
         vertices.push(Vector3D {
@@ -79,104 +77,10 @@ impl Polyhedron for Icosahedron {
             z: -1.0,
         });
 
-        // // North Hemisphere
-        // vertices.push(Vector3D {
-        //     x: r * 0.0f64.cos(),
-        //     y: r * 0.0f64.sin(),
-        //     z: z,
-        // });
-        // poes nos polos e depois fazes a rotação, depois ves no site se os pontos encaixam
         vertices
-
-        // // 5 around +26.57° latitude
-        // [0.850651, 0.0, 0.525731],
-        // [0.262866, 0.809017, 0.525731],
-        // [-0.688191, 0.500000, 0.525731],
-        // [-0.688191, -0.500000, 0.525731],
-        // [0.262866, -0.809017, 0.525731],
-
-        // // 5 around -26.57° latitude
-        // [0.688191, 0.500000, -0.525731],
-        // [-0.262866, 0.809017, -0.525731],
-        // [-0.850651, 0.0, -0.525731],
-        // [-0.262866, -0.809017, -0.525731],
-        // [0.688191, -0.500000, -0.525731],
-        // let roll =58.2825f64.to_radians();
-        // let yaw =-90f64.to_radians();
-        //         vec![
-        //             Vector3D {
-        //                 x: -1.0,
-        //                 y: phi,
-        //                 z: 0.0,
-        //             }.normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: 1.0,
-        //                 y: phi,
-        //                 z: 0.0,
-        //             }.normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: -1.0,
-        //                 y: -phi,
-        //                 z: 0.0,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: 1.0,
-        //                 y: -phi,
-        //                 z: 0.0,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: 0.0,
-        //                 y: -1.0,
-        //                 z: phi,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: 0.0,
-        //                 y: 1.0,
-        //                 z: phi,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: 0.0,
-        //                 y: -1.0,
-        //                 z: -phi,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: 0.0,
-        //                 y: 1.0,
-        //                 z: -phi,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: phi,
-        //                 y: 0.0,
-        //                 z: -1.0,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: phi,
-        //                 y: 0.0,
-        //                 z: 1.0,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: -phi,
-        //                 y: 0.0,
-        //                 z: -1.0,
-        //             }
-        //             .normalize().roll(roll).yaw(yaw),
-        //             Vector3D {
-        //                 x: -phi,
-        //                 y: 0.0,
-        //                 z: 1.0,
-        //             }.normalize().roll(roll).yaw(yaw),
-        //         ])
     }
-    // Vector3D { x: 0.4472139186657891, y: 0.5257311121191336, z: 0.7236065980224116 }, Vector3D { x: 0.4472139186657892, y: -0.5257311121191336, z: 0.7236065980224116 }, Vector3D { x: -0.4472139186657892, y: 0.5257311121191336, z: -0.7236065980224116 }, Vector3D { x: -0.4472139186657891, y: -0.5257311121191336, z: -0.7236065980224116 }, Vector3D { x: -0.9999999999999003, y: -6.123233995736156e-17, z: 4.466042563544548e-7 }, Vector3D { x: -0.4472131960449229, y: -2.7383910453643627e-17, z: 0.8944273907273219 }, Vector3D { x: 0.4472131960449229, y: 2.7383910453643627e-17, z: -0.8944273907273219 }, Vector3D { x: 0.9999999999999003, y: 6.123233995736156e-17, z: -4.466042563544548e-7 }, Vector3D { x: 0.44721347206153284, y: -0.85065080835204, z: -0.2763934019774887 }, Vector3D { x: -0.4472134720615327, y: -0.85065080835204, z: 0.2763934019774887 }, Vector3D { x: 0.4472134720615327, y: 0.85065080835204, z: -0.2763934019774887 }, Vector3D { x: -0.44721347206153284, y: 0.85065080835204, z: 0.2763934019774887 }
-    // **Returns the list of triangle faces as triplets of indices into the vertex array.**
+
+    /// **Returns the list of triangle faces as triplets of indices into the vertex array.**
     fn face_vertex_indices(&self) -> Vec<Face> {
         vec![
             Face::Triangle([0, 11, 5]),
@@ -204,6 +108,7 @@ impl Polyhedron for Icosahedron {
 
     /// Aproximate spherical centroid
     /// Fast, lies on the unit sphere, stable for icosahedral faces, hierachically consistent
+    /// **Gets the center point of the face**
     fn face_center(&self, face_id: usize) -> Vector3D {
         let indices = self.face_vertex_indices();
         let vertices = self.vertices();
@@ -216,7 +121,8 @@ impl Polyhedron for Icosahedron {
         center.normalize()
     }
 
-    /// Find the triangle face that contains the point on the sphere
+    /// We are looping through the faces till we find the point.
+    /// **Finds the triangle face that contains the point on the sphere**
     fn find_face(&self, point: Vector3D) -> Option<usize> {
         let vertices = self.vertices();
         for (face_idx, face) in self.face_vertex_indices().iter().enumerate() {
@@ -229,53 +135,9 @@ impl Polyhedron for Icosahedron {
         None
     }
 
-    fn rotation_matrix(&self, vector: Vector3D, gama: f64, alpha: f64) -> Vector3D {
-        todo!()
-        // // Rotation around Z-axis (yaw)
-        // let rot_z: Vec<Vector3D> = [
-        //     [alpha.cos(), -alpha.sin(), 0.0],
-        //     [alpha.sin(), alpha.cos(), 0.0],
-        //     [0.0, 0.0, 1.0],
-        // ];
-
-        // // Rotation around X-axis (pitch)
-        // let rot_x: Vec<Vector3D> = [
-        //     [1.0, 0.0, 0.0],
-        //     [0.0, gama.cos(), -gama.sin()],
-        //     [0.0, gama.sin(), gama.cos()],
-        // ];
-
-        // rot_z[0] * (rot_x[0] *
-
-        // yaw * pitch
-    }
-    // fn triangles(
-    //     &self,
-    //     _layout: &dyn Layout,
-    //     _vector: Vector3D,
-    //     _face_vectors: Vec<Vector3D>,
-    //     _face_vertices: [(u8, u8); 3],
-    // ) -> ([Vector3D; 3], [Coord; 3]) {
-    //     todo!()
-    // }
-
+    /// TODO - needs to be reviewed for later PR
     /// Procedure to calculate arc lengths of the `triangle` with a point P (`vector` arc). To 90 degrees right triangle.
-    /// 1. Compute center 3D vector of face
-    /// 2. Compute center 2D point of face
-    /// 3. Check which sub-triangle (out of 3) v falls into:
-    ///     a. v2-v3
-    ///     b. v3-v1
-    ///     c. v1-v2
-    /// 4. For that sub-triangle, compute midpoint (vMid, pMid)
-    /// 5. Test which sub-sub-triangle v is in (with vCenter + vMid + corner)
-    /// 6. Set the triangle vertex indices: [va, vb, vc] = [0, 1, 2]
-    /// 7. Normalize vCenter, vMid
     fn face_arc_lengths(&self, triangle: [Vector3D; 3], vector: Vector3D) -> ArcLengths {
-        // Vertex indices are [0, 1, 2]
-        // Vertices for the 3D triangle that we want (v_mid: B, corner.0: A, v_center: C)
-        // let v3d = [v_mid, corner.0, vector_center];
-        // Vertices for the 2D triangle that we want
-        // let p2d = [p_mid, corner.1, point_center];
         let [mid, corner, center] = triangle;
         ArcLengths {
             ab: self.angle_between_unit(corner, mid),
@@ -287,6 +149,8 @@ impl Polyhedron for Icosahedron {
         }
     }
 
+    /// Uses barycentric coordinates
+    /// **Find if point is in a face**
     fn is_point_in_face(&self, point: Vector3D, triangle: Vec<Vector3D>) -> bool {
         if triangle.len() != 3 {
             return false;
@@ -325,6 +189,7 @@ impl Polyhedron for Icosahedron {
 
     /// Numerically stable angle between two unit vectors
     /// Uses atan2 method for better numerical stability than acos
+    /// **Return the angle between unit vectors**
     fn angle_between_unit(&self, u: Vector3D, v: Vector3D) -> f64 {
         // For unit vectors, use the cross product magnitude and dot product
         // with atan2 for numerical stability

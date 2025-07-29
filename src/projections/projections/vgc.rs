@@ -39,7 +39,7 @@ impl Projection for Vgc {
         // Need the coeficcients to convert from geodetic to authalic
         let coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
-        // // get 3d vertices of the icosahedron
+        // // get 3d vertices of the icosahedron (unit vectors)
         let ico_vectors = polyhedron.vertices();
         let triangles_ids = polyhedron.face_vertex_indices();
 
@@ -52,20 +52,20 @@ impl Projection for Vgc {
 
         let v2d = layout.vertices();
 
-        // for position in positions {
-        //     let lon = position.x().to_radians();
-        //     let lat = Self::lat_geodetic_to_authalic(
-        //         position.y().to_radians(),
-        //         &coef_fourier_geod_to_auth,
-        //     );
-        //     // Calculate 3d unit vectors for point P
-        //     let vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
+        for position in positions {
+            let lon = position.x().to_radians();
+            let lat = Self::lat_geodetic_to_authalic(
+                position.y().to_radians(),
+                &coef_fourier_geod_to_auth,
+            );
+            // Calculate 3d unit vectors for point P
+            let vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
 
-        //     // starting from here, you need:
-        //     // - the 3d point that you want to project
-        //     // - the 3d vertexes of the icosahedron
-        //     // - the 2d vertexes of the layout
-        //     // Polyhedron faces
+            // starting from here, you need:
+            // - the 3d point that you want to project
+            // - the 3d vertexes of the icosahedron
+            // - the 2d vertexes of the layout
+            // Polyhedron faces
         //     let faces_length = polyhedron.faces();
         //     for index in 0..faces_length {
         //         let face = usize::from(index);
@@ -82,6 +82,7 @@ impl Projection for Vgc {
         //             let ArcLengths { ab, bp, ap, .. } =
         //                 polyhedron.triangle_arc_lengths(triangle_3d, vector_3d);
 
+        //             // ==== Slice and Dice formulas ====
         //             // angle ρ
         //             let rho: f64 =
         //                 f64::acos(ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin());
@@ -101,7 +102,9 @@ impl Projection for Vgc {
         //             }
 
         //             let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
+        //             // =================================
 
+        //             // ==== Interpolation ====
         //             // Triangle vertexes
         //             let (p0, p1, p2) = (&triangle_2d[0], &triangle_2d[1], &triangle_2d[2]);
 
@@ -112,6 +115,7 @@ impl Projection for Vgc {
         //             // Between D and B it gives point P
         //             let p_x = pd_x + (pd_x - p1.x) * xy;
         //             let p_y = pd_y + (pd_x - p1.y) * xy;
+        //             // ======================
 
         //             out.push(Coord { x: p_x, y: p_y });
         //         }

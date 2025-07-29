@@ -27,15 +27,6 @@ pub trait Polyhedron {
     /// Given a point on the unit sphere, return the face index that contains it.
     fn find_face(&self, point: Vector3D) -> Option<usize>;
 
-    fn rotation_matrix(&self, ector: Vector3D, gama: f64, alpha: f64) -> Vector3D;
-    // fn unit_vectors(&self) -> Vec<Vector3D>;
-    // fn triangles(
-    //     &self,
-    //     layout: &dyn Layout,
-    //     vector: Vector3D,
-    //     face_vectors: Vec<Vector3D>,
-    //     face_vertices: [(u8, u8); 3],
-    // ) -> ([Vector3D; 3], [Coord; 3]);
     /// Compute spherical arc lengths between point P and the triangle's vertices.
     fn face_arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths;
     // fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D;
