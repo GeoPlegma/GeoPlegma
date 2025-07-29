@@ -9,14 +9,6 @@
 
 use crate::models::vector_3d::Vector3D;
 
-pub enum Face {
-    Triangle([usize; 3]),
-    Quad([usize; 4]),
-    Pentagon([usize; 5]),
-    Hexagon([usize; 6]),
-    Polygon(Vec<usize>), // for rare or irregular faces
-}
-
 pub trait Polyhedron {
     /// Return the actual 3D vertices of each face.
     fn vertices(&self) -> Vec<Vector3D>;
@@ -40,7 +32,27 @@ pub trait Polyhedron {
     fn angle_between_unit(&self, u: Vector3D, v: Vector3D) -> f64;
 }
 
-#[derive(Default, Debug)]
+pub enum Face {
+    Triangle([usize; 3]),
+    Quad([usize; 4]),
+    Pentagon([usize; 5]),
+    Hexagon([usize; 6]),
+    Polygon(Vec<usize>), // for rare or irregular faces
+}
+
+impl Face {
+    pub fn indices(&self) -> &[usize] {
+        match self {
+            Face::Triangle(v) => v,
+            Face::Quad(v) => v,
+            Face::Pentagon(v) => v,
+            Face::Hexagon(v) => v,
+            Face::Polygon(v) => v,
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct ArcLengths {
     pub ab: f64,
     pub bc: f64,

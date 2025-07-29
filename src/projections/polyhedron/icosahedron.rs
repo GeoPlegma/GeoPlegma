@@ -82,6 +82,7 @@ impl Polyhedron for Icosahedron {
 
     /// **Returns the list of triangle faces as triplets of indices into the vertex array.**
     fn face_vertex_indices(&self) -> Vec<Face> {
+        // want to avoid a loop here for performance reasons
         vec![
             Face::Triangle([0, 11, 5]),
             Face::Triangle([0, 5, 1]),
@@ -110,9 +111,9 @@ impl Polyhedron for Icosahedron {
     /// Fast, lies on the unit sphere, stable for icosahedral faces, hierachically consistent
     /// **Gets the center point of the face**
     fn face_center(&self, face_id: usize) -> Vector3D {
-        let indices = self.face_vertex_indices();
+        let faces = self.face_vertex_indices();
         let vertices = self.vertices();
-        let face = &indices[face_id];
+        let face = faces[face_id].indices();
         let a = vertices[face[0]];
         let b = vertices[face[1]];
         let c = vertices[face[2]];
@@ -126,7 +127,7 @@ impl Polyhedron for Icosahedron {
     fn find_face(&self, point: Vector3D) -> Option<usize> {
         let vertices = self.vertices();
         for (face_idx, face) in self.face_vertex_indices().iter().enumerate() {
-            let triangle: Vec<Vector3D> = face.iter().map(|&i| vertices[i]).collect();
+            let triangle: Vec<Vector3D> = face.indices().iter().map(|&i| vertices[i]).collect();
 
             if self.is_point_in_face(point, triangle) {
                 return Some(face_idx);
@@ -210,11 +211,11 @@ mod tests {
     fn test_face_center() {
         let ico = Icosahedron {};
         let faces = ico.face_vertex_indices();
-        println!("{:?}", ico.vertices());
+
         for (i, face) in faces.iter().enumerate() {
-            let v0 = ico.vertices()[face[0]];
-            let v1 = ico.vertices()[face[1]];
-            let v2 = ico.vertices()[face[2]];
+            let v0 = ico.vertices()[face.indices()[0]];
+            let v1 = ico.vertices()[face.indices()[1]];
+            let v2 = ico.vertices()[face.indices()[2]];
             let center = ico.face_center(i);
 
             // Check if center it's on the unit sphere
