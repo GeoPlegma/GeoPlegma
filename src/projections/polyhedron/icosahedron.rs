@@ -10,18 +10,12 @@
 use std::f64::consts::PI;
 
 use crate::{
-    constants::PolyhedronConstants,
-    models::vector_3d::Vector3D,
-    projections::{layout::traits::Layout, polyhedron::traits::Face},
+    constants::PolyhedronConstants, models::vector_3d::Vector3D,
+    projections::polyhedron::traits::Face,
 };
 use geo::Coord;
 
 use super::traits::{ArcLengths, Polyhedron};
-
-pub const FACES: u8 = 20;
-
-// pub const ORIENTATION_LAT: f64 =
-// pub const ORIENTATION_LON: f64 =
 
 #[derive(Default, Debug)]
 pub struct Icosahedron {}
@@ -32,14 +26,14 @@ pub struct Icosahedron {}
 /// - Two vertices on the poles, which ensures better symmetry for polar areas and
 /// simplifies some projections.
 /// That means this icosahedron is not a standard implementation but a rotated implementation to fit equal-area projections.
-/// The other vertices are on northen and southern hemisphere in two equatorial rings, with alternating longitude.
+/// The other vertices are on northern and southern hemisphere in two equatorial rings, with alternating longitude.
 impl Polyhedron for Icosahedron {
     /// The 12 points are symmetrically arranged on the sphere and lie at the same distance from the origin, forming a regular icosahedron
-    /// They are then nromalized in the sphere
+    /// They are then normalized in the sphere
     /// **Returns the actual 3D positions of the three vertices for each face.**
     fn vertices(&self) -> Vec<Vector3D> {
         let mut vertices = Vec::with_capacity(12);
-        let phi = PolyhedronConstants::GOLDEN_RATIO; // golden ratio
+        let phi = PolyhedronConstants::golden_ratio(); // golden ratio
         let z = 1.0 / (1.0 + phi.powi(2)).sqrt(); // Height (z) from center to top/bottom for the other 10 points
         let r = (1.0 - z.powi(2)).sqrt(); // Radius of the ring
 
