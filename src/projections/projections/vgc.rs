@@ -39,7 +39,7 @@ impl Projection for Vgc {
         // Need the coeficcients to convert from geodetic to authalic
         let coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
-        // // get 3d vertices of the icosahedron (unit vectors)
+        // get 3d vertices of the icosahedron (unit vectors)
         let ico_vectors = polyhedron.vertices();
         let triangles_ids = polyhedron.face_vertex_indices();
 
@@ -120,7 +120,7 @@ impl Projection for Vgc {
         //             out.push(Coord { x: p_x, y: p_y });
         //         }
         //     }
-        // }
+        }
 
         out
     }

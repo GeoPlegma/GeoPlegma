@@ -20,18 +20,22 @@ pub enum Face {
 pub trait Polyhedron {
     /// Return the actual 3D vertices of each face.
     fn vertices(&self) -> Vec<Vector3D>;
+
     /// Return index triplets of the icosahedron faces.
     fn face_vertex_indices(&self) -> Vec<Face>;
+
     /// Compute the centroid of a triangle face.
     fn face_center(&self, face_id: usize) -> Vector3D;
+
     /// Given a point on the unit sphere, return the face index that contains it.
     fn find_face(&self, point: Vector3D) -> Option<usize>;
 
     /// Compute spherical arc lengths between point P and the triangle's vertices.
     fn face_arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths;
-    // fn face_center(&self, vector1: Vector3D, vector2: Vector3D, vector3: Vector3D) -> Vector3D;
+
     /// Classic spherical triangle containment test.
     fn is_point_in_face(&self, point: Vector3D, face: Vec<Vector3D>) -> bool;
+
     /// Get angle (in radians) between two unit vectors.
     fn angle_between_unit(&self, u: Vector3D, v: Vector3D) -> f64;
 }
