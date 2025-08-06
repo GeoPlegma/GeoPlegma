@@ -7,14 +7,19 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::adapters::dggal::common::{ids_to_zones, to_geo_extent, to_geo_point};
 use crate::error::dggal::DggalError;
 use crate::error::port::PortError;
 use crate::models::common::Zones;
 use crate::ports::dggrs::DggrsPort;
+#[cfg(not(target_arch = "wasm32"))]
 use dggal::{DGGAL, DGGRS};
+#[cfg(not(target_arch = "wasm32"))]
 use dggal_rust::dggal;
+#[cfg(not(target_arch = "wasm32"))]
 use dggal_rust::ecrt;
+#[cfg(not(target_arch = "wasm32"))]
 use ecrt::Application;
 use geo::Point;
 use std::env;
@@ -40,8 +45,10 @@ impl DggalImpl {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::adapters::dggal::context::GLOBAL_DGGAL;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
     let dggal = GLOBAL_DGGAL.lock().map_err(|_| DggalError::LockFailure)?;
     DGGRS::new(&*dggal, grid_name).map_err(|_| DggalError::UnknownGrid {
@@ -49,6 +56,7 @@ fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl DggrsPort for DggalImpl {
     fn zones_from_bbox(
         &self,

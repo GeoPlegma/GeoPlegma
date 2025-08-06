@@ -8,12 +8,23 @@ rust-version = "1.88"
 
 [dependencies]
 geo = "0.30.0"
-rand = "0.8.5"
+rand = "0.9.2"
+# rand = { version = "0.9.2", default-features = false, features = ["std", "thread_rng"] }
 tracing = "0.1.41"
 h3o = { version = "0.8.0", features = ["geo"] }
-dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/update-unified-crate"}
-#dggal-rust = {path = "../dggal-rust"}
+# dggal-rust = { path = "../../dggal-rust" }
 rayon = "1.10.0"
 thiserror = "2.0.12"
 once_cell = "1.21.0"
+wasm-bindgen = "0.2.100"
 
+# # getrandom = { version = "0.3.3", features = ["std"] }
+# [target.wasm32-unknown-unknown.dependencies]
+# getrandom_v2 = { version = "0.2", features = ["js"], package = "getrandom" }
+getrandom    = { version = "0.3", features = ["wasm_js"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/update-unified-crate"}
+
+[lib]
+crate-type = ["cdylib"]

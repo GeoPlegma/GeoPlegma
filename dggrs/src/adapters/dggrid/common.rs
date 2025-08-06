@@ -11,7 +11,7 @@ use crate::error::dggrid::DggridError;
 use crate::models::common::{Zone, ZoneID, Zones};
 use core::f64;
 use geo::geometry::{LineString, Point, Polygon};
-use rand::distributions::{Alphanumeric, DistString};
+use rand::distr::{Alphanumeric, SampleString};
 use std::fs;
 use std::fs::File;
 use std::io::{self, BufRead, Write};
@@ -28,7 +28,7 @@ pub struct IdArray {
 }
 
 pub fn dggrid_setup(workdir: &PathBuf) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
-    let code = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+    let code = Alphanumeric.sample_string(&mut rand::rng(), 16);
     let meta_path = workdir.join(&code).with_extension("meta"); // metafile
     let aigen_path = workdir.join(&code).with_extension("gen"); // AIGEN
     let children_path = workdir.join(&code).with_extension("chd"); // Children

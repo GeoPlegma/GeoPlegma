@@ -19,11 +19,17 @@ pub fn get(tool: &str, dggrs: &str) -> Result<Arc<dyn DggrsPort>, FactoryError> 
         ("DGGRID", "ISEA3H") => Ok(Arc::new(Isea3hImpl::default())),
         ("DGGRID", "IGEO7") => Ok(Arc::new(Igeo7Impl::default())),
         ("H3O", "H3") => Ok(Arc::new(H3Impl::default())),
+        #[cfg(not(target_arch = "wasm32"))]
         ("DGGAL", "IVEA3H") => Ok(Arc::new(DggalImpl::new("IVEA3H"))),
+        #[cfg(not(target_arch = "wasm32"))]
         ("DGGAL", "IVEA9R") => Ok(Arc::new(DggalImpl::new("IVEA9R"))),
+        #[cfg(not(target_arch = "wasm32"))]
         ("DGGAL", "ISEA3H") => Ok(Arc::new(DggalImpl::new("ISEA3H"))),
+        #[cfg(not(target_arch = "wasm32"))]
         ("DGGAL", "ISEA9R") => Ok(Arc::new(DggalImpl::new("ISEA9R"))),
+        #[cfg(not(target_arch = "wasm32"))]
         ("DGGAL", "RTEA3H") => Ok(Arc::new(DggalImpl::new("RTEA3H"))),
+        #[cfg(not(target_arch = "wasm32"))]
         ("DGGAL", "RTEA9R") => Ok(Arc::new(DggalImpl::new("RTEA9R"))),
         _ => Err(FactoryError::UnsupportedCombination {
             tool: tool.to_string(),

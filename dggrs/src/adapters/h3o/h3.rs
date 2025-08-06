@@ -19,7 +19,9 @@ use h3o::{CellIndex, LatLng, Resolution};
 use std::str::FromStr;
 
 pub const MAX_DEPTH: u8 = 10;
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
 pub struct H3Impl {
     pub adapter: H3oAdapter,
 }
