@@ -8,7 +8,8 @@
 // except according to those terms.
 
 use crate::error::dggrid::DggridError;
-use crate::models::common::{Zone, ZoneID, Zones};
+use crate::error::port::GeoPlegmaError;
+use crate::models::common::{Zone, ZoneId, Zones};
 use core::f64;
 use geo::{LineString, Point, Polygon, Rect};
 use rand::distributions::{Alphanumeric, DistString};
@@ -88,7 +89,7 @@ pub fn dggrid_metafile(
     Ok(())
 }
 pub fn dggrid_execute(dggrid_path: &PathBuf, meta_path: &PathBuf) {
-    let _ = Command::new(&dggrid_path).arg(&meta_path).output();
+    let _ = Command::new(&dggrid_path).arg(&meta_path).output(); // FIX: Better handling of output and raise DggridError::DggridExecutionFailed
 }
 
 pub fn dggrid_parse(
@@ -96,7 +97,7 @@ pub fn dggrid_parse(
     children_path: &PathBuf,
     neighbor_path: &PathBuf,
     depth: &u8,
-) -> Result<Zones, DggridError> {
+) -> Result<Zones, GeoPlegmaError> {
     let aigen_data = read_file(&aigen_path)?;
     let mut result = parse_aigen(&aigen_data, &depth)?;
     let children_data = read_file(&children_path)?;
@@ -109,8 +110,8 @@ pub fn dggrid_parse(
     Ok(result)
 }
 
-pub fn parse_aigen(data: &String, depth: &u8) -> Result<Zones, DggridError> {
-    let mut zone_id = ZoneID::default();
+pub fn parse_aigen(data: &String, depth: &u8) -> Result<Zones, GeoPlegmaError> {
+    let mut zone_id = ZoneId::new_str(&"0")?;
     let mut zones = Zones { zones: Vec::new() };
 
     let mut raw_coords: Vec<(f64, f64)> = vec![];
@@ -128,7 +129,7 @@ pub fn parse_aigen(data: &String, depth: &u8) -> Result<Zones, DggridError> {
         if line_parts.len() == 3 {
             // For ISEA3H prepend zero-padded depth to the ID
             let id_str = format!("{:02}{}", depth, line_parts[0]);
-            zone_id = ZoneID::new(&id_str).expect("Cannot accept this id");
+            zone_id = ZoneId::new_str(&id_str)?;
             pnt = Point::new(
                 line_parts[1]
                     .parse::<f64>()
@@ -227,20 +228,20 @@ pub fn parse_neighbors(data: &String, depth: &u8) -> Result<Vec<IdArray>, Dggrid
 pub fn assign_field(zones: &mut Zones, data: Vec<IdArray>, field: &str) {
     for item in data {
         if let Some(ref id_str) = item.id {
-            let target_id = ZoneID::StrID(id_str.clone());
+            let target_id = ZoneId::StrId(id_str.clone());
             if let Some(cell) = zones.zones.iter_mut().find(|c| c.id == target_id) {
                 match field {
                     "children" => {
                         cell.children = item
                             .arr
                             .clone()
-                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
+                            .map(|v| v.into_iter().map(ZoneId::StrId).collect())
                     }
                     "neighbors" => {
                         cell.neighbors = item
                             .arr
                             .clone()
-                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
+                            .map(|v| v.into_iter().map(ZoneId::StrId).collect())
                     }
                     _ => panic!("Unknown field: {}", field),
                 }
@@ -262,10 +263,10 @@ pub fn print_file(file: PathBuf) {
 // Todo: this is inefficient, use the read_lines function as in print_file
 // https://doc.rust-lang.org/rust-by-example/std_misc/file/read_lines.html
 pub fn read_file(path: &Path) -> Result<String, DggridError> {
-    fs::read_to_string(path).map_err(|e| DggridError::FileRead {
+    Ok(fs::read_to_string(path).map_err(|e| DggridError::FileRead {
         path: path.display().to_string(),
         source: e,
-    })
+    })?)
 }
 
 pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>

@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use crate::error::dggal::DggalError;
-use crate::models::common::{Zone, ZoneID, Zones};
+use crate::models::common::{Zone, ZoneId, Zones};
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
 use geo::{LineString, Point, Polygon, Rect, coord};
 
@@ -36,7 +36,7 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalErr
             // TODO: Wrap the children and neighbors into an if statement if requested.
             //let children = dggrs.getSubZones(id, 1);
 
-            let children: Option<Vec<ZoneID>> = Some(
+            let children: Option<Vec<ZoneId>> = Some(
                 dggrs
                     .getZoneChildren(id)
                     .into_iter()
@@ -47,7 +47,7 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalErr
             let mut nb_types: [i32; 6] = [0; 6];
             //let neighbors = dggrs.getZoneNeighbors(id, &mut nb_types);
 
-            let neighbors: Option<Vec<ZoneID>> = Some(
+            let neighbors: Option<Vec<ZoneId>> = Some(
                 dggrs
                     .getZoneNeighbors(id, &mut nb_types)
                     .into_iter()
@@ -56,7 +56,7 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalErr
             );
 
             Ok(Zone {
-                id: ZoneID::IntID(id),
+                id: ZoneId::IntId(id),
                 region,
                 vertex_count: count_edges,
                 center,
@@ -86,9 +86,9 @@ fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
     Polygon::new(LineString::from(coords), vec![])
 }
 
-fn to_u64_zone_id(id: DGGRSZone) -> ZoneID {
+fn to_u64_zone_id(id: DGGRSZone) -> ZoneId {
     // NOTE: Expand this to do the conversion automaticallt
-    ZoneID::IntID(id)
+    ZoneId::IntId(id)
 }
 
 pub fn to_geo_point(pt: Point) -> GeoPoint {

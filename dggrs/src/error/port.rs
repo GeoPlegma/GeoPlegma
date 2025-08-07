@@ -54,4 +54,10 @@ pub enum GeoPlegmaError {
 
     #[error("Relative depth too large to convert to u8: {0}")]
     RelativeDepthTooLarge(RelativeDepth),
+
+    #[error("Unsupported ZoneId format '{0}'")]
+    UnsupportedZoneIdFormat(String),
+
+    #[error("Invalid hex ZoneId: '{0}'")]
+    InvalidHexId(String),
 }

@@ -13,12 +13,12 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct Zone {
-    pub id: ZoneID,
+    pub id: ZoneId,
     pub region: Polygon,
     pub center: Point,
     pub vertex_count: u32,
-    pub children: Option<Vec<ZoneID>>,
-    pub neighbors: Option<Vec<ZoneID>>,
+    pub children: Option<Vec<ZoneId>>,
+    pub neighbors: Option<Vec<ZoneId>>,
 }
 
 #[derive(Debug)]
@@ -27,60 +27,97 @@ pub struct Zones {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum ZoneID {
-    StrID(String),
-    IntID(u64),
+pub enum ZoneId {
+    StrId(String),
+    HexId(HexString),
+    IntId(u64),
 }
 
-//#[derive(Debug, Clone)]
-//pub struct ZoneID {
-//    pub id: String,
-//}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HexString(String);
 
-impl ZoneID {
-    pub fn new(id: &str) -> Result<Self, String> {
-        if (id.len() == 16 || id.len() == 18) && id.chars().all(|c| c.is_ascii_alphanumeric()) {
-            //FIX:Remove the 18 character option after fixing DGGRID hack with prepended 2 character resolution
-            Ok(ZoneID::StrID(id.to_string()))
+impl HexString {
+    pub fn new(s: &str) -> Result<Self, String> {
+        if s.len() == 16 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+            Ok(Self(s.to_string()))
         } else {
-            Err("ID must be exactly 16 or 18 alphanumeric characters.".to_string())
+            Err("HexId must be exactly 16 hexadecimal characters.".to_string())
         }
     }
-    pub fn new_int(id: u64) -> Self {
-        ZoneID::IntID(id)
+
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
+}
+
+impl fmt::Display for HexString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ZoneId {
+    /// 1 to 32 character ZoneID
+    pub fn new_str(s: &str) -> Result<Self, GeoPlegmaError> {
+        if (1..=32).contains(&s.len()) {
+            Ok(ZoneId::StrId(s.to_string()))
+        } else {
+            Err(GeoPlegmaError::UnsupportedZoneIdFormat(format!(
+                "StrId must be between 1 and 32 characters got '{}'",
+                s
+            )))
+        }
+    }
+
+    /// Hexadecimal ZoneId
+    pub fn new_hex(s: &str) -> Result<Self, GeoPlegmaError> {
+        HexString::new(s)
+            .map(ZoneId::HexId)
+            .map_err(|e| GeoPlegmaError::InvalidHexId(e))
+    }
+
+    /// 64 bit Integer ZoneId
+    pub fn new_int(id: u64) -> Self {
+        ZoneId::IntId(id)
+    }
+
+    /// convert ZoneId::StrId as String
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            ZoneID::StrID(s) => Some(s),
+            ZoneId::StrId(s) => Some(s),
             _ => None,
         }
     }
 
+    /// convert ZoneId::HexId as String
+    pub fn as_hex(&self) -> Option<&HexString> {
+        match self {
+            ZoneId::HexId(h) => Some(h),
+            _ => None,
+        }
+    }
+
+    /// convert ZoneId::IntId as String
     pub fn as_u64(&self) -> Option<u64> {
         match self {
-            ZoneID::IntID(i) => Some(*i),
+            ZoneId::IntId(i) => Some(*i),
             _ => None,
         }
     }
 }
 
-impl Default for ZoneID {
+impl Default for ZoneId {
     fn default() -> Self {
-        ZoneID::StrID("0000000000000000".to_string()) // TODO: Some valid default ID should probably be integer not string
+        ZoneId::HexId(HexString::new("0000000000000000").unwrap())
     }
 }
 
-// impl fmt::Display for ZoneID {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(f, "{}", self.id)
-//     }
-// }
-
-impl fmt::Display for ZoneID {
+impl fmt::Display for ZoneId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ZoneID::StrID(s) => write!(f, "{s}"),
-            ZoneID::IntID(i) => write!(f, "{i}"),
+            ZoneId::StrId(s) => write!(f, "{s}"),
+            ZoneId::HexId(s) => write!(f, "{s}"),
+            ZoneId::IntId(i) => write!(f, "{i}"),
         }
     }
 }
