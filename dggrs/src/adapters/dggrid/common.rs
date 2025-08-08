@@ -9,6 +9,7 @@
 
 use crate::error::dggrid::DggridError;
 use crate::models::common::{Zone, ZoneID, Zones};
+use crate::wasm_getters_setters;
 use core::f64;
 use geo::geometry::{LineString, Point, Polygon};
 use rand::distr::{Alphanumeric, SampleString};
@@ -20,12 +21,47 @@ use std::process::Command;
 use tracing::debug;
 
 pub const DENSIFICATION: u8 = 50; // DGGRID option
+use wasm_bindgen::prelude::*;
 
-#[derive(Debug)]
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
 pub struct IdArray {
-    pub id: Option<String>,
-    pub arr: Option<Vec<String>>,
+    id: Option<String>,
+    arr: Option<Vec<String>>,
 }
+
+// this is strictly for wasm, since the String type in Rust isn't implicitly copyable
+wasm_getters_setters!(IdArray,
+    (get_id, set_id,  id, "id", Option<String>),
+    (get_arr, set_arr, arr, "arr", Option<Vec<String>>),
+);
+// #[wasm_bindgen]
+// impl IdArray {
+//     #[wasm_bindgen(constructor)]
+//     pub fn new(id: Option<String>, arr: Option<Vec<String>>) -> IdArray {
+//         IdArray { id, arr }
+//     }
+
+//     #[wasm_bindgen(getter)]
+//     pub fn id(&self) -> Option<String> {
+//         self.id.clone()
+//     }
+
+//     #[wasm_bindgen(setter)]
+//     pub fn set_id(&mut self, id: Option<String>) {
+//         self.id = id;
+//     }
+
+//     #[wasm_bindgen(getter)]
+//     pub fn arr(&self) -> Option<Vec<String>> {
+//         self.arr
+//     }
+
+//     #[wasm_bindgen(setter)]
+//     pub fn set_arr(&mut self, arr: Option<Vec<String>>) {
+//         self.arr = arr;
+//     }
+// }
 
 pub fn dggrid_setup(workdir: &PathBuf) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
     let code = Alphanumeric.sample_string(&mut rand::rng(), 16);

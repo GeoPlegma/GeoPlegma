@@ -6,9 +6,7 @@
 // <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
-use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct H3oAdapter {}
 

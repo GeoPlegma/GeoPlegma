@@ -9,14 +9,12 @@
 
 use crate::error::dggal::DggalError;
 use crate::models::common::{Zone, ZoneID, Zones};
-#[cfg(not(target_arch = "wasm32"))]
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
 use geo::LineString;
 use geo::Point;
 use geo::Polygon;
 use geo::coord;
 
-#[cfg(not(target_arch = "wasm32"))]
 pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalError> {
     let zones: Vec<Zone> = ids
         .into_iter()
@@ -73,12 +71,10 @@ pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalErr
     Ok(Zones { zones })
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn to_point(pt: &GeoPoint) -> Point<f64> {
     Point::new(pt.lon, pt.lat)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
     let mut coords: Vec<_> = points
         .iter()
@@ -92,13 +88,11 @@ fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
     Polygon::new(LineString::from(coords), vec![])
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn to_u64_zone_id(id: DGGRSZone) -> ZoneID {
     // NOTE: Expand this to do the conversion automaticallt
     ZoneID::IntID(id)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub fn to_geo_point(pt: Point) -> GeoPoint {
     GeoPoint {
         lat: pt.y().to_radians(),
@@ -106,7 +100,6 @@ pub fn to_geo_point(pt: Point) -> GeoPoint {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub fn to_geo_extent(bbox: Option<Vec<Vec<f64>>>) -> GeoExtent {
     match bbox {
         Some(coords) if coords.len() == 2 && coords[0].len() == 2 && coords[1].len() == 2 => {

@@ -7,6 +7,8 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub mod dggal;
 pub mod dggrid;
+#[cfg(feature = "native")]
+pub mod dggal;
+#[cfg(feature = "native")]
 pub mod h3o;
