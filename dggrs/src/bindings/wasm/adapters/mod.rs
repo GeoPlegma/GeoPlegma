@@ -7,16 +7,4 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![doc = include_str!("../../README.md")]
-pub mod adapters;
-pub mod bindings;
-pub mod dggrs;
-pub mod error;
-pub mod factory;
-pub mod models;
-pub mod ports;
-
-/// This is the only re-export that is needed.
-pub use factory::dggrs_factory::get;
-
-mod macros;
+pub mod dggrid;
