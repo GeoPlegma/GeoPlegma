@@ -24,8 +24,8 @@ pub const DENSIFICATION: u8 = 50; // DGGRID option
 
 #[derive(Debug, Clone)]
 pub struct IdArray {
-    id: Option<String>,
-    arr: Option<Vec<String>>,
+    pub id: Option<String>,
+    pub arr: Option<Vec<String>>,
 }
 
 pub fn dggrid_setup(workdir: &PathBuf) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {

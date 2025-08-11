@@ -20,6 +20,8 @@ wasm-bindgen = "0.2.100"
 # the two following avoid errors during the wasm compilcation
 getrandom    = { version = "0.3", features = ["wasm_js"] }
 serde-wasm-bindgen = "0.6.5"
+js-sys = "0.3.77"
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/update-unified-crate"}
 # dggal-rust = { path = "../../dggal-rust" }
