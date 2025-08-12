@@ -11,74 +11,7 @@ use crate::{
 /// Each String is 24 bytes (ptr, len, capacity) + heap data.
 /// Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm.
 /// wasm-bindgen will have to walk and serialize everything, which is slow for thousands of zones.
-// #[wasm_bindgen]
-// pub struct Zone {
-//     id: String,
-//     region_x: f64,
-//     region_y: f64,
-//     center_x: f64,
-//     center_y: f64,
-//     vertex_count: u32,
-//     children: Option<Vec<String>>,
-//     neighbors: Option<Vec<String>>,
-// }
-// pub struct JsZones {
-//     zones: ZonesExport,
-// }
-// wasm_fields_clone!(
-//     Zone,
-//     (get_id, set_id, id, "id", String),
-//     (get_region_x, set_region_x, region_x, "region_x", f64),
-//     (get_region_y, set_region_y, region_y, "region_y", f64),
-//     (get_center_x, set_center_x, center_x, "center_x", f64),
-//     (get_center_y, set_center_y, center_y, "center_y", f64),
-//     // (get_center, set_center, center, "center", (f64, f64)),
-//     (get_vertex_count, set_vertex_count, vertex_count, "vertex_count", u32),
-//     (get_children, set_children, children, "children", Option<Vec<String>>),
-//     (get_neighbors, set_neighbors, neighbors, "neighbors", Option<Vec<String>>));
 
-// #[wasm_bindgen]
-// pub struct Zones {
-//     zones: Vec<Zone>,
-// }
-// wasm_fields_clone!{
-//     Zones,
-//     (get_zones, set_zones, zones, "zones", Vec<Zone>)
-// }
-// #[wasm_bindgen]
-// #[derive(Debug, Clone, PartialEq)]
-// pub enum ZoneID {
-//     StrID(String),
-//     IntID(u64),
-// }
-
-// #[wasm_bindgen]
-// impl ZoneID {
-//     pub fn new(id: &str) -> Result<Self, String> {
-//         if (id.len() == 16 || id.len() == 18) && id.chars().all(|c| c.is_ascii_alphanumeric()) {
-//             //FIX:Remove the 18 character option after fixing DGGRID hack with prepended 2 character resolution
-//             Ok(ZoneID::StrID(id.to_string()))
-//         } else {
-//             Err("ID must be exactly 16 or 18 alphanumeric characters.".to_string())
-//         }
-//     }
-//     pub fn new_int(id: u64) -> Self {
-//         ZoneID::IntID(id)
-//     }
-//     pub fn as_str(&self) -> Option<&str> {
-//         match self {
-//             ZoneID::StrID(s) => Some(s),
-//             _ => None,
-//         }
-//     }
-
-//     pub fn as_u64(&self) -> Option<u64> {
-//         match self {
-//             ZoneID::IntID(i) => Some(*i),
-//             _ => None,
-//         }
-//     }
-// }
 /// No wasm_bindgen overhead per zone — you pass one pointer + length per field instead of millions of small objects.
 /// Zero-copy — JS reads directly from WebAssembly memory.
 /// Keeps geometry-heavy Zone struct in Rust for efficient calculations.

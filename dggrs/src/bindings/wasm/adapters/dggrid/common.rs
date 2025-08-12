@@ -1,11 +1,7 @@
-use std::{
-    io::{BufReader, Lines},
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use js_sys::Array;
 use serde_wasm_bindgen::to_value;
-use tracing::span::Id;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -15,7 +11,6 @@ use crate::{
         read_file, read_lines,
     },
     bindings::wasm::models::common::JsZones,
-    models::common::{ZoneID, Zones},
     wasm_fields_clone,
 };
 
@@ -32,16 +27,6 @@ wasm_fields_clone!(JsIdArray,
     (get_id, set_id,  id, "id", Option<String>),
     (get_arr, set_arr, arr, "arr", Option<Vec<String>>),
 );
-
-// #[wasm_bindgen]
-// pub struct JsIdArrays {
-//     ids: Vec<Option<String>>,
-//     vec_array: Vec<Option<Vec<String>>>,
-// }
-
-// wasm_fields_clone!(JsIdArrays,
-//     (get_id_arrays, set_id_arrays,  id_arrays, "id_arrays", Vec<JsIdArray>),
-// );
 
 #[wasm_bindgen]
 pub fn dggrid_setup_wasm(workdir: String) -> Result<JsValue, JsValue> {
@@ -189,5 +174,6 @@ pub fn read_lines_wasm(filename: String) -> Result<Array, JsValue> {
 pub fn bbox_to_aigen_wasm(js_bbox: Array, bboxfile: String) -> Result<(), JsValue> {
     let bbox: Vec<Vec<f64>> = serde_wasm_bindgen::from_value(js_bbox.into())?;
 
-    bbox_to_aigen(&bbox, &PathBuf::from(bboxfile)).map_err(|e| JsValue::from_str(&format!("IO error: {e}")))
+    bbox_to_aigen(&bbox, &PathBuf::from(bboxfile))
+        .map_err(|e| JsValue::from_str(&format!("IO error: {e}")))
 }
