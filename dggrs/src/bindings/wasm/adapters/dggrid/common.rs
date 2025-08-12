@@ -10,34 +10,37 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     adapters::dggrid::common::{
-        assign_field, bbox_to_aigen, dggrid_cleanup, dggrid_execute, dggrid_metafile, dggrid_parse, dggrid_setup, parse_aigen, parse_children, parse_neighbors, print_file, read_file, read_lines
+        IdArray, assign_field, bbox_to_aigen, dggrid_cleanup, dggrid_execute, dggrid_metafile,
+        dggrid_parse, dggrid_setup, parse_aigen, parse_children, parse_neighbors, print_file,
+        read_file, read_lines,
     },
     bindings::wasm::models::common::JsZones,
+    models::common::{ZoneID, Zones},
     wasm_fields_clone,
 };
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct IdArray {
+pub struct JsIdArray {
     id: Option<String>,
     arr: Option<Vec<String>>,
 }
 #[wasm_bindgen]
-impl IdArray {}
+impl JsIdArray {}
 // this is strictly for wasm, since the String type in Rust isn't implicitly copyable
-wasm_fields_clone!(IdArray,
+wasm_fields_clone!(JsIdArray,
     (get_id, set_id,  id, "id", Option<String>),
     (get_arr, set_arr, arr, "arr", Option<Vec<String>>),
 );
 
 // #[wasm_bindgen]
-// pub struct IdArrays {
+// pub struct JsIdArrays {
 //     ids: Vec<Option<String>>,
 //     vec_array: Vec<Option<Vec<String>>>,
 // }
 
-// wasm_fields_clone!(IdArrays,
-//     (get_id_arrays, set_id_arrays,  id_arrays, "id_arrays", Vec<IdArray>),
+// wasm_fields_clone!(JsIdArrays,
+//     (get_id_arrays, set_id_arrays,  id_arrays, "id_arrays", Vec<JsIdArray>),
 // );
 
 #[wasm_bindgen]
@@ -121,7 +124,7 @@ pub fn parse_children_wasm(data: String, depth: u8) -> Result<Array, JsValue> {
     let mut js_array = Array::new();
     for item in &vec {
         js_array.push(&JsValue::from(item.id.clone()));
-        // Convert Rust IdArray to JsValue
+        // Convert Rust JsIdArray to JsValue
         js_array.push(&JsValue::from(item.arr.clone()));
     }
     Ok(js_array)
@@ -134,16 +137,25 @@ pub fn parse_neighbors_wasm(data: String, depth: u8) -> Result<Array, JsValue> {
     let mut js_array = Array::new();
     for item in &vec {
         js_array.push(&JsValue::from(item.id.clone()));
-        // Convert Rust IdArray to JsValue
+        // Convert Rust JsIdArray to JsValue
         js_array.push(&JsValue::from(item.arr.clone()));
     }
     Ok(js_array)
 }
 
-// #[wasm_bindgen]
-// pub fn assign_field_wasm(data: String, depth: u8) {
-//     assign_field(zones, data, field);
-// }
+#[wasm_bindgen]
+pub fn assign_field_wasm(js_zones: JsZones, data: Vec<JsIdArray>, field: &str) {
+    let mut zones = js_zones.to_import();
+    let mut ids_arrays = Vec::with_capacity(data.len());
+    for ids in data.iter() {
+        ids_arrays.push(IdArray {
+            id: ids.id.clone(),
+            arr: ids.arr.clone(),
+        })
+    }
+
+    assign_field(&mut zones, ids_arrays, field);
+}
 
 #[wasm_bindgen]
 pub fn print_file_wasm(file: String) {
@@ -173,10 +185,9 @@ pub fn read_lines_wasm(filename: String) -> Result<Array, JsValue> {
     Ok(js_array)
 }
 
+#[wasm_bindgen]
+pub fn bbox_to_aigen_wasm(js_bbox: Array, bboxfile: String) -> Result<(), JsValue> {
+    let bbox: Vec<Vec<f64>> = serde_wasm_bindgen::from_value(js_bbox.into())?;
 
-// #[wasm_bindgen]
-// pub fn bbox_to_aigen_wasm(bbox: Array, bboxfile: String) -> Result<()> {
-
-//     bbox_to_aigen(bbox, &PathBuf::from(bboxfile))
-
-// }
+    bbox_to_aigen(&bbox, &PathBuf::from(bboxfile)).map_err(|e| JsValue::from_str(&format!("IO error: {e}")))
+}

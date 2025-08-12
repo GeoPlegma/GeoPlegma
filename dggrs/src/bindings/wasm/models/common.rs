@@ -1,8 +1,11 @@
-use geo::{Point, Polygon};
+use geo::{LineString, Point, Polygon};
 use std::{collections::HashMap, fmt};
 use wasm_bindgen::prelude::*;
 
-use crate::{models::common::Zones, wasm_fields_clone};
+use crate::{
+    models::common::{Zone, ZoneID, Zones},
+    wasm_fields_clone,
+};
 
 /// The Zone struct has nested heap allocations (String, Vec<(f64,f64)>, Vec<String>), which means:
 /// Each String is 24 bytes (ptr, len, capacity) + heap data.
@@ -120,6 +123,93 @@ wasm_fields_clone!(
     (get_neighbors_offsets, set_neighbors_offsets, neighbors_offsets, "neighbors_offsets",Vec<u32>),
     (get_neighbors_index, set_neighbors_index, neighbors_index, "neighbors_index",Vec<u32>));
 
+impl JsZones {
+    /// Rebuild a `Zones` struct from a flattened `ZonesExport`
+    pub fn to_import(&self) -> Zones {
+        let zone_count = self.id_offsets.len();
+        let mut zones = Vec::with_capacity(zone_count);
+
+        // 1) reconstruct id strings
+        let mut ids: Vec<String> = Vec::with_capacity(zone_count);
+        for i in 0..zone_count {
+            let start = self.id_offsets[i] as usize;
+            let end = if i + 1 < zone_count {
+                self.id_offsets[i + 1] as usize
+            } else {
+                self.utf8_ids.len()
+            };
+            let s =
+                str::from_utf8(&self.utf8_ids[start..end]).expect("invalid utf8 in id buffer");
+            ids.push(s.to_string());
+        }
+        // 2) build zones
+        for i in 0..zone_count {
+            // region
+            let region_start = self.region_offsets[i] as usize;
+            let region_end = if i + 1 < zone_count {
+                self.region_offsets[i + 1] as usize
+            } else {
+                self.region_coords.len()
+            };
+            let mut coords = Vec::new();
+            let mut j = region_start;
+            while j + 1 < region_end {
+                coords.push((self.region_coords[j], self.region_coords[j + 1]));
+                j += 2;
+            }
+            let line_string: LineString = coords.into();
+            let region: Polygon = Polygon::new(line_string, vec![]);
+
+            // children
+            let children_start = self.children_offsets[i] as usize;
+            let children_end = if i + 1 < zone_count {
+                self.children_offsets[i + 1] as usize
+            } else {
+                self.children_index.len()
+            };
+            let children: Option<Vec<ZoneID>> = if children_end > children_start {
+                Some(
+                    self.children_index[children_start..children_end]
+                        .iter()
+                        .map(|&idx| ZoneID::StrID(ids[idx as usize].clone()))
+                        .collect(),
+                )
+            } else {
+                None
+            };
+
+            // neighbors
+            let neighbors_start = self.neighbors_offsets[i] as usize;
+            let neighbors_end = if i + 1 < zone_count {
+                self.neighbors_offsets[i + 1] as usize
+            } else {
+                self.neighbors_index.len()
+            };
+            let neighbors: Option<Vec<ZoneID>> = if neighbors_end > neighbors_start {
+                Some(
+                    self.neighbors_index[neighbors_start..neighbors_end]
+                        .iter()
+                        .map(|&idx| ZoneID::StrID(ids[idx as usize].clone()))
+                        .collect(),
+                )
+            } else {
+                None
+            };
+
+            zones.push(Zone {
+                id: ZoneID::StrID(ids[i].clone()),
+                region: region,
+                center: Point::new(self.center_x[i], self.center_y[i]),
+                vertex_count: self.vertex_count[i],
+                children,
+                neighbors,
+            })
+        }
+
+        Zones { zones: zones }
+    }
+}
+
 // @TODO needs to be reviewed
 impl Zones {
     /// Flatten `Zones` into `ZonesExport`:
@@ -142,7 +232,9 @@ impl Zones {
 
         // Pre-pass: collect id strings and build id -> index map
         for (i, zone) in self.zones.iter().enumerate() {
+            // size of ids
             id_offsets.push(utf8_ids.len() as u32);
+            // ids array
             let id_str = zone.id.to_string(); // ZoneID implements Display
             utf8_ids.extend_from_slice(id_str.as_bytes());
             // optionally add a separator if you need readable boundaries, but offsets suffice
