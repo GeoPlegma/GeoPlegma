@@ -9,3 +9,9 @@
 
 pub mod icosahedron;
 pub mod traits;
+pub mod polyhedron;
+pub mod utils;
+
+// Re-export the main types
+pub use polyhedron::Polyhedron;
+pub use traits::{Face, ArcLengths};
