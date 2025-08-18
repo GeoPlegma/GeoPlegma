@@ -10,7 +10,7 @@
 pub mod icosahedron;
 pub mod traits;
 pub mod polyhedron;
-pub mod utils;
+pub mod spherical_geometry;
 
 // Re-export the main types
 pub use polyhedron::Polyhedron;

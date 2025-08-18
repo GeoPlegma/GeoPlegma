@@ -8,7 +8,7 @@
 
 use crate::models::vector_3d::Vector3D;
 use super::traits::{Face, ArcLengths};
-use super::utils;
+use super::spherical_geometry;
 
 /// A concrete polyhedron with pre-computed geometric data.
 /// This design separates data from operations for better performance
@@ -99,7 +99,7 @@ impl Polyhedron {
                 .map(|&i| self.vertices[i])
                 .collect();
 
-            if utils::is_point_in_face(point, &triangle) {
+            if spherical_geometry::point_in_planar_triangle(point, [triangle[0], triangle[1], triangle[2]]) {
                 return Some(face_idx);
             }
         }
@@ -120,19 +120,19 @@ impl Polyhedron {
     pub fn face_arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
         let [mid, corner, center] = triangle;
         ArcLengths {
-            ab: utils::angle_between_unit(corner, mid),
-            bc: utils::angle_between_unit(mid, center),
-            ac: utils::angle_between_unit(corner, center),
-            ap: utils::angle_between_unit(corner, point),
-            bp: utils::angle_between_unit(mid, point),
-            cp: utils::angle_between_unit(center, point),
+            ab: spherical_geometry::stable_angle_between(corner, mid),
+            bc: spherical_geometry::stable_angle_between(mid, center),
+            ac: spherical_geometry::stable_angle_between(corner, center),
+            ap: spherical_geometry::stable_angle_between(corner, point),
+            bp: spherical_geometry::stable_angle_between(mid, point),
+            cp: spherical_geometry::stable_angle_between(center, point),
         }
     }
 
       /// Check if point lies within a face
     pub fn is_point_in_face(&self, point: Vector3D, face_id: usize) -> bool {
         if let Some(face_vertices) = self.face_vertices(face_id) {
-            utils::is_point_in_face(point, &face_vertices)
+            spherical_geometry::point_in_planar_triangle(point, [face_vertices[0], face_vertices[1], face_vertices[2]])
         } else {
             false
         }
