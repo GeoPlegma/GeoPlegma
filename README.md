@@ -168,7 +168,7 @@ Instead of printing out the length of `result.zones.len()` you can also print ou
 
 Dependencies
 ------------
-This crate depends on `dggal-rust` from https://github.com/GeoPlegma/dggal-rust.
+This crate depends on `dggal-rust` from <https://github.com/GeoPlegma/dggal-rust>.
 
 Testing
 -------
