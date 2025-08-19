@@ -17,7 +17,9 @@ use dggal_rust::dggal;
 use dggal_rust::ecrt;
 use ecrt::Application;
 use geo::Point;
+use wasm_bindgen::JsValue;
 use std::env;
+use std::path::PathBuf;
 
 // fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
 //     let args: Vec<String> = env::args().collect();
@@ -50,6 +52,14 @@ fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
 }
 
 impl DggrsPort for DggalImpl {
+            fn zones_from_bbox1(
+        &self,
+        depth: u8,
+        densify: bool,
+        bbox: Option<Vec<Vec<f64>>>,
+    ) -> Result<Zones, PortError>  {
+        todo!()
+    }
     fn zones_from_bbox(
         &self,
         depth: u8,

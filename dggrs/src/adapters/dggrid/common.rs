@@ -19,6 +19,8 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tracing::debug;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::JsValue;
 
 pub const DENSIFICATION: u8 = 50; // DGGRID option
 
@@ -91,14 +93,33 @@ pub fn dggrid_metafile(
 pub fn dggrid_execute(dggrid_path: &PathBuf, meta_path: &PathBuf) {
     let _ = Command::new(&dggrid_path).arg(&meta_path).output();
 }
+#[cfg(not(target_arch = "wasm32"))]
+pub fn read_file_(path: &std::path::Path) -> Result<String, DggridError> {
+    read_file(&path)
 
+    // use crate::read_file_wasm;
+    // let a = read_file_wasm(&path.to_string_lossy()).map_err(|e| JsValue::from_str(&e.to_string()));
+    // let buf: [u8] = &a.unwrap();
+    // String::from_utf8_lossy(a.unwra<p()).map_err(|e| DggridError::FileRead {
+    //     path: path.display().to_string(),
+    //     source: e,
+    // })
+}
+#[cfg(target_arch = "wasm32")]
+pub fn read_file_(path: &std::path::Path) -> Result<String, DggridError> {
+ ///// FALATA O GEN FILE
+        use wasm_bindgen::JsValue;
+    use crate::read_file_wasm;
+    read_file_wasm(&path.to_string_lossy())
+        .map_err(|e: JsValue| DggridError::Other(format!("JS error: {:?}", e)))
+}
 pub fn dggrid_parse(
     aigen_path: &PathBuf,
     children_path: &PathBuf,
     neighbor_path: &PathBuf,
     depth: &u8,
 ) -> Result<Zones, DggridError> {
-    let aigen_data = read_file(&aigen_path)?;
+    let aigen_data = read_file_(&aigen_path)?;
     let mut result = parse_aigen(&aigen_data, &depth)?;
     let children_data = read_file(&children_path)?;
     let children = parse_children(&children_data, &depth)?;

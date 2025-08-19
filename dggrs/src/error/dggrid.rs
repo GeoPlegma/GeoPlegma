@@ -33,4 +33,7 @@ pub enum DggridError {
         #[source]
         source: io::Error,
     },
+
+     #[error(" Other error {0}")]
+    Other(String),
 }

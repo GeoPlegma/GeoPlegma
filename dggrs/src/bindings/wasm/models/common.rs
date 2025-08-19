@@ -1,67 +1,112 @@
 use geo::{LineString, Point, Polygon};
+use napi_derive::napi;
 use std::{collections::HashMap, fmt};
 use wasm_bindgen::prelude::*;
+// use napi_derive::napi;
 
+// use crate::models::common::{Zone, Zones};
+// #[napi(object)]
+// pub struct JsZone {
+//     pub id: String, // Flatten ZoneID
+//     pub center: (f64, f64),
+//     pub region: Vec<(f64, f64)>, // Exterior ring
+//     pub vertex_count: u32,
+//     pub children: Option<Vec<String>>,
+//     pub neighbors: Option<Vec<String>>,
+// }
+// #[napi(object)]
+// pub struct JsZones {
+//     pub zones: Vec<JsZone>,
+// }
+// #[napi]
+// impl From<&Zone> for JsZone {
+//     fn from(zone: &Zone) -> Self {
+//         JsZone {
+//             id: zone.id.to_string(),
+//             center: (zone.center.x(), zone.center.y()),
+//             region: zone.region.exterior().points().map(|p| (p.x(), p.y())).collect(),
+//             vertex_count: zone.vertex_count,
+//             children: zone.children.as_ref().map(|vec| vec.iter().map(|id| id.to_string()).collect()),
+//             neighbors: zone.neighbors.as_ref().map(|vec| vec.iter().map(|id| id.to_string()).collect()),
+//         }
+//     }
+// }
+// #[napi]
+// impl From<&Zones> for JsZones {
+//     fn from(zones: &Zones) -> Self {
+//         JsZones {
+//             zones: zones.zones.iter().map(JsZone::from).collect(),
+//         }
+//     }
+// }
 use crate::{
     models::common::{Zone, ZoneID, Zones},
     wasm_fields_clone,
 };
 
 /// The Zone struct has nested heap allocations (String, Vec<(f64,f64)>, Vec<String>), which means:
-/// Each String is 24 bytes (ptr, len, capacity) + heap data.
-/// Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm.
-/// wasm-bindgen will have to walk and serialize everything, which is slow for thousands of zones.
+/// - Each String is 24 bytes (ptr, len, capacity) + heap data.
+/// - Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm.
+/// - napi-rs will have to walk and serialize everything, which is slow for thousands of zones.
 
-/// No wasm_bindgen overhead per zone — you pass one pointer + length per field instead of millions of small objects.
+/// No napi-rs overhead per zone — you pass one pointer + length per field instead of millions of small objects.
 /// Zero-copy — JS reads directly from WebAssembly memory.
 /// Keeps geometry-heavy Zone struct in Rust for efficient calculations.
 /// Scales to millions of zones without crashing the browser or blowing up memory usage.
-#[wasm_bindgen]
+/// Tradeoff
+/// Pro: Hugely faster for large datasets
+/// Con: JS side reconstruction is manual — you need to decode UTF-8 strings from byte arrays using TextDecoder and use offset tables.
+// #[wasm_bindgen]
+#[napi(object)]
 pub struct JsZones {
     // zone ids flattened
-    id_offsets: Vec<u32>, // len = num_zones (start index of each id in utf8_ids)
-    utf8_ids: Vec<u8>,
+    pub id_offsets: Vec<u32>, // len = num_zones (start index of each id in utf8_ids)
+    pub utf8_ids: Vec<u8>,
 
     // centers
-    center_x: Vec<f64>,
-    center_y: Vec<f64>,
+    pub center_x: Vec<f64>,
+    pub center_y: Vec<f64>,
 
     // vertex counts
-    vertex_count: Vec<u32>,
+    pub vertex_count: Vec<u32>,
 
     // regions (flattened coordinates)
-    region_offsets: Vec<u32>, // len = num_zones (start index of each zone's coords in region_coords)
-    region_coords: Vec<f64>,  // flattened x,y,x,y,...
+    pub region_offsets: Vec<u32>, // len = num_zones (start index of each zone's coords in region_coords)
+    pub region_coords: Vec<f64>,  // flattened x,y,x,y,...
 
-    // children as indices into `zones` vector
-    children_offsets: Vec<u32>, // len = num_zones (start index into children_index)
-    children_index: Vec<u32>,   // flattened child indices
+    // children (IDs, flattened UTF-8)
+    pub children_offsets: Vec<u32>, // start index into children_utf8_ids
+    pub children_id_offsets: Vec<u32>, // start index of each child string inside children_utf8_ids
+    pub children_utf8_ids: Vec<u8>, // raw utf8
 
-    // neighbors as indices into `zones` vector
-    neighbors_offsets: Vec<u32>, // len = num_zones (start index into neighbors_index)
-    neighbors_index: Vec<u32>,   // flattened neighbor indices
+    // neighbors (IDs, flattened UTF-8)
+    pub neighbors_offsets: Vec<u32>,
+    pub neighbors_id_offsets: Vec<u32>,
+    pub neighbors_utf8_ids: Vec<u8>,
 }
 
-wasm_fields_clone!(
-    JsZones,
-    (get_id_offsets, set_id_offsets, id_offsets, "id_offsets", Vec<u32>),
-    (get_utf8_ids, set_utf8_ids, utf8_ids, "utf8_ids", Vec<u8>),
-    (get_center_x, set_center_x, center_x, "center_x", Vec<f64>),
-    (get_center_y, set_center_y, center_y, "center_y", Vec<f64>),
-    (get_vertex_count, set_vertex_count, vertex_count, "vertex_count", Vec<u32>),
-    (get_region_offset, set_region_offset, region_offsets, "region_offset", Vec<u32>),
-    (get_region_coords, set_region_coords, region_coords, "region_coords", Vec<f64>),
-    (get_children_offsets, set_children_offsets, children_offsets, "children_offsets",Vec<u32>),
-    (get_children_index, set_children_index, children_index, "children_index",Vec<u32>),
-    (get_neighbors_offsets, set_neighbors_offsets, neighbors_offsets, "neighbors_offsets",Vec<u32>),
-    (get_neighbors_index, set_neighbors_index, neighbors_index, "neighbors_index",Vec<u32>));
+// wasm_fields_clone!(
+//     JsZones,
+//     (get_id_offsets, set_id_offsets, id_offsets, "id_offsets", Vec<u32>),
+//     (get_utf8_ids, set_utf8_ids, utf8_ids, "utf8_ids", Vec<u8>),
+//     (get_center_x, set_center_x, center_x, "center_x", Vec<f64>),
+//     (get_center_y, set_center_y, center_y, "center_y", Vec<f64>),
+//     (get_vertex_count, set_vertex_count, vertex_count, "vertex_count", Vec<u32>),
+//     (get_region_offset, set_region_offset, region_offsets, "region_offset", Vec<u32>),
+//     (get_region_coords, set_region_coords, region_coords, "region_coords", Vec<f64>),
+//     (get_children_offsets, set_children_offsets, children_offsets, "children_offsets",Vec<u32>),
+//     (get_children_index, set_children_index, children_index, "children_index",Vec<u32>),
+//     (get_neighbors_offsets, set_neighbors_offsets, neighbors_offsets, "neighbors_offsets",Vec<u32>),
+//     (get_neighbors_index, set_neighbors_index, neighbors_index, "neighbors_index",Vec<u32>));
 
+#[napi]
 impl JsZones {
     /// Rebuild a `Zones` struct from a flattened `ZonesExport`
     pub fn to_import(&self) -> Zones {
         let zone_count = self.id_offsets.len();
         let mut zones = Vec::with_capacity(zone_count);
 
+        let decoder = |bytes: &[u8]| String::from_utf8(bytes.to_vec()).unwrap();
         // 1) reconstruct id strings
         let mut ids: Vec<String> = Vec::with_capacity(zone_count);
         for i in 0..zone_count {
@@ -71,8 +116,7 @@ impl JsZones {
             } else {
                 self.utf8_ids.len()
             };
-            let s =
-                str::from_utf8(&self.utf8_ids[start..end]).expect("invalid utf8 in id buffer");
+            let s = str::from_utf8(&self.utf8_ids[start..end]).expect("invalid utf8 in id buffer");
             ids.push(s.to_string());
         }
         // 2) build zones
@@ -94,39 +138,51 @@ impl JsZones {
             let region: Polygon = Polygon::new(line_string, vec![]);
 
             // children
-            let children_start = self.children_offsets[i] as usize;
-            let children_end = if i + 1 < zone_count {
+            let c_start = self.children_offsets[i] as usize;
+            let c_end = if i + 1 < self.children_offsets.len() {
                 self.children_offsets[i + 1] as usize
             } else {
-                self.children_index.len()
+                self.children_id_offsets.len()
             };
-            let children: Option<Vec<ZoneID>> = if children_end > children_start {
-                Some(
-                    self.children_index[children_start..children_end]
-                        .iter()
-                        .map(|&idx| ZoneID::StrID(ids[idx as usize].clone()))
-                        .collect(),
-                )
-            } else {
+            let mut children = Vec::new();
+            for j in c_start..c_end {
+                let s = self.children_id_offsets[j] as usize;
+                let e = if j + 1 < self.children_id_offsets.len() {
+                    self.children_id_offsets[j + 1] as usize
+                } else {
+                    self.children_utf8_ids.len()
+                };
+                let id_str = decoder(&self.children_utf8_ids[s..e]);
+                children.push(ZoneID::StrID(id_str));
+            }
+            let children = if children.is_empty() {
                 None
+            } else {
+                Some(children)
             };
 
             // neighbors
-            let neighbors_start = self.neighbors_offsets[i] as usize;
-            let neighbors_end = if i + 1 < zone_count {
+            let n_start = self.neighbors_offsets[i] as usize;
+            let n_end = if i + 1 < self.neighbors_offsets.len() {
                 self.neighbors_offsets[i + 1] as usize
             } else {
-                self.neighbors_index.len()
+                self.neighbors_id_offsets.len()
             };
-            let neighbors: Option<Vec<ZoneID>> = if neighbors_end > neighbors_start {
-                Some(
-                    self.neighbors_index[neighbors_start..neighbors_end]
-                        .iter()
-                        .map(|&idx| ZoneID::StrID(ids[idx as usize].clone()))
-                        .collect(),
-                )
-            } else {
+            let mut neighbors = Vec::new();
+            for j in n_start..n_end {
+                let s = self.neighbors_id_offsets[j] as usize;
+                let e = if j + 1 < self.neighbors_id_offsets.len() {
+                    self.neighbors_id_offsets[j + 1] as usize
+                } else {
+                    self.neighbors_utf8_ids.len()
+                };
+                let id_str = decoder(&self.neighbors_utf8_ids[s..e]);
+                neighbors.push(ZoneID::StrID(id_str));
+            }
+            let neighbors = if neighbors.is_empty() {
                 None
+            } else {
+                Some(neighbors)
             };
 
             zones.push(Zone {
@@ -163,8 +219,37 @@ impl Zones {
         let mut region_offsets = Vec::with_capacity(n);
         let mut region_coords = Vec::new();
 
-        // Pre-pass: collect id strings and build id -> index map
-        for (i, zone) in self.zones.iter().enumerate() {
+        // // Pre-pass: collect id strings and build id -> index map
+        // for (i, zone) in self.zones.iter().enumerate() {
+        //     // size of ids
+        //     id_offsets.push(utf8_ids.len() as u32);
+        //     // ids array
+        //     let id_str = zone.id.to_string(); // ZoneID implements Display
+        //     utf8_ids.extend_from_slice(id_str.as_bytes());
+        //     // optionally add a separator if you need readable boundaries, but offsets suffice
+        //     // no separator to save space
+        // }
+        // // Build mapping from string id -> index
+        // let mut id_to_index: HashMap<String, u32> = HashMap::with_capacity(n);
+        // for (i, zone) in self.zones.iter().enumerate() {
+        //     id_to_index.insert(zone.id.to_string(), i as u32);
+        // }
+
+        // Second pass for centers, vertex counts, regions, children/neighbors
+        // let mut children_offsets = Vec::with_capacity(n);
+        // let mut children_index = Vec::new();
+
+        // let mut neighbors_offsets = Vec::with_capacity(n);
+        // let mut neighbors_index = Vec::new();
+        let mut children_offsets = Vec::new();
+        let mut children_id_offsets = Vec::new();
+        let mut children_utf8_ids = Vec::new();
+
+        let mut neighbors_offsets = Vec::new();
+        let mut neighbors_id_offsets = Vec::new();
+        let mut neighbors_utf8_ids = Vec::new();
+        for zone in &self.zones {
+            // --- id ---
             // size of ids
             id_offsets.push(utf8_ids.len() as u32);
             // ids array
@@ -172,26 +257,14 @@ impl Zones {
             utf8_ids.extend_from_slice(id_str.as_bytes());
             // optionally add a separator if you need readable boundaries, but offsets suffice
             // no separator to save space
-        }
-        // Build mapping from string id -> index
-        let mut id_to_index: HashMap<String, u32> = HashMap::with_capacity(n);
-        for (i, zone) in self.zones.iter().enumerate() {
-            id_to_index.insert(zone.id.to_string(), i as u32);
-        }
-
-        // Second pass for centers, vertex counts, regions, children/neighbors
-        let mut children_offsets = Vec::with_capacity(n);
-        let mut children_index = Vec::new();
-
-        let mut neighbors_offsets = Vec::with_capacity(n);
-        let mut neighbors_index = Vec::new();
-
-        for zone in &self.zones {
             // centers & vertex_count
+            // --- center ---
             center_x.push(zone.center.x());
             center_y.push(zone.center.y());
-            vertex_count.push(zone.vertex_count);
 
+            // --- vertex count ---
+            vertex_count.push(zone.vertex_count);
+            // --- region (just exterior ring) ---
             // region exterior ring flattened (x,y)
             region_offsets.push(region_coords.len() as u32);
             // Use exterior ring points (you may want interior rings too depending on your data)
@@ -199,31 +272,26 @@ impl Zones {
                 region_coords.push(coord.x());
                 region_coords.push(coord.y());
             }
+            // --- children ---
 
             // children -> indices
-            children_offsets.push(children_index.len() as u32);
+            children_offsets.push(children_id_offsets.len() as u32);
             if let Some(children) = &zone.children {
-                for child_id in children {
-                    let idx_opt = id_to_index.get(&child_id.to_string());
-                    if let Some(idx) = idx_opt {
-                        children_index.push(*idx);
-                    } else {
-                        // choose desired behavior if child id not found: skip or push u32::MAX
-                        // here we skip missing children
-                    }
+                for child in children {
+                    children_id_offsets.push(children_utf8_ids.len() as u32);
+                    let c = child.to_string();
+                    children_utf8_ids.extend_from_slice(c.as_bytes());
                 }
             }
 
+            // --- neighbors ---
             // neighbors -> indices
-            neighbors_offsets.push(neighbors_index.len() as u32);
+            neighbors_offsets.push(neighbors_id_offsets.len() as u32);
             if let Some(neighbors) = &zone.neighbors {
-                for neigh_id in neighbors {
-                    let idx_opt = id_to_index.get(&neigh_id.to_string());
-                    if let Some(idx) = idx_opt {
-                        neighbors_index.push(*idx);
-                    } else {
-                        // skip missing neighbor
-                    }
+                for neighbor in neighbors {
+                    neighbors_id_offsets.push(neighbors_utf8_ids.len() as u32);
+                    let n = neighbor.to_string();
+                    neighbors_utf8_ids.extend_from_slice(n.as_bytes());
                 }
             }
         }
@@ -237,9 +305,11 @@ impl Zones {
             region_offsets,
             region_coords,
             children_offsets,
-            children_index,
+            children_id_offsets,
+            children_utf8_ids,
             neighbors_offsets,
-            neighbors_index,
+            neighbors_id_offsets,
+            neighbors_utf8_ids,
         }
     }
 }

@@ -9,6 +9,7 @@
 
 use crate::adapters::h3o::common::{cells_to_zones, res};
 use crate::adapters::h3o::h3o::H3oAdapter;
+use crate::error::dggrid::DggridError;
 use crate::error::h3o::H3oError;
 use crate::error::port::PortError;
 use crate::models::common::Zones;
@@ -16,6 +17,8 @@ use crate::ports::dggrs::DggrsPort;
 use geo::{LineString, Point, Polygon};
 use h3o::geom::{ContainmentMode, TilerBuilder};
 use h3o::{CellIndex, LatLng, Resolution};
+use wasm_bindgen::JsValue;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 pub const MAX_DEPTH: u8 = 10;
@@ -40,6 +43,14 @@ impl Default for H3Impl {
 }
 
 impl DggrsPort for H3Impl {
+            fn zones_from_bbox1(
+        &self,
+        depth: u8,
+        densify: bool,
+        bbox: Option<Vec<Vec<f64>>>,
+    ) -> Result<Zones, PortError> {
+        todo!()
+    }
     fn zones_from_bbox(
         &self,
         depth: u8,

@@ -21,6 +21,9 @@ wasm-bindgen = "0.2.100"
 getrandom    = { version = "0.3", features = ["wasm_js"] }
 serde-wasm-bindgen = "0.6.5"
 js-sys = "0.3.77"
+web-sys = "0.3.77"
+napi = "3.2.4"
+napi-derive = "3.2.4"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/update-unified-crate"}

@@ -14,6 +14,7 @@ use crate::models::common::Zones;
 use crate::ports::dggrs::DggrsPort;
 use core::f64;
 use geo::geometry::Point;
+use wasm_bindgen::JsValue;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -43,6 +44,14 @@ impl Default for Igeo7Impl {
 }
 
 impl DggrsPort for Igeo7Impl {
+        fn zones_from_bbox1(
+        &self,
+        depth: u8,
+        densify: bool,
+        bbox: Option<Vec<Vec<f64>>>,
+    ) -> Result<Zones, PortError>  {
+        todo!()
+    }
     fn zones_from_bbox(
         &self,
         depth: u8,

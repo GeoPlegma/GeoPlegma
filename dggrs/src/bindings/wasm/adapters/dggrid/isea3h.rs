@@ -1,6 +1,6 @@
 use crate::{
     adapters::dggrid::isea3h::{
-        extract_res_from_cellid, extract_res_from_z3, extract_res_from_z7, isea3h_metafile,
+        extract_res_from_cellid, extract_res_from_z3, extract_res_from_z7,
     },
     bindings::wasm::adapters::dggrid::dggrid::DggridAdapter,
 };
@@ -31,9 +31,9 @@ impl Isea3hImplWasm {
 //     }
 // }
 
-#[wasm_bindgen]
-pub fn isea3h_metafile_wasm(meta_path: String) -> Result<(), JsValue> {
-    isea3h_metafile(&PathBuf::from(meta_path))
-        .map_err(|e| JsValue::from_str(&format!("Metafile error: {e}")));
-    Ok(())
-}
+// #[wasm_bindgen]
+// pub fn isea3h_metafile_wasm(meta_path: String) -> Result<(), JsValue> {
+//     isea3h_metafile(&PathBuf::from(meta_path))
+//         .map_err(|e| JsValue::from_str(&format!("Metafile error: {e}")));
+//     Ok(())
+// }
