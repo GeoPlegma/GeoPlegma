@@ -95,7 +95,6 @@ impl Dggrs {
         }
     }
 
-    // impl DggrsPort for Isea3hImpl {
     #[napi(js_name = zonesFromBbox)]
     pub fn zones_from_bbox(
         &self,

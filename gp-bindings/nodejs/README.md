@@ -21,7 +21,7 @@ npm run test
 ```bash
 npm run build
 ```
-This script will build and copy the index.node and index.d.ts files into `dist`. This folder will be used in the npm library as source code files.
+The `build` script will build a new folder `dist` with the bundled files inside, and copy the index.node and index.d.ts files into that same folder. This folder will be used in the npm library as the source code files.
 
 
 NOTE: Eventually a github job will be added for this statement workflow.
