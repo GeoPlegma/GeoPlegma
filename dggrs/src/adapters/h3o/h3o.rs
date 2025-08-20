@@ -7,7 +7,6 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[derive(Clone, Copy)]
 pub struct H3oAdapter {}
 
 impl H3oAdapter {

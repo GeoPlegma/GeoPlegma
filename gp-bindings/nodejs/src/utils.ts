@@ -1,3 +1,48 @@
+// for now the type is `any`, I will add other types in other PRs
+export function decodeZones(zones: any) {
+  const decodedZones: any = [];
+  const bufferIds = Buffer.from(zones.utf8Ids);
+  const bufferCoords = new Float64Array(zones.regionCoords);
+
+  for (let i = 0; i < zones.idOffsets.length; i++) {
+    const start = zones.idOffsets[i];
+    const end =
+      i + 1 < zones.idOffsets.length
+        ? zones.idOffsets[i + 1]
+        : bufferIds.length;
+    const id = new TextDecoder("utf-8").decode(bufferIds.subarray(start, end));
+
+    // region coords
+    const vertexCount = zones.vertexCount[i];
+    const regionStart = zones.regionOffsets[i];
+    const bufferRegion = bufferCoords.subarray(
+      regionStart,
+      regionStart + vertexCount * 2
+    );
+    const region = [];
+    for (let j = 0; j < bufferRegion.length; j += 2) {
+      region.push([bufferRegion[j], bufferRegion[j + 1]]);
+    }
+
+    // children
+    const children = decodeChildren(zones, i);
+
+    // neighbors
+    const neighbors = decodeNeighbors(zones, i);
+
+    decodedZones.push({
+      id,
+      center: [zones.centerX[i], zones.centerY[i]],
+      vertexCount,
+      region,
+      children,
+      neighbors,
+    });
+  }
+
+  return decodedZones;
+}
+
 export function decodeChildren(jsZones: any, zoneIndex: any) {
   const children = [];
   const start = jsZones.childrenOffsets[zoneIndex];

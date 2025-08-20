@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use napi::{Error};
+use napi::Error;
 
 use crate::{
     adapters::dggrid::{igeo7::Igeo7Impl, isea3h::Isea3hImpl},
@@ -11,6 +11,7 @@ use crate::{
 };
 
 use napi_derive::napi;
+
 #[napi]
 pub struct Dggrs {
     inner: DggrsPortEnum,
@@ -94,26 +95,12 @@ impl Dggrs {
         densify: bool,
         bbox: Option<Vec<Vec<f64>>>,
     ) -> napi::Result<JsZones> {
-        // Convert JsValue -> Option<Vec<Vec<f64>>>
-        // let bbox_rust: Option<Vec<Vec<f64>>> = if bbox.is_null() || bbox.is_undefined() {
-        //     None
-        // } else {
-        //     from_value(bbox).map_err(|e| JsValue::from_str(&format!("bad bbox: {}", e)))?
-        // };
         let zones = self
             .inner
             .zones_from_bbox(depth, densify, bbox)
             .map_err(|e| Error::from_reason(e.to_string()))?;
 
-        // Ok(JsZones::from(&zones))
         Ok(zones.to_export())
-        // {
-        //     Ok(z) => {
-        //         let zones = z.to_export();
-        //         Ok(zones)
-        //     }
-        //     Err(err) => Err(err),
-        // }
     }
 
     #[napi(js_name = zoneFromPoint)]

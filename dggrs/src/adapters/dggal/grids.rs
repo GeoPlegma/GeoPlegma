@@ -17,9 +17,7 @@ use dggal_rust::dggal;
 use dggal_rust::ecrt;
 use ecrt::Application;
 use geo::Point;
-use wasm_bindgen::JsValue;
 use std::env;
-use std::path::PathBuf;
 
 // fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
 //     let args: Vec<String> = env::args().collect();

@@ -2,17 +2,17 @@
 /* eslint-disable */
 export declare class Dggrs {
   constructor(dggrs: string)
-  zonesFromBbox(depth: number, densify: boolean, bbox?: Array<Array<number>> | undefined | null): JsZones
-  zoneFromPoint(depth: number, point: Array<number>, densify: boolean): JsZones
-  zonesFromParent(depth: number, parentZoneId: string, densify: boolean): JsZones
-  zoneFromId(zoneId: string, densify: boolean): JsZones
+  zonesFromBbox(depth: number, densify: boolean, bbox?: Array<Array<number>> | undefined | null): FlatZones
+  zoneFromPoint(depth: number, point: Array<number>, densify: boolean): FlatZones
+  zonesFromParent(depth: number, parentZoneId: string, densify: boolean): FlatZones
+  zoneFromId(zoneId: string, densify: boolean): FlatZones
 }
 
 /**
  * The Zone struct has nested heap allocations (String, Vec<(f64,f64)>, Vec<String>), which means:
  * - Each String is 24 bytes (ptr, len, capacity) + heap data.
- * - Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm.
- * - napi-rs will have to walk and serialize everything, which is slow for thousands of zones.
+ * - Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm/napi-rs.
+ * - wasm/napi-rs will have to walk and serialize everything, which is slow for thousands of zones.
  * No napi-rs overhead per zone — you pass one pointer + length per field instead of millions of small objects.
  * Zero-copy — JS reads directly from WebAssembly memory.
  * Keeps geometry-heavy Zone struct in Rust for efficient calculations.
@@ -21,7 +21,7 @@ export declare class Dggrs {
  * Pro: Hugely faster for large datasets
  * Con: JS side reconstruction is manual — you need to decode UTF-8 strings from byte arrays using TextDecoder and use offset tables.
  */
-export interface JsZones {
+export interface FlatZones {
   idOffsets: Array<number>
   utf8Ids: Array<number>
   centerX: Array<number>
@@ -35,4 +35,18 @@ export interface JsZones {
   neighborsOffsets: Array<number>
   neighborsIdOffsets: Array<number>
   neighborsUtf8Ids: Array<number>
+}
+
+export declare const enum Id {
+  String = 'String',
+  U64 = 'U64'
+}
+
+export interface Zone {
+  id: Id
+  region: Array<Array<number>>
+  center: Array<number>
+  vertexCount: number
+  children?: Array<Id>
+  neighbors?: Array<Id>
 }

@@ -1,17 +1,30 @@
 use geo::{LineString, Point, Polygon};
 use napi_derive::napi;
-use std::{collections::HashMap, fmt};
-use wasm_bindgen::prelude::*;
 
 use crate::{
     models::common::{Zone, ZoneID, Zones},
 };
 
+#[napi(object, js_name=Zone)]
+pub struct RustZone {
+    pub id: Id,
+    pub region: Vec<Vec<f64>>,
+    pub center: Vec<f64>,
+    pub vertex_count: u32,
+    pub children: Option<Vec<Id>>,
+    pub neighbors: Option<Vec<Id>>,
+}
+
+#[napi(string_enum)]
+pub enum Id {
+    String,
+    U64,
+}
+
 /// The Zone struct has nested heap allocations (String, Vec<(f64,f64)>, Vec<String>), which means:
 /// - Each String is 24 bytes (ptr, len, capacity) + heap data.
-/// - Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm.
-/// - napi-rs will have to walk and serialize everything, which is slow for thousands of zones.
-
+/// - Each (f64, f64) is fine in Rust, but Vec<(f64,f64)> is not a flat Vec<f64> in wasm/napi-rs.
+/// - wasm/napi-rs will have to walk and serialize everything, which is slow for thousands of zones.
 /// No napi-rs overhead per zone — you pass one pointer + length per field instead of millions of small objects.
 /// Zero-copy — JS reads directly from WebAssembly memory.
 /// Keeps geometry-heavy Zone struct in Rust for efficient calculations.
@@ -19,8 +32,7 @@ use crate::{
 /// Tradeoff
 /// Pro: Hugely faster for large datasets
 /// Con: JS side reconstruction is manual — you need to decode UTF-8 strings from byte arrays using TextDecoder and use offset tables.
-// #[wasm_bindgen]
-#[napi(object)]
+#[napi(object, js_name=FlatZones)]
 pub struct JsZones {
     // zone ids flattened
     pub id_offsets: Vec<u32>, // len = num_zones (start index of each id in utf8_ids)
