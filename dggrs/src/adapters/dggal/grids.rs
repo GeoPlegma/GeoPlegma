@@ -52,14 +52,6 @@ fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
 }
 
 impl DggrsPort for DggalImpl {
-            fn zones_from_bbox1(
-        &self,
-        depth: u8,
-        densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Result<Zones, PortError>  {
-        todo!()
-    }
     fn zones_from_bbox(
         &self,
         depth: u8,

@@ -7,20 +7,11 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::path::PathBuf;
-
 use crate::error::port::PortError;
 use crate::models::common::Zones;
 use geo::Point;
-use wasm_bindgen::JsValue;
 // That is the port
 pub trait DggrsPort: Send + Sync {
-    fn zones_from_bbox1(
-        &self,
-        depth: u8,
-        densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Result<Zones, PortError> ;
     fn zones_from_bbox(
         &self,
         depth: u8,

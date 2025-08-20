@@ -43,14 +43,6 @@ impl Default for H3Impl {
 }
 
 impl DggrsPort for H3Impl {
-            fn zones_from_bbox1(
-        &self,
-        depth: u8,
-        densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Result<Zones, PortError> {
-        todo!()
-    }
     fn zones_from_bbox(
         &self,
         depth: u8,

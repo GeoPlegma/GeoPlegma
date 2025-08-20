@@ -2,46 +2,9 @@ use geo::{LineString, Point, Polygon};
 use napi_derive::napi;
 use std::{collections::HashMap, fmt};
 use wasm_bindgen::prelude::*;
-// use napi_derive::napi;
 
-// use crate::models::common::{Zone, Zones};
-// #[napi(object)]
-// pub struct JsZone {
-//     pub id: String, // Flatten ZoneID
-//     pub center: (f64, f64),
-//     pub region: Vec<(f64, f64)>, // Exterior ring
-//     pub vertex_count: u32,
-//     pub children: Option<Vec<String>>,
-//     pub neighbors: Option<Vec<String>>,
-// }
-// #[napi(object)]
-// pub struct JsZones {
-//     pub zones: Vec<JsZone>,
-// }
-// #[napi]
-// impl From<&Zone> for JsZone {
-//     fn from(zone: &Zone) -> Self {
-//         JsZone {
-//             id: zone.id.to_string(),
-//             center: (zone.center.x(), zone.center.y()),
-//             region: zone.region.exterior().points().map(|p| (p.x(), p.y())).collect(),
-//             vertex_count: zone.vertex_count,
-//             children: zone.children.as_ref().map(|vec| vec.iter().map(|id| id.to_string()).collect()),
-//             neighbors: zone.neighbors.as_ref().map(|vec| vec.iter().map(|id| id.to_string()).collect()),
-//         }
-//     }
-// }
-// #[napi]
-// impl From<&Zones> for JsZones {
-//     fn from(zones: &Zones) -> Self {
-//         JsZones {
-//             zones: zones.zones.iter().map(JsZone::from).collect(),
-//         }
-//     }
-// }
 use crate::{
     models::common::{Zone, ZoneID, Zones},
-    wasm_fields_clone,
 };
 
 /// The Zone struct has nested heap allocations (String, Vec<(f64,f64)>, Vec<String>), which means:
@@ -84,20 +47,6 @@ pub struct JsZones {
     pub neighbors_id_offsets: Vec<u32>,
     pub neighbors_utf8_ids: Vec<u8>,
 }
-
-// wasm_fields_clone!(
-//     JsZones,
-//     (get_id_offsets, set_id_offsets, id_offsets, "id_offsets", Vec<u32>),
-//     (get_utf8_ids, set_utf8_ids, utf8_ids, "utf8_ids", Vec<u8>),
-//     (get_center_x, set_center_x, center_x, "center_x", Vec<f64>),
-//     (get_center_y, set_center_y, center_y, "center_y", Vec<f64>),
-//     (get_vertex_count, set_vertex_count, vertex_count, "vertex_count", Vec<u32>),
-//     (get_region_offset, set_region_offset, region_offsets, "region_offset", Vec<u32>),
-//     (get_region_coords, set_region_coords, region_coords, "region_coords", Vec<f64>),
-//     (get_children_offsets, set_children_offsets, children_offsets, "children_offsets",Vec<u32>),
-//     (get_children_index, set_children_index, children_index, "children_index",Vec<u32>),
-//     (get_neighbors_offsets, set_neighbors_offsets, neighbors_offsets, "neighbors_offsets",Vec<u32>),
-//     (get_neighbors_index, set_neighbors_index, neighbors_index, "neighbors_index",Vec<u32>));
 
 #[napi]
 impl JsZones {
@@ -219,28 +168,6 @@ impl Zones {
         let mut region_offsets = Vec::with_capacity(n);
         let mut region_coords = Vec::new();
 
-        // // Pre-pass: collect id strings and build id -> index map
-        // for (i, zone) in self.zones.iter().enumerate() {
-        //     // size of ids
-        //     id_offsets.push(utf8_ids.len() as u32);
-        //     // ids array
-        //     let id_str = zone.id.to_string(); // ZoneID implements Display
-        //     utf8_ids.extend_from_slice(id_str.as_bytes());
-        //     // optionally add a separator if you need readable boundaries, but offsets suffice
-        //     // no separator to save space
-        // }
-        // // Build mapping from string id -> index
-        // let mut id_to_index: HashMap<String, u32> = HashMap::with_capacity(n);
-        // for (i, zone) in self.zones.iter().enumerate() {
-        //     id_to_index.insert(zone.id.to_string(), i as u32);
-        // }
-
-        // Second pass for centers, vertex counts, regions, children/neighbors
-        // let mut children_offsets = Vec::with_capacity(n);
-        // let mut children_index = Vec::new();
-
-        // let mut neighbors_offsets = Vec::with_capacity(n);
-        // let mut neighbors_index = Vec::new();
         let mut children_offsets = Vec::new();
         let mut children_id_offsets = Vec::new();
         let mut children_utf8_ids = Vec::new();
@@ -273,7 +200,6 @@ impl Zones {
                 region_coords.push(coord.y());
             }
             // --- children ---
-
             // children -> indices
             children_offsets.push(children_id_offsets.len() as u32);
             if let Some(children) = &zone.children {

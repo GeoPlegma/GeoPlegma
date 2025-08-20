@@ -61,12 +61,24 @@ export class Dggrs extends Aux {
   constructor(name: string) {
     super(name);
   }
-  zonesFromBbox1(
+  zonesFromBbox(
     depth: number,
     densify: boolean,
     bbox?: Array<Array<number>> | undefined | null
   ): any {
-    const zones = super.zonesFromBbox1(depth, densify, bbox);
+    const zones = super.zonesFromBbox(depth, densify, bbox);
+    return decodeZones(zones);
+  }
+  zoneFromPoint(depth: number, point: Array<number>, densify: boolean): any {
+    const zones = super.zoneFromPoint(depth, point, densify);
+    return decodeZones(zones);
+  }
+  zonesFromParent(depth: number, parentZoneId: String, densify: boolean): any {
+    const zones = super.zonesFromParent(depth, parentZoneId, densify);
+    return decodeZones(zones);
+  }
+  zoneFromId(zoneId: number, densify: boolean): any {
+    const zones = super.zoneFromId(zoneId, densify);
     return decodeZones(zones);
   }
 }

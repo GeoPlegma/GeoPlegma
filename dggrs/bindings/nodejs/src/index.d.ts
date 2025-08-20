@@ -2,8 +2,10 @@
 /* eslint-disable */
 export declare class Dggrs {
   constructor(dggrs: string)
-  add(a: number, b: number): number
-  zonesFromBbox1(depth: number, densify: boolean, bbox?: Array<Array<number>> | undefined | null): JsZones
+  zonesFromBbox(depth: number, densify: boolean, bbox?: Array<Array<number>> | undefined | null): JsZones
+  zoneFromPoint(depth: number, point: Array<number>, densify: boolean): JsZones
+  zonesFromParent(depth: number, parentZoneId: string, densify: boolean): JsZones
+  zoneFromId(zoneId: string, densify: boolean): JsZones
 }
 
 /**

@@ -44,66 +44,66 @@ impl Default for Isea3hImpl {
 }
 
 impl DggrsPort for Isea3hImpl {
-    fn zones_from_bbox1(
-        &self,
-        depth: u8,
-        densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Result<Zones, PortError> {
-        // THIS WORKS
-        let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
-            common::dggrid_setup(&self.adapter.workdir);
+    // fn zones_from_bbox1(
+    //     &self,
+    //     depth: u8,
+    //     densify: bool,
+    //     bbox: Option<Vec<Vec<f64>>>,
+    // ) -> Result<Zones, PortError> {
+    //     // THIS WORKS
+    //     let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
+    //         common::dggrid_setup(&self.adapter.workdir);
 
-        let _ = common::dggrid_metafile(
-            &meta_path,
-            &depth,
-            &aigen_path.with_extension(""),
-            &children_path.with_extension(""),
-            &neighbor_path.with_extension(""),
-            densify,
-        );
+    //     let _ = common::dggrid_metafile(
+    //         &meta_path,
+    //         &depth,
+    //         &aigen_path.with_extension(""),
+    //         &children_path.with_extension(""),
+    //         &neighbor_path.with_extension(""),
+    //         densify,
+    //     );
 
-        let _ = isea3h_metafile(&meta_path);
+    //     let _ = isea3h_metafile(&meta_path);
 
-        // if let Some(bbox) = &bbox {
-        //     let _ = common::bbox_to_aigen(bbox, &bbox_path);
+    //     // if let Some(bbox) = &bbox {
+    //     //     let _ = common::bbox_to_aigen(bbox, &bbox_path);
 
-        //     // Append to metafile
-        //     // let mut meta_file = OpenOptions::new()
-        //     //     .append(true)
-        //     //     .write(true)
-        //     //     .open(&meta_path)
-        //     //     .expect("cannot open file");
-        //     // append_to_file(meta_path, &contents);
-        //     let contents = format!(
-        //         "clip_subset_type AIGEN\n\
-        //  clip_region_files {} \n\
-        //  ",
-        //         &bbox_path.to_string_lossy()
-        //     );
+    //     //     // Append to metafile
+    //     //     // let mut meta_file = OpenOptions::new()
+    //     //     //     .append(true)
+    //     //     //     .write(true)
+    //     //     //     .open(&meta_path)
+    //     //     //     .expect("cannot open file");
+    //     //     // append_to_file(meta_path, &contents);
+    //     //     let contents = format!(
+    //     //         "clip_subset_type AIGEN\n\
+    //     //  clip_region_files {} \n\
+    //     //  ",
+    //     //         &bbox_path.to_string_lossy()
+    //     //     );
 
-        //     let _ = append_to_file(&meta_path, &contents);
-        //     // let _ = writeln!(meta_file, "clip_subset_type AIGEN");
-        //     // let _ = writeln!(
-        //     //     meta_file,
-        //     //     "clip_region_files {}",
-        //     //     &bbox_path.to_string_lossy()
-        //     // );
-        // }
+    //     //     let _ = append_to_file(&meta_path, &contents);
+    //     //     // let _ = writeln!(meta_file, "clip_subset_type AIGEN");
+    //     //     // let _ = writeln!(
+    //     //     //     meta_file,
+    //     //     //     "clip_region_files {}",
+    //     //     //     &bbox_path.to_string_lossy()
+    //     //     // );
+    //     // }
 
-        common::print_file(meta_path.clone());
-        common::dggrid_execute(&self.adapter.executable, &meta_path);
-        let result = common::dggrid_parse(&aigen_path, &children_path, &neighbor_path, &depth)?;
+    //     common::print_file(meta_path.clone());
+    //     common::dggrid_execute(&self.adapter.executable, &meta_path);
+    //     let result = common::dggrid_parse(&aigen_path, &children_path, &neighbor_path, &depth)?;
 
-        common::dggrid_cleanup(
-            &meta_path,
-            &aigen_path,
-            &children_path,
-            &neighbor_path,
-            &bbox_path,
-        );
-        Ok(result)
-    }
+    //     common::dggrid_cleanup(
+    //         &meta_path,
+    //         &aigen_path,
+    //         &children_path,
+    //         &neighbor_path,
+    //         &bbox_path,
+    //     );
+    //     Ok(result)
+    // }
     fn zones_from_bbox(
         &self,
         depth: u8,
