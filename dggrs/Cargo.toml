@@ -28,6 +28,7 @@ dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/
 [lib]
 crate-type = ["cdylib"]
 
+# this is for later when we have wasm for browser
 [features]
 # Defines a feature named `webp` that does not enable any other features.
 default = ["native"]
