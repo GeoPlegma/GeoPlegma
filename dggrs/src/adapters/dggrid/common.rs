@@ -11,7 +11,7 @@ use crate::error::dggrid::DggridError;
 use crate::models::common::{Zone, ZoneID, Zones};
 use core::f64;
 use geo::geometry::{LineString, Point, Polygon};
-use rand::distr::{Alphanumeric, SampleString};
+use rand::distributions::{Alphanumeric, DistString};
 use std::fs;
 use std::fs::File;
 use std::io::{self, BufRead, Write};

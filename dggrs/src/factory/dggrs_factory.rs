@@ -7,10 +7,9 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#[cfg(feature = "native")]
-use crate::adapters::{dggal::grids::DggalImpl, h3o::h3::H3Impl};
-
-use crate::adapters::{dggrid::igeo7::Igeo7Impl, dggrid::isea3h::Isea3hImpl};
+use crate::adapters::{
+    dggal::grids::DggalImpl, dggrid::igeo7::Igeo7Impl, dggrid::isea3h::Isea3hImpl, h3o::h3::H3Impl,
+};
 use crate::error::factory::FactoryError;
 use crate::ports::dggrs::DggrsPort;
 use std::sync::Arc;
@@ -19,19 +18,12 @@ pub fn get(tool: &str, dggrs: &str) -> Result<Arc<dyn DggrsPort>, FactoryError> 
     match (tool.to_uppercase().as_str(), dggrs.to_uppercase().as_str()) {
         ("DGGRID", "ISEA3H") => Ok(Arc::new(Isea3hImpl::default())),
         ("DGGRID", "IGEO7") => Ok(Arc::new(Igeo7Impl::default())),
-        #[cfg(feature = "native")]
         ("H3O", "H3") => Ok(Arc::new(H3Impl::default())),
-        #[cfg(feature = "native")]
         ("DGGAL", "IVEA3H") => Ok(Arc::new(DggalImpl::new("IVEA3H"))),
-        #[cfg(feature = "native")]
         ("DGGAL", "IVEA9R") => Ok(Arc::new(DggalImpl::new("IVEA9R"))),
-        #[cfg(feature = "native")]
         ("DGGAL", "ISEA3H") => Ok(Arc::new(DggalImpl::new("ISEA3H"))),
-        #[cfg(feature = "native")]
         ("DGGAL", "ISEA9R") => Ok(Arc::new(DggalImpl::new("ISEA9R"))),
-        #[cfg(feature = "native")]
         ("DGGAL", "RTEA3H") => Ok(Arc::new(DggalImpl::new("RTEA3H"))),
-        #[cfg(feature = "native")]
         ("DGGAL", "RTEA9R") => Ok(Arc::new(DggalImpl::new("RTEA9R"))),
         _ => Err(FactoryError::UnsupportedCombination {
             tool: tool.to_string(),

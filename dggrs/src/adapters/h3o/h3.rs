@@ -19,6 +19,7 @@ use h3o::{CellIndex, LatLng, Resolution};
 use std::str::FromStr;
 
 pub const MAX_DEPTH: u8 = 10;
+
 pub struct H3Impl {
     pub adapter: H3oAdapter,
 }
