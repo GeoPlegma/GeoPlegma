@@ -1,5 +1,5 @@
 // Copyright 2025 contributors to the GeoPlegmata project.
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,62 +8,88 @@
 // except according to those terms.
 
 use crate::error::dggal::DggalError;
-use crate::models::common::{Zone, ZoneID, Zones};
+use crate::models::common::{Zone, ZoneId, Zones};
+use crate::ports::dggrs::DggrsPortConfig;
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
-use geo::LineString;
-use geo::Point;
-use geo::Polygon;
-use geo::coord;
+use geo::{GeodesicArea, LineString, Point, Polygon, Rect, coord};
 
-pub fn ids_to_zones(dggrs: DGGRS, ids: Vec<DGGRSZone>) -> Result<Zones, DggalError> {
-    let zones: Vec<Zone> = ids
+pub fn to_zones(
+    dggrs: DGGRS,
+    dggal_zones: Vec<DGGRSZone>,
+    conf: DggrsPortConfig,
+) -> Result<Zones, DggalError> {
+    let zones: Vec<Zone> = dggal_zones
         .into_iter()
-        .map(|id| {
-            let dggal_geo_points: Vec<GeoPoint> = dggrs.getZoneWGS84Vertices(id);
-            let region: Polygon<f64> = to_polygon(&dggal_geo_points);
+        .map(|dggal_zone| {
+            let id = ZoneId::new_int(dggal_zone);
 
-            let center_point = dggrs.getZoneWGS84Centroid(id);
-            let center: Point<f64> = to_point(&center_point);
+            let center = if conf.center {
+                let center_point = dggrs.getZoneWGS84Centroid(dggal_zone);
+                Some(to_point(&center_point))
+            } else {
+                None
+            };
 
-            let count_edges: u32 = dggrs.countZoneEdges(id).try_into().unwrap(); // NOTE: Implement proper error ahndling in error.rs (to be created) and do pattern matching here. 
-            //
-            //
-            let count_edges: u32 = dggrs.countZoneEdges(id).try_into().map_err(|e| {
-                DggalError::EdgeCountConversion {
-                    zone_id: id.to_string(),
-                    source: e,
-                }
-            })?;
+            let region = if conf.neighbors || conf.area_sqm {
+                let dggal_geo_points = if conf.densify {
+                    dggrs.getZoneRefinedWGS84Vertices(dggal_zone, 0)
+                } else {
+                    dggrs.getZoneWGS84Vertices(dggal_zone)
+                };
+                Some(to_polygon(&dggal_geo_points))
+            } else {
+                None
+            };
 
-            // TODO: Wrap the children and neighbors into an if statement if requested.
-            //let children = dggrs.getSubZones(id, 1);
+            let area_sqm = if conf.area_sqm {
+                region.as_ref().map(|r| r.geodesic_area_unsigned()) // NOTE: It is also an option to use the build in area function of H3o
+            } else {
+                None
+            };
 
-            let children: Option<Vec<ZoneID>> = Some(
-                dggrs
-                    .getZoneChildren(id)
+            let vertex_count = if conf.vertex_count {
+                let vc = dggrs.countZoneEdges(dggal_zone).try_into().map_err(|e| {
+                    DggalError::EdgeCountConversion {
+                        zone_id: dggal_zone.to_string(),
+                        source: e,
+                    }
+                })?;
+                Some(vc)
+            } else {
+                None
+            };
+
+            let children = if conf.children {
+                let c: Vec<ZoneId> = dggrs
+                    .getZoneChildren(dggal_zone)
                     .into_iter()
                     .map(to_u64_zone_id)
-                    .collect(),
-            );
+                    .collect();
+                Some(c)
+            } else {
+                None
+            };
 
-            let mut nb_types: [i32; 6] = [0; 6];
-            //let neighbors = dggrs.getZoneNeighbors(id, &mut nb_types);
-
-            let neighbors: Option<Vec<ZoneID>> = Some(
-                dggrs
-                    .getZoneNeighbors(id, &mut nb_types)
+            let neighbors = if conf.neighbors {
+                let mut nb_types: [i32; 6] = [0; 6]; // WARN: don't replace this
+                let n: Vec<ZoneId> = dggrs
+                    .getZoneNeighbors(dggal_zone, &mut nb_types)
                     .into_iter()
                     .map(to_u64_zone_id)
-                    .collect(),
-            );
+                    .collect();
+                Some(n)
+            } else {
+                None
+            };
 
             Ok(Zone {
-                id: ZoneID::IntID(id),
+                id,
                 region,
-                vertex_count: count_edges,
                 center,
-                children, // TODO: we need to make an enum for string and integer based indicies
+                vertex_count,
+                children,
                 neighbors,
+                area_sqm,
             })
         })
         .collect::<Result<Vec<Zone>, DggalError>>()?;
@@ -88,9 +114,9 @@ fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
     Polygon::new(LineString::from(coords), vec![])
 }
 
-fn to_u64_zone_id(id: DGGRSZone) -> ZoneID {
+fn to_u64_zone_id(id: DGGRSZone) -> ZoneId {
     // NOTE: Expand this to do the conversion automaticallt
-    ZoneID::IntID(id)
+    ZoneId::IntId(id)
 }
 
 pub fn to_geo_point(pt: Point) -> GeoPoint {
@@ -100,19 +126,19 @@ pub fn to_geo_point(pt: Point) -> GeoPoint {
     }
 }
 
-pub fn to_geo_extent(bbox: Option<Vec<Vec<f64>>>) -> GeoExtent {
-    match bbox {
-        Some(coords) if coords.len() == 2 && coords[0].len() == 2 && coords[1].len() == 2 => {
-            let ll = GeoPoint {
-                lat: coords[0][1].to_radians(),
-                lon: coords[0][0].to_radians(),
-            };
-            let ur = GeoPoint {
-                lat: coords[1][1].to_radians(),
-                lon: coords[1][0].to_radians(),
-            };
-            GeoExtent { ll, ur }
-        }
-        _ => panic!("Invalid bounding box format"), // FIX: remove panic. bbox: Option<Vec<Vec<f64>>> has to be replaced with geo::geometry::Rect here https://docs.rs/geo/latest/geo/geometry/struct.Rect.html
+/// Convert geo::Rect BBox to DGGAL::GeoExtent
+pub fn bbox_to_geoextent(bbox: &Rect<f64>) -> GeoExtent {
+    let min = bbox.min(); // lower-left in degrees
+    let max = bbox.max(); // upper-right in degrees
+
+    GeoExtent {
+        ll: GeoPoint {
+            lat: min.y.to_radians(),
+            lon: min.x.to_radians(),
+        },
+        ur: GeoPoint {
+            lat: max.y.to_radians(),
+            lon: max.x.to_radians(),
+        },
     }
 }

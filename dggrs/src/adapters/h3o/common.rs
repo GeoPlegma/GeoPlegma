@@ -1,5 +1,5 @@
 // Copyright 2025 contributors to the GeoPlegmata project.
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -8,14 +8,23 @@
 // except according to those terms.
 
 use crate::{
-    error::h3o::H3oError,
-    models::common::{Zone, ZoneID, Zones},
+    error::{h3o::H3oError, port::GeoPlegmaError},
+    models::common::{RefinementLevel, Zone, ZoneId, Zones},
+    ports::dggrs::DggrsPortConfig,
 };
-use geo::{Coord, CoordsIter, LineString, Point, Polygon};
+use geo::{Coord, CoordsIter, GeodesicArea, LineString, Point, Polygon};
 use h3o::{Boundary, CellIndex, LatLng, Resolution};
 
-pub fn res(level: u8) -> Resolution {
-    Resolution::try_from(level).unwrap_or_else(|_| panic!("Invalid H3 resolution: {}", level))
+/// Translates integer resolution to H3 string resolution
+pub fn refinement_level_to_h3_resolution(
+    refinement_level: RefinementLevel,
+) -> Result<Resolution, GeoPlegmaError> {
+    Resolution::try_from(refinement_level.get()).map_err(|e| {
+        GeoPlegmaError::H3o(H3oError::CannotTranslateToH3Resolution {
+            rf: refinement_level.to_string(),
+            source: e,
+        })
+    })
 }
 
 pub fn boundary_to_polygon(boundary: &Boundary) -> Polygon<f64> {
@@ -50,50 +59,77 @@ pub fn latlng_to_point(latlng: LatLng) -> Point {
     Point::new(latlng.lng(), latlng.lat())
 }
 
-pub fn cells_to_zones(cells: Vec<CellIndex>) -> Result<Zones, H3oError> {
-    let zones: Vec<Zone> = cells
+pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsPortConfig) -> Result<Zones, GeoPlegmaError> {
+    let zones: Vec<Zone> = h3o_zones
         .into_iter()
-        .map(|cell| {
-            let id = ZoneID::StrID(cell.to_string());
+        .map(|h3o_zone| {
+            let id = ZoneId::new_hex(&h3o_zone.to_string())?;
 
-            let center = LatLng::from(cell);
-            let center_point = latlng_to_point(center); // geo::Point
+            let center = if conf.center {
+                let ll = LatLng::from(h3o_zone);
+                Some(latlng_to_point(ll)) // geo::Point
+            } else {
+                None
+            };
 
-            let boundary = cell.boundary();
-            let region = boundary_to_polygon(&boundary); // geo::Polygon
+            let region = if conf.region || conf.area_sqm || conf.vertex_count {
+                let boundary = h3o_zone.boundary();
+                Some(boundary_to_polygon(&boundary)) // geo::Polygon
+            } else {
+                None
+            };
 
-            let vertex_count = region.exterior().coords_count() as u32;
+            let area_sqm = if conf.area_sqm {
+                region.as_ref().map(|r| r.geodesic_area_unsigned()) // NOTE: It is also an option to use the build in area function of H3o
+            } else {
+                None
+            };
 
-            let child_res = cell
-                .resolution()
-                .succ() // succ() returns an Option, therefore we can use ok_or_else in the next line and not map_err
-                .ok_or_else(|| H3oError::ResolutionLimitReached {
-                    zone_id: cell.to_string(),
-                })?;
+            let vertex_count = if conf.vertex_count {
+                region.as_ref().map(|r| r.exterior().coords_count() as u32) // NOTE: It is also an option to use the build-in vertex function of H3o
+            } else {
+                None
+            };
 
-            let children_opt = Some(
-                cell.children(child_res)
-                    .map(|c| ZoneID::StrID(c.to_string()))
-                    .collect(),
-            );
+            let children = if conf.children {
+                let chr_res = h3o_zone
+                    .resolution()
+                    .succ() // NOTE: succ() returns an Option, therefore we can use ok_or_else in the next line and not map_err
+                    .ok_or_else(|| H3oError::ResolutionLimitReached {
+                        zone_id: h3o_zone.to_string(),
+                    })?;
 
-            let neighbors_opt = Some(
-                cell.grid_disk::<Vec<_>>(1)
+                let chr_vec: Vec<ZoneId> = h3o_zone
+                    .children(chr_res)
+                    .map(|c| ZoneId::new_hex(&c.to_string()))
+                    .collect::<Result<_, _>>()?; // NOTE: In Result<_ , _>> the _ means that the T and E are inferred. 
+                Some(chr_vec)
+            } else {
+                None
+            };
+
+            let neighbors = if conf.neighbors {
+                let nbr: Vec<ZoneId> = h3o_zone
+                    .grid_disk::<Vec<CellIndex>>(1)
                     .into_iter()
-                    .map(|c| ZoneID::StrID(c.to_string()))
-                    .collect(),
-            );
+                    .map(|c| ZoneId::new_hex(&c.to_string()))
+                    .collect::<Result<_, _>>()?; // NOTE: In Result<_ , _>> the _ means that the T and E are inferred. 
+                Some(nbr)
+            } else {
+                None
+            };
 
             Ok(Zone {
                 id,
                 region,
+                center,
                 vertex_count,
-                center: center_point,
-                children: children_opt,
-                neighbors: neighbors_opt,
+                children,
+                neighbors,
+                area_sqm,
             })
         })
-        .collect::<Result<Vec<Zone>, H3oError>>()?;
+        .collect::<Result<Vec<Zone>, GeoPlegmaError>>()?;
 
     Ok(Zones { zones })
 }

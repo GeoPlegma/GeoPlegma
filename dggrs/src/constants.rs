@@ -1,4 +1,4 @@
-// Copyright 2025 contributors to the GeoPlegma project.
+// Copyright 2025 contributors to the GeoPlegmata project.
 // Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
@@ -7,14 +7,14 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![doc = include_str!("../../README.md")]
-pub mod adapters;
-pub mod constants;
-pub mod error;
-pub mod factory;
-pub mod models;
-pub mod ports;
+use geo::{Coord, Rect};
 
-/// This is the only re-export that is needed.
-pub use factory::dggrs_factory::get;
-pub use ports::dggrs::DggrsPortConfig as config;
+pub fn whole_earth_bbox() -> Rect<f64> {
+    Rect::new(
+        Coord {
+            x: -180.0,
+            y: -90.0,
+        },
+        Coord { x: 180.0, y: 90.0 },
+    )
+}

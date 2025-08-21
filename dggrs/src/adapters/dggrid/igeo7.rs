@@ -1,5 +1,5 @@
 // Copyright 2025 contributors to the GeoPlegma project.
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -9,9 +9,10 @@
 
 use crate::adapters::dggrid::common;
 use crate::adapters::dggrid::dggrid::DggridAdapter;
-use crate::error::port::PortError;
-use crate::models::common::Zones;
-use crate::ports::dggrs::DggrsPort;
+use crate::error::dggrid::DggridError;
+use crate::error::port::GeoPlegmaError;
+use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::ports::dggrs::{DggrsPort, DggrsPortConfig};
 use core::f64;
 use geo::geometry::Point;
 use std::fs;
@@ -20,6 +21,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use tracing::debug;
 pub const CLIP_CELL_DENSIFICATION: u8 = 50; // DGGRID option
+use geo::Rect;
 
 pub struct Igeo7Impl {
     pub adapter: DggridAdapter,
@@ -45,26 +47,27 @@ impl Default for Igeo7Impl {
 impl DggrsPort for Igeo7Impl {
     fn zones_from_bbox(
         &self,
-        depth: u8,
-        densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Result<Zones, PortError> {
+        refinement_level: RefinementLevel,
+        bbox: Option<Rect<f64>>,
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
-            common::dggrid_setup(&self.adapter.workdir);
+            common::dggrid::setup(&self.adapter.workdir);
 
-        let _ = common::dggrid_metafile(
+        let _ = common::write::metafile(
             &meta_path,
-            &depth,
+            &refinement_level,
             &aigen_path.with_extension(""),
             &children_path.with_extension(""),
             &neighbor_path.with_extension(""),
-            densify,
+            &cfg,
         );
 
         let _ = igeo7_metafile(&meta_path);
 
         if let Some(bbox) = &bbox {
-            let _ = common::bbox_to_aigen(bbox, &bbox_path);
+            let _ = common::write::bbox(bbox, &bbox_path);
 
             // Append to metafile
             let mut meta_file = OpenOptions::new()
@@ -81,10 +84,10 @@ impl DggrsPort for Igeo7Impl {
             );
         }
 
-        common::print_file(meta_path.clone());
-        common::dggrid_execute(&self.adapter.executable, &meta_path);
-        let result = common::dggrid_parse(&aigen_path, &children_path, &neighbor_path, &depth)?;
-        common::dggrid_cleanup(
+        common::write::file(meta_path.clone());
+        common::dggrid::execute(&self.adapter.executable, &meta_path);
+        let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
+        common::cleanup(
             &meta_path,
             &aigen_path,
             &children_path,
@@ -94,17 +97,23 @@ impl DggrsPort for Igeo7Impl {
         Ok(result)
     }
 
-    fn zone_from_point(&self, depth: u8, point: Point, densify: bool) -> Result<Zones, PortError> {
+    fn zone_from_point(
+        &self,
+        refinement_level: RefinementLevel,
+        point: Point,
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
-            common::dggrid_setup(&self.adapter.workdir);
+            common::dggrid::setup(&self.adapter.workdir);
 
-        let _ = common::dggrid_metafile(
+        let _ = common::write::metafile(
             &meta_path,
-            &depth,
+            &refinement_level,
             &aigen_path.with_extension(""),
             &children_path.with_extension(""),
             &neighbor_path.with_extension(""),
-            densify,
+            &cfg,
         );
 
         let _ = igeo7_metafile(&meta_path);
@@ -134,10 +143,10 @@ impl DggrsPort for Igeo7Impl {
         let _ = writeln!(input_file, "{} {}", point.y(), point.x())
             .expect("Cannot create point input file");
 
-        common::print_file(meta_path.clone());
-        common::dggrid_execute(&self.adapter.executable, &meta_path);
-        let result = common::dggrid_parse(&aigen_path, &children_path, &neighbor_path, &depth)?;
-        common::dggrid_cleanup(
+        common::write::file(meta_path.clone());
+        common::dggrid::execute(&self.adapter.executable, &meta_path);
+        let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
+        common::cleanup(
             &meta_path,
             &aigen_path,
             &children_path,
@@ -149,21 +158,24 @@ impl DggrsPort for Igeo7Impl {
     }
     fn zones_from_parent(
         &self,
-        depth: u8,
-        parent_zone_id: String, // ToDo: needs validation function
-        // clip_cell_res: u8,
-        densify: bool,
-    ) -> Result<Zones, PortError> {
+        relative_depth: RelativeDepth,
+        parent_zone_id: ZoneId,
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
-            common::dggrid_setup(&self.adapter.workdir);
+            common::dggrid::setup(&self.adapter.workdir);
 
-        let _ = common::dggrid_metafile(
+        let parent_zone_res = get_refinement_level_from_z7_zone_id(&parent_zone_id)?;
+        let target_level = parent_zone_res.add(relative_depth)?;
+
+        let _ = common::write::metafile(
             &meta_path,
-            &depth,
+            &target_level,
             &aigen_path.with_extension(""),
             &children_path.with_extension(""),
             &neighbor_path.with_extension(""),
-            densify,
+            &cfg,
         );
 
         let _ = igeo7_metafile(&meta_path);
@@ -175,23 +187,21 @@ impl DggrsPort for Igeo7Impl {
             .open(&meta_path)
             .expect("cannot open file");
 
-        let clip_cell_res = extract_res_from_cellid(&parent_zone_id, "IGEO7").unwrap();
-
-        let clip_cell_address = &parent_zone_id[2..]; // strip first two characters. ToDo: can we get the res from the index itself?
-
-        let _ = writeln!(meta_file, "clip_subset_type zones_from_parent");
-        let _ = writeln!(meta_file, "clip_cell_res {:?}", clip_cell_res);
+        let _ = writeln!(meta_file, "clip_subset_type COARSE_CELLS");
+        let _ = writeln!(meta_file, "clip_cell_res {:?}", parent_zone_res);
         let _ = writeln!(
             meta_file,
             "clip_cell_densification {}",
             CLIP_CELL_DENSIFICATION
         );
-        let _ = writeln!(meta_file, "clip_cell_addresses \"{}\"", clip_cell_address);
+        let _ = writeln!(meta_file, "clip_cell_addresses \"{}\"", parent_zone_id);
         let _ = writeln!(meta_file, "input_address_type Z7");
-        common::print_file(meta_path.clone());
-        common::dggrid_execute(&self.adapter.executable, &meta_path);
-        let result = common::dggrid_parse(&aigen_path, &children_path, &neighbor_path, &depth)?;
-        common::dggrid_cleanup(
+        common::write::file(meta_path.clone());
+        common::dggrid::execute(&self.adapter.executable, &meta_path);
+
+        let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
+
+        common::cleanup(
             &meta_path,
             &aigen_path,
             &children_path,
@@ -202,21 +212,21 @@ impl DggrsPort for Igeo7Impl {
     }
     fn zone_from_id(
         &self,
-        zone_id: String, // ToDo: needs validation function
-        densify: bool,
-    ) -> Result<Zones, PortError> {
+        zone_id: ZoneId,
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
-            common::dggrid_setup(&self.adapter.workdir);
+            common::dggrid::setup(&self.adapter.workdir);
 
-        let clip_cell_res = extract_res_from_cellid(&zone_id, "IGEO7").unwrap();
-        let depth = clip_cell_res;
-        let _ = common::dggrid_metafile(
+        let refinement_level = get_refinement_level_from_z7_zone_id(&zone_id).unwrap();
+        let _ = common::write::metafile(
             &meta_path,
-            &depth,
+            &refinement_level,
             &aigen_path.with_extension(""),
             &children_path.with_extension(""),
             &neighbor_path.with_extension(""),
-            densify,
+            &cfg,
         );
 
         let _ = igeo7_metafile(&meta_path);
@@ -227,8 +237,6 @@ impl DggrsPort for Igeo7Impl {
             .write(true)
             .open(&meta_path)
             .expect("cannot open file");
-
-        let zone = &zone_id[2..]; // strip first two characters. ToDo: only if we attached the res to the front
 
         let _ = writeln!(
             meta_file,
@@ -243,14 +251,14 @@ impl DggrsPort for Igeo7Impl {
             .create(true)
             .open(&input_path)
             .expect("cannot open file");
-        let _ = writeln!(input_file, "{}", zone).expect("Cannot create zone id input file");
+        let _ = writeln!(input_file, "{}", zone_id).expect("Cannot create zone id input file");
 
         let _ = writeln!(meta_file, "dggrid_operation TRANSFORM_POINTS");
         let _ = writeln!(meta_file, "input_address_type Z7");
-        common::print_file(meta_path.clone());
-        common::dggrid_execute(&self.adapter.executable, &meta_path);
-        let result = common::dggrid_parse(&aigen_path, &children_path, &neighbor_path, &depth)?;
-        common::dggrid_cleanup(
+        common::write::file(meta_path.clone());
+        common::dggrid::execute(&self.adapter.executable, &meta_path);
+        let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
+        common::cleanup(
             &meta_path,
             &aigen_path,
             &children_path,
@@ -258,6 +266,26 @@ impl DggrsPort for Igeo7Impl {
             &bbox_path,
         );
         Ok(result)
+    }
+
+    fn min_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+        Ok(RefinementLevel::new(0)?)
+    }
+
+    fn max_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+        Ok(RefinementLevel::new(18)?)
+    }
+
+    fn default_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+        Ok(RefinementLevel::new(2)?)
+    }
+
+    fn max_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
+        Ok(RelativeDepth::new(3)?)
+    }
+
+    fn default_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
+        Ok(RelativeDepth::new(1)?)
     }
 }
 
@@ -276,44 +304,52 @@ pub fn igeo7_metafile(meta_path: &PathBuf) -> io::Result<()> {
     Ok(())
 }
 
-pub fn extract_res_from_cellid(id: &str, dggs_type: &str) -> Result<u8, String> {
-    match dggs_type {
-        "ISEA3H" => extract_res_from_z3(id),
-        "IGEO7" => extract_res_from_z3(id), // ToDo: As the extraction of the res based on the Z7
-        // index does not yet work, I am using the same method as for Z3.
-        _ => Err(format!("Unsupported DGGS type: {}", dggs_type)),
-    }
-}
-
-/// Extract resolution from ISEA3H ID (Z3)
-pub fn extract_res_from_z3(id: &str) -> Result<u8, String> {
-    if id.len() < 2 {
-        return Err("ZoneID too short to extract resolution".to_string());
-    }
-
-    id[..2]
-        .parse::<u8>()
-        .map_err(|_| "Invalid resolution prefix in ZoneID".to_string())
-}
-/// Extract resolution from IGEO7 ID (Z7)
-pub fn extract_res_from_z7(id: &str) -> Result<u8, String> {
-    match id.len() {
-        1 => Ok(0),
-        2 => Ok(1),
+/// Determines the refinement level from an IGEO7 (Z7) zone identifier.
+///
+/// This function interprets a Z7 zone identifier as defined by the Z7 indexing scheme, where the first four bits encode the base cell number and the remaining 60 bits are composed of 20 three-bit digits. Digits with values `0` through `6` represent valid resolution steps, while the value `7` indicates padding beyond the zone’s resolution. The refinement level is determined by counting the number of valid digits before the first padding digit. If no padding digit is found, the maximum refinement level of 20 is returned. See [IGEO7: A new hierarchically indexed hexagonal equal-area discrete global grid system ](https://doi.org/10.5194/agile-giss-6-32-2025) for more information.
+///
+/// # Parameters
+/// - `dggrid_z7_id`: A `ZoneId` expected to be in hexadecimal form (`ZoneId::HexId`).
+///
+/// # Returns
+/// - `Ok(RefinementLevel)`: The detected refinement level.
+/// - `Err(GeoPlegmaError)`: If the identifier is not a `HexId`, contains invalid digits, or fails to create a valid `RefinementLevel`.
+///
+/// # Panics
+/// This function will panic if the provided hex string cannot be parsed into a `u64`, though this is not expected when IDs are generated by DGGRID.
+///
+/// # Requirements
+/// Zone identifiers must be generated using DGGRID version 8.41 or later to ensure compatibility with the Z7 format.
+pub fn get_refinement_level_from_z7_zone_id(
+    dggrid_z7_id: &ZoneId,
+) -> Result<RefinementLevel, GeoPlegmaError> {
+    // make sure to generate zones with DGGRID version 8.41
+    let hex = match dggrid_z7_id {
+        ZoneId::HexId(h) => h.as_str(),
         _ => {
-            let num = u64::from_str_radix(id, 16).map_err(|_| "Invalid hex ZoneID".to_string())?;
+            return Err(GeoPlegmaError::Dggrid(DggridError::InvalidZ7Format(
+                "Expected ZoneId::HexId".to_string(),
+            )))?;
+        }
+    };
 
-            let shifted = num << 4;
+    let v = u64::from_str_radix(hex, 16).unwrap(); // NOTE: This should be safe if the hex string is coming from DGGRID.
 
-            let lz = shifted.leading_zeros();
+    let mut resolution = RefinementLevel::new(20)?;
+    for i in 0..20 {
+        let shift = 60 - 3 * (i + 1);
+        let digit = ((v >> shift) & 0b111) as u8;
 
-            if lz > 63 {
-                return Err("Invalid IGEO7 ZoneID: No resolution mask found".to_string());
-            }
-
-            let res = 2 + lz;
-
-            Ok(res as u8)
+        if digit > 7 {
+            return Err(GeoPlegmaError::Dggrid(DggridError::InvalidZ7Format(
+                format!("Invalid Z7 digit {} at position {}", digit, i + 1),
+            )));
+        }
+        if digit == 7 {
+            resolution = RefinementLevel::new(i)?;
+            break;
         }
     }
+
+    Ok(resolution)
 }

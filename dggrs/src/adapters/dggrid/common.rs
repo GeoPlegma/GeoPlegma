@@ -1,5 +1,5 @@
-// Copyright 2025 contributors to the GeoPlegma project.
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Copyright 2025 iontributors to the GeoPlegma project.
+// Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,169 +7,364 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::error::dggrid::DggridError;
-use crate::models::common::{Zone, ZoneID, Zones};
-use core::f64;
-use geo::geometry::{LineString, Point, Polygon};
-use rand::distributions::{Alphanumeric, DistString};
-use std::fs;
-use std::fs::File;
-use std::io::{self, BufRead, Write};
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use tracing::debug;
+pub mod dggrid {
+    use rand::distributions::{Alphanumeric, DistString};
+    use std::path::PathBuf;
+    use std::process::Command;
 
-pub const DENSIFICATION: u8 = 50; // DGGRID option
-
-#[derive(Debug)]
-pub struct IdArray {
-    pub id: Option<String>,
-    pub arr: Option<Vec<String>>,
+    pub fn setup(workdir: &PathBuf) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
+        let code = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+        let meta_path = workdir.join(&code).with_extension("meta"); // metafile
+        let aigen_path = workdir.join(&code).with_extension("gen"); // AIGEN
+        let children_path = workdir.join(&code).with_extension("chd"); // Children
+        let neighbor_path = workdir.join(&code).with_extension("nbr"); // Neightbors
+        let bbox_path = workdir.join(&code).with_extension("bbox"); // BBox
+        let input_path = workdir.join(&code).with_extension("txt"); // Input file for e.g. points
+        (
+            meta_path,
+            aigen_path,
+            children_path,
+            neighbor_path,
+            bbox_path,
+            input_path,
+        )
+    }
+    pub fn execute(dggrid_path: &PathBuf, meta_path: &PathBuf) {
+        let _ = Command::new(&dggrid_path).arg(&meta_path).output(); // FIX: Better handling of output and raise DggridError::DggridExecutionFailed
+    }
 }
 
-pub fn dggrid_setup(workdir: &PathBuf) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
-    let code = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
-    let meta_path = workdir.join(&code).with_extension("meta"); // metafile
-    let aigen_path = workdir.join(&code).with_extension("gen"); // AIGEN
-    let children_path = workdir.join(&code).with_extension("chd"); // Children
-    let neighbor_path = workdir.join(&code).with_extension("nbr"); // Neightbors
-    let bbox_path = workdir.join(&code).with_extension("bbox"); // BBox
-    let input_path = workdir.join(&code).with_extension("txt"); // Input file for e.g. points
-    (
-        meta_path,
-        aigen_path,
-        children_path,
-        neighbor_path,
-        bbox_path,
-        input_path,
-    )
-}
+pub mod write {
+    use crate::models::common::RefinementLevel;
+    use crate::ports::dggrs::DggrsPortConfig;
+    use geo::Rect;
+    use std::fs;
+    use std::io::{self, Write};
+    use std::path::PathBuf;
+    use tracing::debug;
 
-pub fn dggrid_metafile(
-    metafile: &PathBuf,
-    depth: &u8,
-    cell_output_file_name: &PathBuf,
-    children_output_file_name: &PathBuf,
-    neighbor_output_file_name: &PathBuf,
-    densify: bool,
-) -> io::Result<()> {
-    debug!("Writing to {:?}", metafile);
-    let mut file = fs::File::create(metafile)?;
-    writeln!(file, "longitude_wrap_mode UNWRAP_EAST")?;
-    writeln!(file, "cell_output_type AIGEN")?;
-    writeln!(file, "unwrap_points FALSE")?;
-    writeln!(file, "output_cell_label_type OUTPUT_ADDRESS_TYPE")?;
-    writeln!(file, "precision 9")?;
-    writeln!(file, "dggs_res_spec {}", depth)?;
+    pub const DENSIFICATION: u8 = 50; // DGGRID option
 
-    writeln!(
-        file,
-        "cell_output_file_name {}",
-        cell_output_file_name.to_string_lossy().into_owned()
-    )?;
+    pub fn metafile(
+        metafile: &PathBuf,
+        refinement_level: &RefinementLevel,
+        cell_output_file_name: &PathBuf,
+        children_output_file_name: &PathBuf,
+        neighbor_output_file_name: &PathBuf,
+        conf: &DggrsPortConfig,
+    ) -> io::Result<()> {
+        debug!("Writing to {:?}", metafile);
+        let mut file = fs::File::create(metafile)?;
+        writeln!(file, "longitude_wrap_mode UNWRAP_EAST")?;
+        writeln!(file, "cell_output_type AIGEN")?;
+        writeln!(file, "unwrap_points FALSE")?;
+        writeln!(file, "output_cell_label_type OUTPUT_ADDRESS_TYPE")?;
+        writeln!(file, "precision 7")?;
+        writeln!(file, "dggs_res_spec {}", refinement_level.get())?;
+        writeln!(file, "z3_invalid_digit 3")?; // TODO: Remove with DGGRID version 9 as this is  only relevant for ISEA3H and only placed here for convenience.
 
-    writeln!(file, "neighbor_output_type TEXT")?;
-    writeln!(
-        file,
-        "neighbor_output_file_name {}",
-        neighbor_output_file_name.to_string_lossy().into_owned()
-    )?;
-    writeln!(file, "children_output_type TEXT")?;
-    writeln!(
-        file,
-        "children_output_file_name {}",
-        children_output_file_name.to_string_lossy().into_owned()
-    )?;
+        writeln!(
+            file,
+            "cell_output_file_name {}",
+            cell_output_file_name.to_string_lossy().into_owned()
+        )?;
 
-    if densify == true {
-        writeln!(file, "densification {}", DENSIFICATION)?;
+        if conf.neighbors {
+            writeln!(file, "neighbor_output_type TEXT")?;
+            writeln!(
+                file,
+                "neighbor_output_file_name {}",
+                neighbor_output_file_name.to_string_lossy().into_owned()
+            )?;
+        }
+
+        if conf.children {
+            writeln!(file, "children_output_type TEXT")?;
+            writeln!(
+                file,
+                "children_output_file_name {}",
+                children_output_file_name.to_string_lossy().into_owned()
+            )?;
+        }
+
+        if conf.densify {
+            writeln!(file, "densification {}", DENSIFICATION)?;
+        }
+
+        Ok(())
     }
 
-    Ok(())
-}
-pub fn dggrid_execute(dggrid_path: &PathBuf, meta_path: &PathBuf) {
-    let _ = Command::new(&dggrid_path).arg(&meta_path).output();
-}
+    pub fn bbox(bbox: &Rect<f64>, bboxfile: &PathBuf) -> io::Result<()> {
+        let min = bbox.min();
+        let max = bbox.max();
 
-pub fn dggrid_parse(
-    aigen_path: &PathBuf,
-    children_path: &PathBuf,
-    neighbor_path: &PathBuf,
-    depth: &u8,
-) -> Result<Zones, DggridError> {
-    let aigen_data = read_file(&aigen_path)?;
-    let mut result = parse_aigen(&aigen_data, &depth)?;
-    let children_data = read_file(&children_path)?;
-    let children = parse_children(&children_data, &depth)?;
-    assign_field(&mut result, children, "children");
+        let (minx, miny) = (min.x, min.y);
+        let (maxx, maxy) = (max.x, max.y);
 
-    let neighbor_data = read_file(&neighbor_path)?;
-    let neighbors = parse_neighbors(&neighbor_data, &depth)?;
-    assign_field(&mut result, neighbors, "neighbors");
-    Ok(result)
-}
+        // define the 5 vertices (closing the polygon)
+        let vertices = vec![
+            (minx, miny), // lower-left
+            (maxx, miny), // lower-right
+            (maxx, maxy), // upper-right
+            (minx, maxy), // upper-left
+            (minx, miny), // close
+        ];
+        let mut file = fs::File::create(bboxfile)?;
 
-pub fn parse_aigen(data: &String, depth: &u8) -> Result<Zones, DggridError> {
-    let mut zone_id = ZoneID::default();
-    let mut zones = Zones { zones: Vec::new() };
+        // First line: ID and center of the bbox (NOT part of the ring)
+        let center_x = (minx + maxx) / 2.0;
+        let center_y = (miny + maxy) / 2.0;
+        writeln!(file, "1 {:.7} {:.7}", center_x, center_y)?;
 
-    let mut raw_coords: Vec<(f64, f64)> = vec![];
-    let mut ply: Polygon;
-    let mut pnt = Point::new(0.0, 0.0);
-    let mut v_count = 0u32;
+        for (x, y) in &vertices {
+            writeln!(file, "{:.7} {:.7}", x, y)?;
+        }
 
-    // loop over the entire AIGEN file
-    for line in data.lines() {
-        // println!("{:?}", line);
-        let line_parts: Vec<&str> = line.split_whitespace().collect();
-        // The first line of each hexagon is always 3 strings, the first is the ID and the
-        // second two are the center point
+        writeln!(file, "END")?;
+        writeln!(file, "END")?;
 
-        if line_parts.len() == 3 {
-            // For ISEA3H prepend zero-padded depth to the ID
-            let id_str = format!("{:02}{}", depth, line_parts[0]);
-            zone_id = ZoneID::new(&id_str).expect("Cannot accept this id");
-            pnt = Point::new(
-                line_parts[1]
-                    .parse::<f64>()
-                    .expect("cannot parse floating point number"),
-                line_parts[2]
-                    .parse::<f64>()
-                    .expect("cannot parse floating point number"),
-            );
-        // these are coordinate pairs for the region
-        } else if line_parts.len() == 2 {
-            v_count += 1;
-            raw_coords.push((
-                line_parts[0]
-                    .parse::<f64>()
-                    .expect("cannot parse floating point number"),
-                line_parts[1]
-                    .parse::<f64>()
-                    .expect("cannot parse floating point number"),
-            ))
-        // if it just 1 part AND it is END AND if the vertex count is larger than 1
-        } else if line_parts.len() == 1 && line_parts[0] == "END" && v_count > 1 {
-            ply = Polygon::new(LineString::from(raw_coords.clone()), vec![]);
+        Ok(())
+    }
 
-            let zone = Zone {
-                id: zone_id.clone(),
-                region: ply,
-                center: pnt,
-                vertex_count: v_count - 1,
-                children: None,
-                neighbors: None,
-            };
-            zones.zones.push(zone);
-
-            // reset
-            raw_coords.clear();
-            v_count = 0;
+    pub fn file(file: PathBuf) {
+        if let Ok(lines) = super::read::lines(file) {
+            // Consumes the iterator, returns an (Optional) String
+            for line in lines.flatten() {
+                debug!("{}", line);
+            }
         }
     }
-    Ok(zones)
 }
-pub fn dggrid_cleanup(
+
+pub mod read {
+    use crate::error::dggrid::DggridError;
+    use crate::error::port::GeoPlegmaError;
+    use crate::models::common::{Zone, ZoneId};
+    use core::f64;
+    use geo::{LineString, Point, Polygon};
+    use std::collections::{BTreeMap, HashMap};
+    use std::fs;
+    use std::fs::File;
+    use std::io::{self, BufRead};
+    use std::path::Path;
+    /// Used to parse the AIGEN output file of DGGRID that always contains the center and the region
+    pub fn parse_aigen_to_zones_map(s: &str) -> Result<BTreeMap<ZoneId, Zone>, GeoPlegmaError> {
+        let mut out = BTreeMap::new();
+
+        struct AigenZoneRegionCenter {
+            id: ZoneId,
+            xy: (f64, f64),
+            vec_xy: Vec<(f64, f64)>,
+        }
+        let mut cur: Option<AigenZoneRegionCenter> = None;
+
+        for line in s.lines() {
+            // Each line of the AIGEN file is split at the whitespace
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            // NOTE:
+            // Here we match three options:
+            //      1. The ID with x and y for the center
+            //      2. x and y for the polygon (multiple lines)
+            //      3. "END" to signify the end of the polygon geometry
+            // first step is to take the parts from above and consider the slice only.
+            match parts.as_slice() {
+                // header: <ID> <cx> <cy>  thats the center coordinates after the ID
+                [id_str, cx, cy] => {
+                    cur = Some(AigenZoneRegionCenter {
+                        id: ZoneId::new_hex(id_str)?,
+                        xy: (cx.parse()?, cy.parse()?),
+                        vec_xy: Vec::new(),
+                    });
+                }
+                // vertex line: <x> <y>
+                [x, y] => {
+                    if let Some(z) = cur.as_mut() {
+                        z.vec_xy.push((x.parse()?, y.parse()?));
+                    }
+                }
+                // END marker
+                ["END"] => {
+                    // NOTE:
+                    // When END is reachted the vec_xy for the polygon is finished.
+                    // this also mean that the second END at the end of the file
+                    // cannot take anything and is None.
+                    if let Some(z) = cur.take() {
+                        // NOTE:
+                        // there are options to control the cell_output_type and
+                        // point_output_type in DGGRID, maybe we can avoid generating everything
+                        // so we do not have to parse it also.
+                        let pnt = Some(Point::from(z.xy));
+
+                        let poly = if z.vec_xy.len() >= 2 {
+                            Some(Polygon::new(LineString::from(z.vec_xy.clone()), vec![]))
+                        } else {
+                            None
+                        };
+
+                        out.insert(
+                            z.id.clone(),
+                            Zone {
+                                id: z.id,
+                                center: pnt,
+                                region: poly,
+                                children: None,
+                                neighbors: None,
+                                vertex_count: None,
+                                area_sqm: None,
+                            },
+                        );
+                    }
+                }
+                // ignore blanks or comments
+                [] => {}
+                _ => {
+                    // You can choose to return an error here
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Used to parse the text output from DGGRID for children and neighbors
+    pub fn parse_id_list(s: &str) -> Result<HashMap<ZoneId, Vec<ZoneId>>, GeoPlegmaError> {
+        let mut map: HashMap<ZoneId, Vec<ZoneId>> = HashMap::new();
+
+        for (lineno, line) in s.lines().enumerate() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+
+            if parts.is_empty() {
+                continue;
+            }
+            let key = ZoneId::new_hex(parts[0])?;
+
+            let vals = parts
+                .iter()
+                .skip(1)
+                .map(|t| ZoneId::new_hex(t))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            if map.insert(key, vals).is_some() {
+                return Err(GeoPlegmaError::Dggrid(DggridError::Malformed {
+                    msg: format!("duplicate key on line {}", lineno + 1),
+                }));
+            }
+        }
+        Ok(map)
+    }
+
+    // Read aigen file produced by DGGRID
+    // Todo: this is inefficient, use the read_lines function as in print_file
+    // https://doc.rust-lang.org/rust-by-example/std_misc/file/read_lines.html
+    pub fn file(path: &Path) -> Result<String, DggridError> {
+        fs::read_to_string(path).map_err(|e| DggridError::FileRead {
+            path: path.display().to_string(),
+            source: e,
+        })
+    }
+
+    pub fn lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+    where
+        P: AsRef<Path>,
+    {
+        let file = File::open(filename)?;
+        Ok(io::BufReader::new(file).lines())
+    }
+}
+
+pub mod output {
+    use crate::error::port::GeoPlegmaError;
+    use crate::models::common::{ZoneId, Zones};
+    use crate::ports::dggrs::DggrsPortConfig;
+    use geo::GeodesicArea;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    pub fn ingest(
+        aigen_path: &PathBuf,
+        children_path: &PathBuf,
+        neighbors_path: &PathBuf,
+        conf: &DggrsPortConfig,
+    ) -> Result<Zones, GeoPlegmaError> {
+        // the default output
+        let aigen_text = super::read::file(&aigen_path)?;
+        let mut zones_map = super::read::parse_aigen_to_zones_map(&aigen_text)?;
+
+        // children
+        let mut children_map: HashMap<ZoneId, Vec<ZoneId>> = if conf.children {
+            let children_text = super::read::file(&children_path)?;
+            super::read::parse_id_list(&children_text)?
+        } else {
+            HashMap::new()
+        };
+
+        // neighbors
+        let mut neighbors_map: HashMap<ZoneId, Vec<ZoneId>> = if conf.neighbors {
+            let neighbors_text = super::read::file(&neighbors_path)?;
+            super::read::parse_id_list(&neighbors_text)?
+        } else {
+            HashMap::new()
+        };
+
+        // Assemble outputs
+        for (id, z) in zones_map.iter_mut() {
+            // attach children
+            if let Some(v) = children_map.remove(id) {
+                z.children = Some(v);
+            }
+
+            // attach neighbors
+            if let Some(v) = neighbors_map.remove(id) {
+                z.neighbors = Some(v);
+            }
+
+            // vertex count
+            // WARN: actually this is not counting the vertices, it is counting the
+            // corners/nodes/edges of of shapes like triangle, rhombus, pentagon or hexagons
+            if conf.vertex_count {
+                if let Some(ref poly) = z.region {
+                    z.vertex_count = Some(super::helper::corner_count_convex(poly));
+                }
+            }
+
+            // compute area
+            if conf.area_sqm {
+                if let Some(ref poly) = z.region {
+                    // NOTE:
+                    // It may be a good idea to wrap geodesic_area_unsigned into
+                    // a separate extension trait, so that we don't use a different
+                    // calculation elsewhere by accident.
+                    z.area_sqm = Some(poly.geodesic_area_unsigned());
+                }
+            }
+
+            // drop geometry not requested
+            if !conf.region {
+                z.region = None;
+            }
+
+            if !conf.center {
+                z.center = None;
+            }
+        }
+        Ok(Zones {
+            zones: zones_map.into_values().collect(),
+        })
+    }
+}
+
+pub mod helper {
+    use geo::CoordsIter;
+    use geo::prelude::ConvexHull;
+    pub fn corner_count_convex(poly: &geo::Polygon<f64>) -> u32 {
+        let hull: geo::Polygon<f64> = poly.convex_hull();
+        // coords_count() includes the closing vertex => subtract 1
+        (hull.exterior().coords_count() as u32).saturating_sub(1)
+    }
+}
+
+use std::fs;
+use std::path::PathBuf;
+pub fn cleanup(
     meta_path: &PathBuf,
     aigen_path: &PathBuf,
     children_path: &PathBuf,
@@ -181,133 +376,4 @@ pub fn dggrid_cleanup(
     let _ = fs::remove_file(children_path);
     let _ = fs::remove_file(neighbor_path);
     let _ = fs::remove_file(bbox_path);
-}
-
-pub fn parse_children(data: &String, depth: &u8) -> Result<Vec<IdArray>, DggridError> {
-    Ok(data
-        .lines()
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.is_empty() {
-                return None;
-            }
-
-            let id = Some(format!("{:02}{}", depth, parts[0]));
-            let arr = parts
-                .iter()
-                .skip(1)
-                .map(|s| format!("{:02}{}", depth + 1, s))
-                .collect();
-
-            Some(IdArray { id, arr: Some(arr) })
-        })
-        .collect())
-}
-pub fn parse_neighbors(data: &String, depth: &u8) -> Result<Vec<IdArray>, DggridError> {
-    Ok(data
-        .lines()
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.is_empty() {
-                return None;
-            }
-
-            let id = Some(format!("{:02}{}", depth, parts[0]));
-            let arr = parts
-                .iter()
-                .skip(1)
-                .map(|s| format!("{:02}{}", depth, s))
-                .collect();
-
-            Some(IdArray { id, arr: Some(arr) })
-        })
-        .collect())
-}
-
-pub fn assign_field(zones: &mut Zones, data: Vec<IdArray>, field: &str) {
-    for item in data {
-        if let Some(ref id_str) = item.id {
-            let target_id = ZoneID::StrID(id_str.clone());
-            if let Some(cell) = zones.zones.iter_mut().find(|c| c.id == target_id) {
-                match field {
-                    "children" => {
-                        cell.children = item
-                            .arr
-                            .clone()
-                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
-                    }
-                    "neighbors" => {
-                        cell.neighbors = item
-                            .arr
-                            .clone()
-                            .map(|v| v.into_iter().map(ZoneID::StrID).collect())
-                    }
-                    _ => panic!("Unknown field: {}", field),
-                }
-            }
-        }
-    }
-}
-
-pub fn print_file(file: PathBuf) {
-    if let Ok(lines) = read_lines(file) {
-        // Consumes the iterator, returns an (Optional) String
-        for line in lines.flatten() {
-            debug!("{}", line);
-        }
-    }
-}
-
-// Read aigen file produced by DGGRID
-// Todo: this is inefficient, use the read_lines function as in print_file
-// https://doc.rust-lang.org/rust-by-example/std_misc/file/read_lines.html
-pub fn read_file(path: &Path) -> Result<String, DggridError> {
-    fs::read_to_string(path).map_err(|e| DggridError::FileRead {
-        path: path.display().to_string(),
-        source: e,
-    })
-}
-
-pub fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
-}
-
-pub fn bbox_to_aigen(bbox: &Vec<Vec<f64>>, bboxfile: &PathBuf) -> io::Result<()> {
-    if bbox.len() != 2 || bbox[0].len() != 2 || bbox[1].len() != 2 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Invalid bounding box format",
-        ));
-    }
-
-    let (minx, miny) = (bbox[0][0], bbox[0][1]);
-    let (maxx, maxy) = (bbox[1][0], bbox[1][1]);
-
-    // define the 5 vertices (closing the polygon)
-    let vertices = vec![
-        (minx, miny), // lower-left
-        (maxx, miny), // lower-right
-        (maxx, maxy), // upper-right
-        (minx, maxy), // upper-left
-        (minx, miny), // close
-    ];
-    let mut file = fs::File::create(bboxfile)?;
-
-    // First line: ID and center of the bbox (NOT part of the ring)
-    let center_x = (minx + maxx) / 2.0;
-    let center_y = (miny + maxy) / 2.0;
-    writeln!(file, "1 {:.6} {:.6}", center_x, center_y)?;
-
-    for (x, y) in &vertices {
-        writeln!(file, "{:.6} {:.6}", x, y)?;
-    }
-
-    writeln!(file, "END")?;
-    writeln!(file, "END")?;
-
-    Ok(())
 }

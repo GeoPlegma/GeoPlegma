@@ -1,5 +1,5 @@
 // Copyright 2025 contributors to the GeoPlegmata project.
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -7,15 +7,15 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::adapters::h3o::common::{cells_to_zones, res};
+use crate::adapters::h3o::common::{refinement_level_to_h3_resolution, to_zones};
 use crate::adapters::h3o::h3o::H3oAdapter;
 use crate::error::h3o::H3oError;
-use crate::error::port::PortError;
-use crate::models::common::Zones;
-use crate::ports::dggrs::DggrsPort;
-use geo::{LineString, Point, Polygon};
+use crate::error::port::GeoPlegmaError;
+use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::ports::dggrs::{DggrsPort, DggrsPortConfig};
+use geo::{Point, Rect};
 use h3o::geom::{ContainmentMode, TilerBuilder};
-use h3o::{CellIndex, LatLng, Resolution};
+use h3o::{CellIndex, LatLng};
 use std::str::FromStr;
 
 pub const MAX_DEPTH: u8 = 10;
@@ -43,95 +43,111 @@ impl Default for H3Impl {
 impl DggrsPort for H3Impl {
     fn zones_from_bbox(
         &self,
-        depth: u8,
-        _densify: bool,
-        bbox: Option<Vec<Vec<f64>>>,
-    ) -> Result<Zones, PortError> {
-        let cells: Vec<CellIndex>;
+        refinement_level: RefinementLevel,
+        bbox: Option<Rect<f64>>,
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
+        let h3o_zones: Vec<CellIndex>;
 
-        let mut tiler = TilerBuilder::new(res(2))
-            .containment_mode(ContainmentMode::Covers)
-            .build();
+        let mut tiler =
+            TilerBuilder::new(refinement_level_to_h3_resolution(RefinementLevel::new(2)?)?)
+                .containment_mode(ContainmentMode::Covers)
+                .build();
 
         if let Some(b) = bbox {
-            // Validate bbox format: [[minX, minY], [maxX, maxY]]
-            if b.len() == 2 && b[0].len() == 2 && b[1].len() == 2 {
-                let (minx, miny) = (b[0][0], b[0][1]);
-                let (maxx, maxy) = (b[1][0], b[1][1]);
-
-                // Create a counter-clockwise ring (geo expects CCW)
-                let ring = LineString::from(vec![
-                    (minx, miny),
-                    (maxx, miny),
-                    (maxx, maxy),
-                    (minx, maxy),
-                    (minx, miny),
-                ]);
-
-                let polygon = Polygon::new(ring, vec![]);
-                let _ = tiler.add(polygon);
-                cells = tiler.into_coverage().collect::<Vec<_>>();
-            } else {
-                todo!("handle malformed bbox"); // TODO: Should be fixed with proper bbox
-            }
+            // NOTE: adapt resolution dynamically based on bbox size & depth
+            let _ = tiler.add(b.to_polygon());
+            h3o_zones = tiler.into_coverage().collect::<Vec<_>>();
         } else {
-            // cap res to max 10
-            let capped_res = if depth <= 10 { res(depth) } else { res(10) };
-
-            cells = CellIndex::base_cells()
-                .flat_map(|base| base.children(capped_res))
+            if refinement_level > self.default_refinement_level()? {
+                return Err(GeoPlegmaError::DepthTooLarge(refinement_level));
+            }
+            h3o_zones = CellIndex::base_cells()
+                .flat_map(|base| {
+                    base.children(
+                        refinement_level_to_h3_resolution(refinement_level)
+                            .expect("Cannot translate to H3 Resolution"), // NOTE: expect() because flat_map does not understand Result?
+                    )
+                })
                 .collect::<Vec<_>>();
         }
-        Ok(cells_to_zones(cells)?)
+        Ok(to_zones(h3o_zones, cfg)?)
     }
-    fn zone_from_point(&self, depth: u8, point: Point, _densify: bool) -> Result<Zones, PortError> {
+    fn zone_from_point(
+        &self,
+        refinement_level: RefinementLevel,
+        point: Point, // TODO: we should support multiple points at once.
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
         let coord = LatLng::new(point.x(), point.y()).expect("valid coord");
 
-        let cell = coord.to_cell(res(depth)); // TODO: we should support multiple points at once.
+        let h3o_zone = coord.to_cell(refinement_level_to_h3_resolution(refinement_level)?);
 
-        //let zones = cells_to_zones(vec![cell]);
-        Ok(cells_to_zones(vec![cell])?)
+        Ok(to_zones(vec![h3o_zone], cfg)?)
     }
     fn zones_from_parent(
         &self,
-        depth: u8,
-        zone_id: String, // ToDo: needs validation function
-        _densify: bool,
-    ) -> Result<Zones, PortError> {
-        let parent = CellIndex::from_str(&zone_id).map_err(|e| {
-            PortError::H3o(H3oError::InvalidZoneID {
-                zone_id: zone_id.clone(),
+        relative_depth: RelativeDepth,
+        parent_zone_id: ZoneId,
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
+        let parent = CellIndex::from_str(&parent_zone_id.to_string()).map_err(|e| {
+            GeoPlegmaError::H3o(H3oError::InvalidZoneID {
+                zone_id: parent_zone_id.to_string(),
                 source: e,
             })
         })?;
 
-        let base_res = parent.resolution();
-        let next = u8::from(base_res) + depth;
+        let target_level = RefinementLevel::new(parent.resolution() as i32)?.add(relative_depth)?;
 
-        let target_res = Resolution::try_from(next).map_err(|e| {
-            PortError::H3o(H3oError::InvalidResolution {
-                zone_id: zone_id.clone(),
-                depth,
-                source: e,
-            })
-        })?;
+        if target_level > self.max_refinement_level()? {
+            return Err(GeoPlegmaError::H3o(H3oError::ResolutionLimitReached {
+                zone_id: parent.to_string(),
+            }));
+        }
 
-        let children: Vec<CellIndex> = parent.children(target_res).collect();
+        let h3o_sub_zones: Vec<CellIndex> = parent
+            .children(refinement_level_to_h3_resolution(target_level)?)
+            .collect();
 
-        Ok(cells_to_zones(children)?)
+        Ok(to_zones(h3o_sub_zones, cfg)?)
     }
     fn zone_from_id(
         &self,
-        zone_id: String, // ToDo: needs validation function
-        _densify: bool,
-    ) -> Result<Zones, PortError> {
-        let cell = CellIndex::from_str(&zone_id).map_err(|e| {
-            PortError::H3o(H3oError::InvalidZoneID {
-                zone_id: zone_id.clone(),
+        zone_id: ZoneId, // ToDo: needs validation function
+        config: Option<DggrsPortConfig>,
+    ) -> Result<Zones, GeoPlegmaError> {
+        let cfg = config.unwrap_or_default();
+        let h3o_zone = CellIndex::from_str(&zone_id.to_string()).map_err(|e| {
+            GeoPlegmaError::H3o(H3oError::InvalidZoneID {
+                zone_id: zone_id.to_string(),
                 source: e,
             })
         })?;
 
-        Ok(cells_to_zones(vec![cell])?)
+        Ok(to_zones(vec![h3o_zone], cfg)?)
+    }
+
+    fn min_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+        Ok(RefinementLevel::new(0)?) //NOTE: This is hardcoded from the Resolution Enum https://docs.rs/h3o/latest/h3o/enum.Resolution.html
+    }
+
+    fn max_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+        Ok(RefinementLevel::new(15)?) //NOTE: This is hardcoded from the Resolution Enum https://docs.rs/h3o/latest/h3o/enum.Resolution.html
+    }
+
+    fn default_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+        Ok(RefinementLevel::new(1)?)
+    }
+
+    fn max_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
+        Ok(RelativeDepth::new(2)?)
+    }
+
+    fn default_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
+        Ok(RelativeDepth::new(1)?)
     }
 }

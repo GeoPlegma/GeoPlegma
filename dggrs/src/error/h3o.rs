@@ -1,5 +1,5 @@
 // Copyright 2025 contributors to the GeoPlegmata project.
-// Originally authored by Michael Jendryke (GeoInsight GmbH, michael.jendryke@geoinsight.ai)
+// Originally authored by Michael Jendryke, GeoInsight (michael.jendryke@geoinsight.ai)
 //
 // Licenced under the Apache Licence, Version 2.0 <LICENCE-APACHE or
 // http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
@@ -23,7 +23,7 @@ pub enum H3oError {
     },
 
     #[error("Depth {depth} for {zone_id} is to high: {source}")]
-    InvalidResolution {
+    MaxDepthReached {
         zone_id: String,
         depth: u8,
         #[source]
@@ -39,6 +39,13 @@ pub enum H3oError {
 
     #[error("Invalid resolution for H3 zone ID {zone_id}")]
     ResolutionLimitReached { zone_id: String },
+
+    #[error("Cannot Translate RefinementLevel to Resolution {rf}")]
+    CannotTranslateToH3Resolution {
+        rf: String,
+        #[source]
+        source: InvalidResolution,
+    },
 
     #[error("Missing required zone data")]
     MissingZoneData,
