@@ -21,11 +21,19 @@
 //!
 //! # Usage
 //!
-//! ```ignore
-//! use crate::projections::polyhedron::spherical_geometry;
+//! ```
+//! use gp_proj::projections::polyhedron::spherical_geometry;
+//! use gp_proj::models::vector_3d::Vector3D;
 //!
+//! let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
+//! let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
+//! let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
 //! let triangle = [vertex_a, vertex_b, vertex_c];
+//! let test_point = Vector3D::new(0.3, 0.3, 0.3).normalize();
 //! let is_inside = spherical_geometry::point_in_planar_triangle(test_point, triangle);
+//! 
+//! let vec_a = Vector3D::new(1.0, 0.0, 0.0);
+//! let vec_b = Vector3D::new(0.0, 1.0, 0.0);
 //! let angle = spherical_geometry::stable_angle_between(vec_a, vec_b);
 //! ```
 
@@ -66,9 +74,17 @@ pub const DEGENERATE_TRIANGLE_THRESHOLD: f64 = 1e-10;
 /// (with tolerance for numerical stability).
 ///
 /// # Examples
-/// ```ignore
+/// ```
+/// use gp_proj::models::vector_3d::Vector3D;
+/// use gp_proj::projections::polyhedron::spherical_geometry::point_in_planar_triangle;
+/// 
+/// let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
+/// let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
+/// let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
 /// let triangle = [vertex_a, vertex_b, vertex_c];
+/// let test_point = Vector3D::new(0.3, 0.3, 0.3).normalize();
 /// let is_inside = point_in_planar_triangle(test_point, triangle);
+/// assert!(is_inside);
 /// ```
 ///
 /// # Performance
@@ -126,8 +142,15 @@ pub fn point_in_planar_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> boo
 /// - Avoids domain errors near ±1 that can occur with acos
 ///
 /// # Examples
-/// ```ignore
+/// ```
+/// use gp_proj::models::vector_3d::Vector3D;
+/// use gp_proj::projections::polyhedron::spherical_geometry::stable_angle_between;
+/// use std::f64::consts::PI;
+/// 
+/// let vec_a = Vector3D::new(1.0, 0.0, 0.0);
+/// let vec_b = Vector3D::new(0.0, 1.0, 0.0);
 /// let angle = stable_angle_between(vec_a, vec_b);
+/// let expected_angle = PI / 2.0; // 90 degrees
 /// assert!((angle - expected_angle).abs() < 1e-10);
 /// ```
 ///
@@ -162,10 +185,20 @@ pub fn stable_angle_between(u: Vector3D, v: Vector3D) -> f64 {
 /// - Point is inside triangle if u ≥ 0, v ≥ 0, w ≥ 0
 ///
 /// # Examples
-/// ```ignore
+/// ```
+/// use gp_proj::models::vector_3d::Vector3D;
+/// use gp_proj::projections::polyhedron::spherical_geometry::barycentric_coordinates;
+/// 
+/// let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
+/// let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
+/// let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
+/// let triangle = [vertex_a, vertex_b, vertex_c];
+/// let point = Vector3D::new(0.3, 0.3, 0.3).normalize();
+/// 
 /// if let Some((u, v, w)) = barycentric_coordinates(point, triangle) {
 ///     let interpolated = u * triangle[0] + v * triangle[1] + w * triangle[2];
 ///     // interpolated ≈ point (for points inside triangle)
+///     assert!((u + v + w - 1.0).abs() < 1e-10); // coordinates sum to 1
 /// }
 /// ```
 pub fn barycentric_coordinates(point: Vector3D, triangle: [Vector3D; 3]) -> Option<(f64, f64, f64)> {
@@ -219,8 +252,21 @@ pub fn barycentric_coordinates(point: Vector3D, triangle: [Vector3D; 3]) -> Opti
 /// Area of the spherical triangle in steradians, or None if triangle is degenerate
 ///
 /// # Examples
-/// ```ignore
+/// ```
+/// use gp_proj::models::vector_3d::Vector3D;
+/// use gp_proj::projections::polyhedron::spherical_geometry::spherical_triangle_area;
+/// use std::f64::consts::PI;
+/// 
+/// // Create a triangle that covers 1/8 of the sphere (octant)
+/// let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
+/// let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
+/// let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
+/// let triangle = [vertex_a, vertex_b, vertex_c];
 /// let area = spherical_triangle_area(triangle).unwrap_or(0.0);
+/// 
+/// // Area should be π/2 (1/8 of sphere surface area 4π)
+/// let expected_area = PI / 2.0;
+/// assert!((area - expected_area).abs() < 1e-10);
 /// ```
 pub fn spherical_triangle_area(triangle: [Vector3D; 3]) -> Option<f64> {
     let [a, b, c] = triangle;

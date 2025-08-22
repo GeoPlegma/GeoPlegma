@@ -11,7 +11,7 @@ use std::f64::consts::PI;
 
 use crate::{
     constants::PolyhedronConstants, models::vector_3d::Vector3D,
-    projections::polyhedron::traits::Face,
+    projections::polyhedron::geometry::Face,
 };
 
 use super::polyhedron::Polyhedron;

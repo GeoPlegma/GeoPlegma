@@ -7,7 +7,7 @@
 // except according to those terms
 
 use crate::models::vector_3d::Vector3D;
-use super::traits::{Face, ArcLengths};
+use super::geometry::{Face, ArcLengths};
 use super::spherical_geometry;
 
 /// A concrete polyhedron with pre-computed geometric data.

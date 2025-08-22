@@ -29,7 +29,7 @@ use crate::{models::vector_3d::Vector3D, constants::Tolerance};
 /// # Example
 /// ```
 /// use geo::Point;
-/// use geoplegma::utils::geo_to_cartesian;
+/// use gp_proj::utils::geo_to_cartesian;
 /// 
 /// let cartesian = Point::new(0.0, 0.0); // Equator at prime meridian (in radians)
 /// let result = geo_to_cartesian(&cartesian);
@@ -62,7 +62,7 @@ pub fn geo_to_cartesian(cartesian: &Point) -> Vector3D {
 /// 
 /// # Example
 /// ```
-/// use geoplegma::utils::normalize_longitude;
+/// use gp_proj::utils::normalize_longitude;
 /// 
 /// assert_eq!(normalize_longitude(190.0), -170.0);
 /// assert_eq!(normalize_longitude(-190.0), 170.0);
@@ -94,7 +94,7 @@ pub fn normalize_longitude(lon: f64) -> f64 {
 /// 
 /// # Example
 /// ```
-/// use geoplegma::utils::create_point;
+/// use gp_proj::utils::create_point;
 /// 
 /// let valid = create_point(45.0, 30.0);
 /// assert!(valid.is_ok());
@@ -149,7 +149,7 @@ pub fn create_point_normalized(lon: f64, lat: f64) -> Result<Point, String> {
 /// # Example
 /// ```
 /// use geo::Point;
-/// use geoplegma::utils::points_approx_eq;
+/// use gp_proj::utils::points_approx_eq;
 /// 
 /// let p1 = Point::new(1.0, 2.0);
 /// let p2 = Point::new(1.0001, 2.0001);
@@ -177,7 +177,7 @@ pub fn points_approx_eq(p1: &Point, p2: &Point, tolerance: Option<f64>) -> bool 
 /// # Example
 /// ```
 /// use geo::Point;
-/// use geoplegma::utils::great_circle_distance;
+/// use gp_proj::utils::great_circle_distance;
 /// 
 /// let p1 = Point::new(0.0, 0.0);
 /// let p2 = Point::new(1.0, 0.0);
