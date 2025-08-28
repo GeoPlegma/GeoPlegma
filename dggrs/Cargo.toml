@@ -38,6 +38,6 @@ crate-type = ["cdylib", "rlib"]
 # this is for later when we have wasm for browser
 [features]
 # Defines a feature named `webp` that does not enable any other features.
-default = ["native"]
+default = []
 native = []   # native builds include everything
 wasm = []     # for wasm builds run: wasm-pack build --target web --no-default-features --features wasm
