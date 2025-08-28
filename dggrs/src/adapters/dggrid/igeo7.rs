@@ -188,7 +188,7 @@ impl DggrsPort for Igeo7Impl {
             .expect("cannot open file");
 
         let _ = writeln!(meta_file, "clip_subset_type COARSE_CELLS");
-        let _ = writeln!(meta_file, "clip_cell_res {:?}", parent_zone_res);
+        let _ = writeln!(meta_file, "clip_cell_res {:?}", parent_zone_res.get());
         let _ = writeln!(
             meta_file,
             "clip_cell_densification {}",

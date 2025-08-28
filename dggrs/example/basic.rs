@@ -14,6 +14,8 @@ use geo::{Point, Rect};
 /// This is just an example and basic testing function if there is output or not
 pub fn main() -> Result<(), error::port::GeoPlegmaError> {
     let dt = vec![
+        (String::from("IGEO7"), String::from("DGGRID")),
+        (String::from("ISEA3H"), String::from("DGGRID")),
         (String::from("H3"), String::from("H3O")),
         (String::from("ISEA3H"), String::from("DGGAL")),
         (String::from("IVEA3H"), String::from("DGGAL")),
