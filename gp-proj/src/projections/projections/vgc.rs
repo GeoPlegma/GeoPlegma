@@ -7,14 +7,14 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use std::f64::consts::{E, PI};
+use std::f64::consts::PI;
 
 use crate::{
     constants::KarneyCoefficients,
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::traits::{ArcLengths, Polyhedron},
+        polyhedron::Polyhedron,
         projections::traits::Projection,
     },
 };
@@ -30,36 +30,36 @@ impl Projection for Vgc {
     fn forward(
         &self,
         positions: Vec<Point>,
-        polyhedron: Option<&dyn Polyhedron>,
+        polyhedron: Option<&Polyhedron>,
         layout: &dyn Layout,
     ) -> Vec<Coord> {
-        let mut out: Vec<Coord> = vec![];
-        let polyhedron = polyhedron.unwrap();
+        let out: Vec<Coord> = vec![];
+        let _polyhedron = polyhedron.unwrap();
 
         // Need the coeficcients to convert from geodetic to authalic
-        let coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
+        let _coef_fourier_geod_to_auth = Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
         // get 3d vertices of the icosahedron (unit vectors)
-        let ico_vectors = polyhedron.vertices();
-        let triangles_ids = polyhedron.face_vertex_indices();
+        let _ico_vectors = _polyhedron.vertices();
+        let _triangles_ids = _polyhedron.faces();
 
         // ABC
-        let angle_beta: f64 = 36.0f64.to_radians();
+        let _angle_beta: f64 = 36.0f64.to_radians();
         // BCA
-        let angle_gamma: f64 = 60.0f64.to_radians();
+        let _angle_gamma: f64 = 60.0f64.to_radians();
         // BAC
-        let angle_alpha: f64 = PI / 2.0;
+        let _angle_alpha: f64 = PI / 2.0;
 
-        let v2d = layout.vertices();
+        let _v2d = layout.vertices();
 
         for position in positions {
             let lon = position.x().to_radians();
             let lat = Self::lat_geodetic_to_authalic(
                 position.y().to_radians(),
-                &coef_fourier_geod_to_auth,
+                &_coef_fourier_geod_to_auth,
             );
             // Calculate 3d unit vectors for point P
-            let vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
+            let _vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
 
             // starting from here, you need:
             // - the 3d point that you want to project

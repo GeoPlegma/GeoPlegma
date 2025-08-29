@@ -8,5 +8,7 @@
 // except according to those terms.
 
 pub mod dggrid;
+#[cfg(feature = "native")]
 pub mod dggal;
+#[cfg(feature = "native")]
 pub mod h3o;

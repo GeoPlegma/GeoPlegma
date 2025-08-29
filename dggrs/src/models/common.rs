@@ -40,7 +40,7 @@ pub struct HexString(String);
 
 impl HexString {
     pub fn new(s: &str) -> Result<Self, String> {
-        if s.len() == 16 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+        if s.len() <= 16 && s.chars().all(|c| c.is_ascii_hexdigit()) {
             Ok(Self(s.to_string()))
         } else {
             Err("HexId must be exactly 16 hexadecimal characters.".to_string())

@@ -9,7 +9,7 @@
 
 use crate::{
     constants::WGS84,
-    projections::{layout::traits::Layout, polyhedron::traits::Polyhedron}
+    projections::{layout::traits::Layout, polyhedron::Polyhedron}
 };
 use geo::{Point, Coord};
 
@@ -17,7 +17,7 @@ pub trait Projection {
     fn forward(
         &self,
         positions: Vec<Point>,
-        polyhedron: Option<&dyn Polyhedron>,
+        polyhedron: Option<&Polyhedron>,
         layout: &dyn Layout,
     ) -> Vec<Coord>;
     fn inverse(&self) -> String;
