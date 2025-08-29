@@ -43,22 +43,6 @@ pub struct Config {
   pub densify: bool, // TODO:: this is the switch to generate densified gemetry, which is actually not needed for H3 due to the Gnomic projection.
 }
 
-// #[napi]
-// impl Config {
-//   #[napi(constructor)]
-//   pub fn new(&self) -> Self {
-//     Self {
-//       region: self.region,
-//       center: true,
-//       vertex_count: true,
-//       children: true,
-//       neighbors: true,
-//       area_sqm: true,
-//       densify: true,
-//     }
-//   }
-// }
-
 #[napi]
 impl Default for Config {
   fn default() -> Self {

@@ -19,17 +19,8 @@ test('sync function from native code', (t) => {
   for (const p of points) {
     const r = g.zoneFromPoint(rl, p)
     console.log(r.utf8Ids)
-    // for (const id of r.utf8Ids) {
-    //   ids.push(id.toString(16))
-    // }
+
   }
 
-  // console.log(ids)
-  // const k = g.zonesFromParent(rl, '01000<0000000000000')
-  // const i = g.zoneFromId('010000000000000000')
-  // const a = g.zonesFromBbox(3, bbox)>
-  //  const b = g.zoneFromPoint(1, [39, 9]);
-  //  const c = g.zonesFromParent(1, "010000000000000000");
-  //  const d = g.zoneFromId("010000000000000000");
   t.is(rl, 3)
 })
