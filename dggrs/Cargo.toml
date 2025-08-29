@@ -32,12 +32,14 @@ napi-derive = "3.2.4"
 dggal-rust = {git = "https://github.com/GeoPlegma/dggal-rust.git", branch = "mj/update-unified-crate"}
 # dggal-rust = { path = "../../dggal-rust" }
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
+# [lib]
+# crate-type = ["cdylib"]
+# [package.metadata.napi]
+# name = "napi"
+# generate = true
 # this is for later when we have wasm for browser
 [features]
 # Defines a feature named `webp` that does not enable any other features.
-default = []
+default = ["native"]
 native = []   # native builds include everything
 wasm = []     # for wasm builds run: wasm-pack build --target web --no-default-features --features wasm
