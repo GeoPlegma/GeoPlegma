@@ -12,29 +12,32 @@ use crate::adapters::dggal::context::GLOBAL_DGGAL;
 use crate::constants::whole_earth_bbox;
 use crate::error::dggal::DggalError;
 use crate::error::port::GeoPlegmaError;
-use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::models::common::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use crate::ports::dggrs::{DggrsPort, DggrsPortConfig};
 use dggal::DGGRS;
 use dggal_rust::dggal;
 use geo::{Point, Rect};
 
 pub struct DggalImpl {
-    pub grid_name: String,
+    pub id: DggrsUid,
 }
 
 impl DggalImpl {
-    pub fn new(grid_name: &str) -> Self {
-        Self {
-            grid_name: grid_name.to_string(),
-        }
+    pub fn new(id: DggrsUid) -> Self {
+        Self { id }
     }
-}
 
-fn get_dggrs(grid_name: &str) -> Result<DGGRS, DggalError> {
-    let dggal = GLOBAL_DGGAL.lock().map_err(|_| DggalError::LockFailure)?;
-    DGGRS::new(&*dggal, grid_name).map_err(|_| DggalError::UnknownGrid {
-        grid_name: grid_name.to_string(),
-    })
+    #[inline]
+    fn grid_name(&self) -> DggrsName {
+        self.id.spec().name
+    }
+
+    fn get_dggrs(&self) -> Result<DGGRS, DggalError> {
+        let dggal = GLOBAL_DGGAL.lock().map_err(|_| DggalError::LockFailure)?;
+        DGGRS::new(&*dggal, &self.grid_name().to_string()).map_err(|_| DggalError::UnknownGrid {
+            grid_name: self.grid_name().to_string(),
+        })
+    }
 }
 
 impl DggrsPort for DggalImpl {
@@ -47,7 +50,7 @@ impl DggrsPort for DggalImpl {
         let cfg = config.unwrap_or_default();
         if refinement_level > self.max_refinement_level()? {
             return Err(GeoPlegmaError::DepthLimitReached {
-                grid_name: self.grid_name.clone(),
+                grid_name: self.grid_name().to_string(),
                 requested: refinement_level,
                 maximum: self.max_refinement_level()?,
             });
@@ -59,7 +62,7 @@ impl DggrsPort for DggalImpl {
             bbox_to_geoextent(&whole_earth_bbox())
         };
 
-        let dggrs = get_dggrs(&self.grid_name)?;
+        let dggrs = self.get_dggrs()?;
 
         let zones = dggrs.listZones(i32::from(refinement_level), &geo_extent);
         Ok(to_zones(dggrs, zones, cfg)?)
@@ -71,7 +74,7 @@ impl DggrsPort for DggalImpl {
         config: Option<DggrsPortConfig>,
     ) -> Result<Zones, GeoPlegmaError> {
         let cfg = config.unwrap_or_default();
-        let dggrs = get_dggrs(&self.grid_name)?;
+        let dggrs = self.get_dggrs()?;
         let zone = dggrs.getZoneFromWGS84Centroid(refinement_level.get(), &to_geo_point(point));
         let zones = vec![zone];
         Ok(to_zones(dggrs, zones, cfg)?)
@@ -91,13 +94,13 @@ impl DggrsPort for DggalImpl {
 
         if relative_depth > self.max_relative_depth()? {
             return Err(GeoPlegmaError::RelativeDepthLimitReached {
-                grid_name: self.grid_name.clone(),
+                grid_name: self.grid_name().to_string(),
                 requested: relative_depth,
                 maximum: self.max_relative_depth()?,
             });
         };
 
-        let dggrs = get_dggrs(&self.grid_name)?;
+        let dggrs = self.get_dggrs()?;
 
         let target_level =
             RefinementLevel::new(dggrs.getZoneLevel(parent_u64))?.add(relative_depth)?;
@@ -105,7 +108,7 @@ impl DggrsPort for DggalImpl {
         if target_level > self.max_refinement_level()? {
             return Err(
                 GeoPlegmaError::RefinementLevelPlusRelativeDepthLimitReached {
-                    grid_name: self.grid_name.clone(),
+                    grid_name: self.grid_name().to_string(),
                     requested: relative_depth,
                     maximum: self.max_refinement_level()?,
                 },
@@ -128,35 +131,29 @@ impl DggrsPort for DggalImpl {
             )
         })?;
 
-        let dggrs = get_dggrs(&self.grid_name)?;
+        let dggrs = self.get_dggrs()?;
         let zones = vec![zone_u64];
 
         Ok(to_zones(dggrs, zones, cfg)?)
     }
 
     fn min_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
-        Ok(RefinementLevel::new(0)?)
+        Ok(self.id.spec().min_refinement_level)
     }
 
     fn max_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
-        let dggrs = get_dggrs(&self.grid_name).map_err(|_| DggalError::UnknownGrid {
-            grid_name: self.grid_name.clone(),
-        })?;
-
-        let d = dggrs.getMaxDepth();
-
-        Ok(RefinementLevel::new(d)?)
+        Ok(self.id.spec().max_refinement_level)
     }
 
     fn default_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
-        Ok(RefinementLevel::new(2)?)
+        Ok(self.id.spec().default_refinement_level)
     }
 
     fn max_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
-        Ok(RelativeDepth::new(4)?)
+        Ok(self.id.spec().max_relative_depth)
     }
 
     fn default_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
-        Ok(RelativeDepth::new(2)?)
+        Ok(self.id.spec().default_relative_depth)
     }
 }

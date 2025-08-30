@@ -62,6 +62,7 @@ pub mod write {
         writeln!(file, "precision 7")?;
         writeln!(file, "dggs_res_spec {}", refinement_level.get())?;
         writeln!(file, "z3_invalid_digit 3")?; // TODO: Remove with DGGRID version 9 as this is  only relevant for ISEA3H and only placed here for convenience.
+        writeln!(file, "output_file_type NONE")?;
 
         writeln!(
             file,
@@ -370,10 +371,12 @@ pub fn cleanup(
     children_path: &PathBuf,
     neighbor_path: &PathBuf,
     bbox_path: &PathBuf,
+    input_path: &PathBuf,
 ) {
     let _ = fs::remove_file(meta_path);
     let _ = fs::remove_file(aigen_path);
     let _ = fs::remove_file(children_path);
     let _ = fs::remove_file(neighbor_path);
     let _ = fs::remove_file(bbox_path);
+    let _ = fs::remove_file(input_path);
 }

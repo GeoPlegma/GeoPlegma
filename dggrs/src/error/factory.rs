@@ -9,9 +9,13 @@
 
 use thiserror::Error;
 
+use crate::models::common::{DggrsTool, DggrsUid};
+
 /// Error type for instantiating DggrsPort adapters via the factory.
 #[derive(Debug, Error)]
 pub enum FactoryError {
-    #[error("Unsupported combination: tool='{tool}', dggrs='{dggrs}'")]
-    UnsupportedCombination { tool: String, dggrs: String },
+    #[error("Unsupported combination: tool='{tool}', dggrs='{id}'")]
+    UnsupportedCombination { tool: DggrsTool, id: DggrsUid },
+    #[error("DGGRS ID {id} is not available")]
+    AdapterUnavailable { id: DggrsUid },
 }

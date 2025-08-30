@@ -8,21 +8,21 @@
 // except according to those terms.
 use dggrs::error;
 use dggrs::factory;
-use dggrs::models::common::{RefinementLevel, RelativeDepth};
+use dggrs::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
 use geo::{Point, Rect};
 
 /// This is just an example and basic testing function if there is output or not
 pub fn main() -> Result<(), error::port::GeoPlegmaError> {
     let dt = vec![
-        (String::from("IGEO7"), String::from("DGGRID")),
-        (String::from("ISEA3H"), String::from("DGGRID")),
-        (String::from("H3"), String::from("H3O")),
-        (String::from("ISEA3H"), String::from("DGGAL")),
-        (String::from("IVEA3H"), String::from("DGGAL")),
-        (String::from("ISEA9R"), String::from("DGGAL")),
-        (String::from("IVEA9R"), String::from("DGGAL")),
-        (String::from("RTEA3H"), String::from("DGGAL")),
-        (String::from("RTEA9R"), String::from("DGGAL")),
+        DggrsUid::ISEA3HDGGRID,
+        DggrsUid::IGEO7,
+        DggrsUid::H3,
+        DggrsUid::ISEA3HDGGAL,
+        DggrsUid::IVEA3H,
+        DggrsUid::IVEA9R,
+        DggrsUid::IVEA3H,
+        DggrsUid::RTEA9R,
+        DggrsUid::RTEA3H,
     ];
 
     let points = vec![
@@ -42,12 +42,15 @@ pub fn main() -> Result<(), error::port::GeoPlegmaError> {
 
     for p in points {
         for rf in &refinment {
-            for (dggrs, tool) in &dt {
+            for did in &dt {
                 println!(
                     "=== DGGRS: {} TOOL: {} POINT: {:?} RF: {:?}===",
-                    &dggrs, &tool, &p, &rf
+                    &did.spec().name,
+                    &did.spec().tool,
+                    &p,
+                    &rf
                 );
-                let d = factory::dggrs_factory::get(&tool, &dggrs).unwrap();
+                let d = factory::dggrs_factory::get(*did).unwrap();
                 let r = d.zone_from_point(*rf, p, None)?;
                 println!(
                     "{:?} \nzone from point generated {} zones",

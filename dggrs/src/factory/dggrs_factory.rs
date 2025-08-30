@@ -11,23 +11,46 @@ use crate::adapters::{
     dggal::grids::DggalImpl, dggrid::igeo7::Igeo7Impl, dggrid::isea3h::Isea3hImpl, h3o::h3::H3Impl,
 };
 use crate::error::factory::FactoryError;
+use crate::models::common::{DggrsTool, DggrsUid};
 use crate::ports::dggrs::DggrsPort;
 use std::sync::Arc;
 
-pub fn get(tool: &str, dggrs: &str) -> Result<Arc<dyn DggrsPort>, FactoryError> {
-    match (tool.to_uppercase().as_str(), dggrs.to_uppercase().as_str()) {
-        ("DGGRID", "ISEA3H") => Ok(Arc::new(Isea3hImpl::default())),
-        ("DGGRID", "IGEO7") => Ok(Arc::new(Igeo7Impl::default())),
-        ("H3O", "H3") => Ok(Arc::new(H3Impl::default())),
-        ("DGGAL", "IVEA3H") => Ok(Arc::new(DggalImpl::new("IVEA3H"))),
-        ("DGGAL", "IVEA9R") => Ok(Arc::new(DggalImpl::new("IVEA9R"))),
-        ("DGGAL", "ISEA3H") => Ok(Arc::new(DggalImpl::new("ISEA3H"))),
-        ("DGGAL", "ISEA9R") => Ok(Arc::new(DggalImpl::new("ISEA9R"))),
-        ("DGGAL", "RTEA3H") => Ok(Arc::new(DggalImpl::new("RTEA3H"))),
-        ("DGGAL", "RTEA9R") => Ok(Arc::new(DggalImpl::new("RTEA9R"))),
-        _ => Err(FactoryError::UnsupportedCombination {
-            tool: tool.to_string(),
-            dggrs: dggrs.to_string(),
+pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsPort>, FactoryError> {
+    match id.spec().tool {
+        DggrsTool::DGGRID => match id {
+            DggrsUid::ISEA3HDGGRID => Ok(Arc::new(Isea3hImpl::default())),
+            DggrsUid::IGEO7 => Ok(Arc::new(Igeo7Impl::default())),
+            _ => Err(FactoryError::UnsupportedCombination {
+                tool: DggrsTool::DGGRID,
+                id,
+            }),
+        },
+
+        DggrsTool::H3O => match id {
+            DggrsUid::H3 => Ok(Arc::new(H3Impl::default())),
+            _ => Err(FactoryError::UnsupportedCombination {
+                tool: DggrsTool::H3O,
+                id,
+            }),
+        },
+
+        DggrsTool::DGGAL => match id {
+            // All the DGGAL-backed IDs you support:
+            DggrsUid::ISEA3HDGGAL
+            | DggrsUid::IVEA3H
+            | DggrsUid::ISEA9R
+            | DggrsUid::IVEA9R
+            | DggrsUid::RTEA3H
+            | DggrsUid::RTEA9R => Ok(Arc::new(DggalImpl::new(id))), // change DggalImpl::new to take DggrsId
+            _ => Err(FactoryError::UnsupportedCombination {
+                tool: DggrsTool::DGGAL,
+                id,
+            }),
+        },
+
+        DggrsTool::Native => Err(FactoryError::UnsupportedCombination {
+            tool: DggrsTool::Native,
+            id,
         }),
     }
 }

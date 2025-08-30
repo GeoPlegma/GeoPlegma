@@ -11,7 +11,7 @@ use crate::adapters::dggrid::common;
 use crate::adapters::dggrid::dggrid::DggridAdapter;
 use crate::error::dggrid::DggridError;
 use crate::error::port::GeoPlegmaError;
-use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::models::common::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use crate::ports::dggrs::{DggrsPort, DggrsPortConfig};
 use core::f64;
 use geo::{Point, Rect};
@@ -23,13 +23,15 @@ use tracing::debug;
 pub const CLIP_CELL_DENSIFICATION: u8 = 50; // DGGRID option
 
 pub struct Isea3hImpl {
-    pub adapter: DggridAdapter,
+    id: DggrsUid,
+    adapter: DggridAdapter,
 }
 
 impl Isea3hImpl {
     // Optional: allow custom paths too
     pub fn new(executable: PathBuf, workdir: PathBuf) -> Self {
         Self {
+            id: DggrsUid::ISEA3HDGGRID,
             adapter: DggridAdapter::new(executable, workdir),
         }
     }
@@ -38,6 +40,7 @@ impl Isea3hImpl {
 impl Default for Isea3hImpl {
     fn default() -> Self {
         Self {
+            id: DggrsUid::ISEA3HDGGRID,
             adapter: DggridAdapter::default(),
         }
     }
@@ -51,7 +54,7 @@ impl DggrsPort for Isea3hImpl {
         config: Option<DggrsPortConfig>,
     ) -> Result<Zones, GeoPlegmaError> {
         let cfg = config.unwrap_or_default();
-        let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
+        let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
             common::dggrid::setup(&self.adapter.workdir);
 
         let _ = common::write::metafile(
@@ -92,6 +95,7 @@ impl DggrsPort for Isea3hImpl {
             &children_path,
             &neighbor_path,
             &bbox_path,
+            &input_path,
         );
         Ok(result)
     }
@@ -151,6 +155,7 @@ impl DggrsPort for Isea3hImpl {
             &children_path,
             &neighbor_path,
             &bbox_path,
+            &input_path,
         );
         let _ = fs::remove_file(&input_path);
         Ok(result)
@@ -162,7 +167,7 @@ impl DggrsPort for Isea3hImpl {
         config: Option<DggrsPortConfig>,
     ) -> Result<Zones, GeoPlegmaError> {
         let cfg = config.unwrap_or_default();
-        let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, _input_path) =
+        let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
             common::dggrid::setup(&self.adapter.workdir);
 
         let parent_zone_res = get_refinement_level_from_z3_zone_id(&parent_zone_id)?;
@@ -204,6 +209,7 @@ impl DggrsPort for Isea3hImpl {
             &children_path,
             &neighbor_path,
             &bbox_path,
+            &input_path,
         );
         Ok(result)
     }
@@ -261,27 +267,28 @@ impl DggrsPort for Isea3hImpl {
             &children_path,
             &neighbor_path,
             &bbox_path,
+            &input_path,
         );
         Ok(result)
     }
     fn min_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
-        Ok(RefinementLevel::new(0)?)
+        Ok(self.id.spec().min_refinement_level)
     }
 
     fn max_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
-        Ok(RefinementLevel::new(32)?)
+        Ok(self.id.spec().max_refinement_level)
     }
 
     fn default_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
-        Ok(RefinementLevel::new(4)?)
+        Ok(self.id.spec().default_refinement_level)
     }
 
     fn max_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
-        Ok(RelativeDepth::new(8)?)
+        Ok(self.id.spec().max_relative_depth)
     }
 
     fn default_relative_depth(&self) -> Result<RelativeDepth, GeoPlegmaError> {
-        Ok(RelativeDepth::new(3)?)
+        Ok(self.id.spec().default_relative_depth)
     }
 }
 
@@ -318,7 +325,6 @@ pub fn isea3h_metafile(meta_path: &PathBuf) -> io::Result<()> {
 ///
 /// # Requirements
 /// Zone identifiers must be generated using DGGRID version 8.41 or later, with `z3_invalid_digit` explicitly set to `3`.
-
 pub fn get_refinement_level_from_z3_zone_id(
     dggrid_z3_id: &ZoneId,
 ) -> Result<RefinementLevel, GeoPlegmaError> {
