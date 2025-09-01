@@ -4,9 +4,8 @@ on:
   push:
     tags:
       - "v*.*.*"
-  workflow_dispatch:
-  release:
-    types: [published]
+  pull_request:
+    types: [edited]
 
 jobs:
   build:
