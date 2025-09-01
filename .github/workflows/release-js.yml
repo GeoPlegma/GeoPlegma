@@ -26,11 +26,11 @@ jobs:
 
       - name: Install NAPI-RS CLI
         run: npm install
-        path: ~/GeoPlegma/gp-bindings/js
+        working-directory: gp-bindings/js
 
       - name: Build native bindings
         run: napi build --release
-        path: ~/GeoPlegma/gp-bindings/js
+        working-directory: gp-bindings/js
 
       - name: Upload binaries
         uses: softprops/action-gh-release@v2
