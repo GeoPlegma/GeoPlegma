@@ -25,6 +25,10 @@ jobs:
           node-version: 18
 
       - name: Install NAPI-RS CLI
+        run: npm install -g @napi-rs/cli
+        working-directory: gp-bindings/js
+
+      - name: Install NPM libraries
         run: npm install
         working-directory: gp-bindings/js
 
