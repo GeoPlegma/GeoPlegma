@@ -94,3 +94,25 @@ This crate depends on `dggal-rust` from https://github.com/GeoPlegma/dggal-rust.
 Testing
 -------
 There is a test setup for grids in `tests/grids` which you can run with `cargo test --test` (if you only run `cargo test` it will fail as it would also test the documentation and the code in this `README.md`
+
+
+# Release Workflow for bindings (Step by Step)
+
+In GeoPlegma (Rust + bindings repo):
+- Update bindings if needed.
+- Tag a version (e.g. v1.2.3):
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+- GitHub Actions builds the .node files and attaches them to the release.
+
+In GeoPlegma-js (npm wrapper repo):
+- Update package.json version to 1.2.3.
+- Commit and push.
+- Tag the same version:
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+- GitHub Actions fetches the .node files from the GeoPlegma release and publishes your npm package.
