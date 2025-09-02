@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*.*.*"
-  pull_request:
 
 jobs:
   build:
@@ -38,8 +37,8 @@ jobs:
         working-directory: gp-bindings/js
 
       - name: Upload binaries
-        uses: softprops/action-gh-release@v2
+        uses: actions/checkout@v4
         with:
-          files: "npm/*/*.node"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: "gp-bindings/js/*.node"
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
