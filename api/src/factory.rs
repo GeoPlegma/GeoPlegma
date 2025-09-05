@@ -10,13 +10,13 @@
 use crate::adapters::{
     dggal::grids::DggalImpl, dggrid::igeo7::Igeo7Impl, dggrid::isea3h::Isea3hImpl, h3o::h3::H3Impl,
 };
+use crate::api::DggrsApi;
 use crate::constants::DGGRS_SPECS;
 use crate::error::factory::{DggrsUidError, FactoryError};
 use crate::models::common::{DggrsSpec, DggrsTool, DggrsUid};
-use crate::ports::dggrs::DggrsPort;
 use std::sync::Arc;
 
-pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsPort>, FactoryError> {
+pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
     match id.spec().tool {
         DggrsTool::DGGRID => match id {
             DggrsUid::ISEA3HDGGRID => Ok(Arc::new(Isea3hImpl::default())),

@@ -9,10 +9,10 @@
 
 use crate::adapters::dggrid::common;
 use crate::adapters::dggrid::dggrid::DggridAdapter;
+use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::dggrid::DggridError;
 use crate::models::common::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
-use crate::ports::dggrs::{DggrsPort, DggrsPortConfig};
 use core::f64;
 use geo::geometry::Point;
 use std::fs;
@@ -47,12 +47,12 @@ impl Default for Igeo7Impl {
     }
 }
 
-impl DggrsPort for Igeo7Impl {
+impl DggrsApi for Igeo7Impl {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
         bbox: Option<Rect<f64>>,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
@@ -105,7 +105,7 @@ impl DggrsPort for Igeo7Impl {
         &self,
         refinement_level: RefinementLevel,
         point: Point,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
@@ -165,7 +165,7 @@ impl DggrsPort for Igeo7Impl {
         &self,
         relative_depth: RelativeDepth,
         parent_zone_id: ZoneId,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
@@ -219,7 +219,7 @@ impl DggrsPort for Igeo7Impl {
     fn zone_from_id(
         &self,
         zone_id: ZoneId,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =

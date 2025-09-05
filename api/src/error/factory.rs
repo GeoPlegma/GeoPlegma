@@ -7,7 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::models::common::{DggrsTool, DggrsUid};
+use crate::models::common::DggrsUid;
 use std::fmt;
 use thiserror::Error;
 

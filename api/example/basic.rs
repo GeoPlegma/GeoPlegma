@@ -6,9 +6,9 @@
 // <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
-use dggrs::error;
-use dggrs::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
-use dggrs::{get, registry};
+use api::error;
+use api::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
+use api::{get, registry};
 use geo::{Point, Rect};
 
 /// This is just an example and basic testing function if there is output or not

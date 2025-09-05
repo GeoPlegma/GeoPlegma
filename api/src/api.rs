@@ -24,7 +24,7 @@ use geo::{Point, Rect};
 /// - area_sqm (the area in squaremeter as calculated by `geo`'s geodesic_area_unsigned() function
 /// - densify (region geometry densification)
 ///
-pub struct DggrsPortConfig {
+pub struct DggrsApiConfig {
     pub region: bool,
     pub center: bool,
     pub vertex_count: bool,
@@ -34,7 +34,7 @@ pub struct DggrsPortConfig {
     pub densify: bool, // TODO:: this is the switch to generate densified gemetry, which is actually not needed for H3 due to the Gnomic projection.
 }
 
-impl Default for DggrsPortConfig {
+impl Default for DggrsApiConfig {
     fn default() -> Self {
         Self {
             region: true,
@@ -49,13 +49,13 @@ impl Default for DggrsPortConfig {
 }
 
 /// The DGGRS port trait. Each adapter can only implement the functions defined here.
-pub trait DggrsPort: Send + Sync {
+pub trait DggrsApi: Send + Sync {
     /// Get zones for geo::Rect bounding box. If no bbox is supplied the whole world is taken.
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
         bbox: Option<Rect<f64>>,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
     /// Get zones for a geo::Point.
@@ -63,7 +63,7 @@ pub trait DggrsPort: Send + Sync {
         &self,
         refinement_level: RefinementLevel,
         point: Point, // NOTE:Consider accepting a vector of Points.
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
     /// Get zones based on a parent ZoneID.
@@ -71,14 +71,14 @@ pub trait DggrsPort: Send + Sync {
         &self,
         relative_depth: RelativeDepth,
         parent_zone_id: ZoneId,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
     /// Get a zone based on a ZoneID
     fn zone_from_id(
         &self,
         zone_id: ZoneId,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>; // NOTE: Consider accepting a vector of ZoneIDs
 
     /// Get the minimum refinement level of a DGGRS

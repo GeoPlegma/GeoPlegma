@@ -7,16 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::api::DggrsApiConfig;
 use crate::error::dggal::DggalError;
 use crate::models::common::{Zone, ZoneId, Zones};
-use crate::ports::dggrs::DggrsPortConfig;
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
 use geo::{GeodesicArea, LineString, Point, Polygon, Rect, coord};
 
 pub fn to_zones(
     dggrs: DGGRS,
     dggal_zones: Vec<DGGRSZone>,
-    conf: DggrsPortConfig,
+    conf: DggrsApiConfig,
 ) -> Result<Zones, DggalError> {
     let zones: Vec<Zone> = dggal_zones
         .into_iter()

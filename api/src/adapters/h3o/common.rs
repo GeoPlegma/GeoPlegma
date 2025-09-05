@@ -8,9 +8,9 @@
 // except according to those terms.
 
 use crate::{
-    error::{h3o::H3oError, DggrsError},
+    api::DggrsApiConfig,
+    error::{DggrsError, h3o::H3oError},
     models::common::{RefinementLevel, Zone, ZoneId, Zones},
-    ports::dggrs::DggrsPortConfig,
 };
 use geo::{Coord, CoordsIter, GeodesicArea, LineString, Point, Polygon};
 use h3o::{Boundary, CellIndex, LatLng, Resolution};
@@ -59,7 +59,7 @@ pub fn latlng_to_point(latlng: LatLng) -> Point {
     Point::new(latlng.lng(), latlng.lat())
 }
 
-pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsPortConfig) -> Result<Zones, DggrsError> {
+pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsApiConfig) -> Result<Zones, DggrsError> {
     let zones: Vec<Zone> = h3o_zones
         .into_iter()
         .map(|h3o_zone| {
