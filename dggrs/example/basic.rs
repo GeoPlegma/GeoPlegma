@@ -16,15 +16,16 @@ pub fn main() -> Result<(), error::DggrsError> {
     println!("{:?}", registry());
 
     let dt = vec![
-        DggrsUid::ISEA3HDGGRID,
-        DggrsUid::IGEO7,
-        DggrsUid::H3,
-        DggrsUid::ISEA3HDGGAL,
-        DggrsUid::IVEA3H,
-        DggrsUid::IVEA9R,
-        DggrsUid::IVEA3H,
-        DggrsUid::RTEA9R,
-        DggrsUid::RTEA3H,
+        //DggrsUid::ISEA3HDGGRID,
+        //DggrsUid::IGEO7,
+        //DggrsUid::H3,
+        //DggrsUid::ISEA3HDGGAL,
+        //DggrsUid::IVEA3H,
+        //DggrsUid::IVEA9R,
+        //DggrsUid::IVEA3H,
+        //DggrsUid::RTEA9R,
+        //DggrsUid::RTEA3H,
+        DggrsUid::IVEA7H,
     ];
 
     let points = vec![

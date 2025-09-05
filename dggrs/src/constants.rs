@@ -22,7 +22,7 @@ pub fn whole_earth_bbox() -> Rect<f64> {
     )
 }
 
-pub const DGGRS_SPECS: [DggrsSpec; 9] = [
+pub const DGGRS_SPECS: [DggrsSpec; 10] = [
     DggrsSpec {
         id: DggrsUid::ISEA3HDGGRID,
         name: DggrsName::ISEA3H,
@@ -144,6 +144,20 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         uri: None,
         crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
+        max_refinement_level: RefinementLevel::new_const(16),
+        default_refinement_level: RefinementLevel::new_const(2),
+        max_relative_depth: RelativeDepth::new_const(6),
+        default_relative_depth: RelativeDepth::new_const(4),
+    },
+    DggrsSpec {
+        id: DggrsUid::IVEA7H,
+        name: DggrsName::IVEA7H,
+        tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
+        min_refinement_level: RefinementLevel::new_const(0), // FIX: refinement levels and depth
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
         max_relative_depth: RelativeDepth::new_const(6),
