@@ -1,0 +1,13 @@
+[package]
+name = "gp-dggrs"
+version = "0.0.1"
+license = "MIT OR Apache-2.0"
+edition = "2024"
+readme = "README.md"
+rust-version = "1.88"
+
+[dependencies]
+gp-dggrs = {path = "../gp-dggrs/"}
+
+
+
