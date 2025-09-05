@@ -6,3 +6,9 @@
 // <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
+
+use gp_proj::Vector3D;
+
+pub fn main() -> () {
+    println!("Basic example for gp-proj")
+}
