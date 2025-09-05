@@ -8,7 +8,7 @@
 # except according to those terms.
 
 [package]
-name = "dggrs"
+name = "api"
 version = "0.2.0"
 license = "MIT OR Apache-2.0"
 edition = "2024"

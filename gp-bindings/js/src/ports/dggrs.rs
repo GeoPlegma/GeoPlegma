@@ -8,9 +8,9 @@
 // except according to those terms.
 use std::path::PathBuf;
 
-use dggrs::{
+use api::{
   adapters::dggrid::{igeo7::Igeo7Impl, isea3h::Isea3hImpl},
-  error::port::GeoPlegmaError,
+  error::DggrsError,
   models::common::{HexString, RefinementLevel, RelativeDepth, ZoneId, Zones},
   ports::dggrs::{DggrsPort, DggrsPortConfig},
 };
@@ -77,7 +77,7 @@ impl DggrsPort for DggrsPortEnum {
     refinement_level: RefinementLevel,
     bbox: Option<Rect<f64>>,
     config: Option<DggrsPortConfig>,
-  ) -> Result<Zones, GeoPlegmaError> {
+  ) -> Result<Zones, DggrsError> {
     match self {
       DggrsPortEnum::Isea3h(port) => port.zones_from_bbox(refinement_level, bbox, config),
       DggrsPortEnum::Igeo7(port) => port.zones_from_bbox(refinement_level, bbox, config),
@@ -89,7 +89,7 @@ impl DggrsPort for DggrsPortEnum {
     refinement_level: RefinementLevel,
     point: Point, // NOTE:Consider accepting a vector of Points.
     config: Option<DggrsPortConfig>,
-  ) -> Result<Zones, GeoPlegmaError> {
+  ) -> Result<Zones, DggrsError> {
     match self {
       DggrsPortEnum::Isea3h(port) => port.zone_from_point(refinement_level, point, config),
       DggrsPortEnum::Igeo7(port) => port.zone_from_point(refinement_level, point, config),
@@ -101,7 +101,7 @@ impl DggrsPort for DggrsPortEnum {
     relative_depth: RelativeDepth,
     parent_zone_id: ZoneId,
     config: Option<DggrsPortConfig>,
-  ) -> Result<Zones, GeoPlegmaError> {
+  ) -> Result<Zones, DggrsError> {
     match self {
       DggrsPortEnum::Isea3h(port) => port.zones_from_parent(relative_depth, parent_zone_id, config),
       DggrsPortEnum::Igeo7(port) => port.zones_from_parent(relative_depth, parent_zone_id, config),
@@ -112,30 +112,30 @@ impl DggrsPort for DggrsPortEnum {
     &self,
     zone_id: ZoneId,
     config: Option<DggrsPortConfig>,
-  ) -> Result<Zones, GeoPlegmaError> {
+  ) -> Result<Zones, DggrsError> {
     match self {
       DggrsPortEnum::Isea3h(port) => port.zone_from_id(zone_id, config),
       DggrsPortEnum::Igeo7(port) => port.zone_from_id(zone_id, config),
     }
   }
 
-  fn min_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+  fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
     todo!()
   }
 
-  fn max_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+  fn max_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
     todo!()
   }
 
-  fn default_refinement_level(&self) -> Result<RefinementLevel, GeoPlegmaError> {
+  fn default_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
     todo!()
   }
 
-  fn max_relative_depth(&self) -> Result<dggrs::models::common::RelativeDepth, GeoPlegmaError> {
+  fn max_relative_depth(&self) -> Result<api::models::common::RelativeDepth, DggrsError> {
     todo!()
   }
 
-  fn default_relative_depth(&self) -> Result<dggrs::models::common::RelativeDepth, GeoPlegmaError> {
+  fn default_relative_depth(&self) -> Result<api::models::common::RelativeDepth, DggrsError> {
     todo!()
   }
   // forward the rest...

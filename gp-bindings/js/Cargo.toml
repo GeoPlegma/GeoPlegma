@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 geo = "0.30.0"
 napi = "3.0.0"
 napi-derive = "3.0.0"
-dggrs = { path = "../../dggrs" }   # depends on your core crate
+api = { path = "../../api" }   # depends on your core crate
 
 [build-dependencies]
 napi-build = "2"

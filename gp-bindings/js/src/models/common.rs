@@ -9,7 +9,7 @@
 use geo::{LineString, Point, Polygon};
 use napi_derive::napi;
 
-use dggrs::models::common::{Zone, ZoneId, Zones};
+use api::models::common::{Zone, ZoneId, Zones};
 
 #[napi(object, js_name=Zone)]
 pub struct RustZone {
