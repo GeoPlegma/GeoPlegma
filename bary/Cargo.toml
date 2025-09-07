@@ -1,0 +1,11 @@
+[package]
+name = "bary"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+readme.workspace = true
+
+[dependencies]
+cargo-watch = "8.5.3"
+plotters = "0.3.7"
