@@ -22,11 +22,16 @@ pub fn whole_earth_bbox() -> Rect<f64> {
     )
 }
 
-pub const DGGRS_SPECS: [DggrsSpec; 9] = [
+pub const DGGRS_SPECS: [DggrsSpec; 10] = [
     DggrsSpec {
         id: DggrsUid::ISEA3HDGGRID,
         name: DggrsName::ISEA3H,
         tool: DggrsTool::DGGRID,
+
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(36),
         default_refinement_level: RefinementLevel::new_const(3),
@@ -37,6 +42,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::IGEO7,
         name: DggrsName::IGEO7,
         tool: DggrsTool::DGGRID,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(20),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -47,6 +56,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::H3,
         name: DggrsName::H3,
         tool: DggrsTool::H3O,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -57,6 +70,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::ISEA3HDGGAL,
         name: DggrsName::ISEA3H,
         tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(33),
         default_refinement_level: RefinementLevel::new_const(3),
@@ -67,6 +84,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::IVEA3H,
         name: DggrsName::IVEA3H,
         tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(33),
         default_refinement_level: RefinementLevel::new_const(3),
@@ -77,6 +98,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::ISEA9R,
         name: DggrsName::ISEA9R,
         tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -87,6 +112,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::IVEA9R,
         name: DggrsName::IVEA9R,
         tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -97,6 +126,10 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::RTEA3H,
         name: DggrsName::RTEA3H,
         tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(33),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -107,7 +140,25 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
         id: DggrsUid::RTEA9R,
         name: DggrsName::RTEA9R,
         tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
         min_refinement_level: RefinementLevel::new_const(0),
+        max_refinement_level: RefinementLevel::new_const(16),
+        default_refinement_level: RefinementLevel::new_const(2),
+        max_relative_depth: RelativeDepth::new_const(6),
+        default_relative_depth: RelativeDepth::new_const(4),
+    },
+    DggrsSpec {
+        id: DggrsUid::IVEA7H,
+        name: DggrsName::IVEA7H,
+        tool: DggrsTool::DGGAL,
+        title: None, // NOTE: Use Some() for optional values.
+        description: None,
+        uri: None,
+        crs: None,
+        min_refinement_level: RefinementLevel::new_const(0), // FIX: refinement levels and depth
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
         max_relative_depth: RelativeDepth::new_const(6),

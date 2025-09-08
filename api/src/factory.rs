@@ -36,7 +36,8 @@ pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
             | DggrsUid::ISEA9R
             | DggrsUid::IVEA9R
             | DggrsUid::RTEA3H
-            | DggrsUid::RTEA9R => Ok(Arc::new(DggalImpl::new(id))), // change DggalImpl::new to take DggrsId
+            | DggrsUid::RTEA9R
+            | DggrsUid::IVEA7H => Ok(Arc::new(DggalImpl::new(id))), // change DggalImpl::new to take DggrsId
             _ => Err(DggrsUidError::Unsupported { id }.into()),
         },
 

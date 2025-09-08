@@ -47,6 +47,7 @@ impl DggrsApi for H3Impl {
         refinement_level: RefinementLevel,
         bbox: Option<Rect<f64>>,
         config: Option<DggrsApiConfig>,
+
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let h3o_zones: Vec<CellIndex>;
