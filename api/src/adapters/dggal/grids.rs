@@ -9,11 +9,11 @@
 
 use crate::adapters::dggal::common::{bbox_to_geoextent, to_geo_point, to_zones};
 use crate::adapters::dggal::context::GLOBAL_DGGAL;
+use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::constants::whole_earth_bbox;
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
 use crate::models::common::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
-use crate::ports::dggrs::{DggrsPort, DggrsPortConfig};
 use dggal::DGGRS;
 use dggal_rust::dggal;
 use geo::{Point, Rect};
@@ -40,12 +40,12 @@ impl DggalImpl {
     }
 }
 
-impl DggrsPort for DggalImpl {
+impl DggrsApi for DggalImpl {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
         bbox: Option<Rect<f64>>,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         if refinement_level > self.max_refinement_level()? {
@@ -71,7 +71,7 @@ impl DggrsPort for DggalImpl {
         &self,
         refinement_level: RefinementLevel,
         point: Point,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let dggrs = self.get_dggrs()?;
@@ -83,7 +83,7 @@ impl DggrsPort for DggalImpl {
         &self,
         relative_depth: RelativeDepth,
         parent_zone_id: ZoneId,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let parent_u64 = parent_zone_id.as_u64().ok_or_else(|| {
@@ -120,7 +120,7 @@ impl DggrsPort for DggalImpl {
     fn zone_from_id(
         &self,
         zone_id: ZoneId,
-        config: Option<DggrsPortConfig>,
+        config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
         let zone_u64 = zone_id.as_u64().ok_or_else(|| {

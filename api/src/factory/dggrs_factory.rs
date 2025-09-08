@@ -10,23 +10,28 @@
 use crate::adapters::{
     dggal::grids::DggalImpl, dggrid::igeo7::Igeo7Impl, dggrid::isea3h::Isea3hImpl, h3o::h3::H3Impl,
 };
-use crate::api::DggrsApi;
-use crate::constants::DGGRS_SPECS;
-use crate::error::factory::{DggrsUidError, FactoryError};
-use crate::models::common::{DggrsSpec, DggrsTool, DggrsUid};
+use crate::error::factory::FactoryError;
+use crate::models::common::{DggrsTool, DggrsUid};
+use crate::ports::dggrs::DggrsPort;
 use std::sync::Arc;
 
-pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
+pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsPort>, FactoryError> {
     match id.spec().tool {
         DggrsTool::DGGRID => match id {
             DggrsUid::ISEA3HDGGRID => Ok(Arc::new(Isea3hImpl::default())),
             DggrsUid::IGEO7 => Ok(Arc::new(Igeo7Impl::default())),
-            _ => Err(DggrsUidError::Unsupported { id }.into()),
+            _ => Err(FactoryError::UnsupportedCombination {
+                tool: DggrsTool::DGGRID,
+                id,
+            }),
         },
 
         DggrsTool::H3O => match id {
             DggrsUid::H3 => Ok(Arc::new(H3Impl::default())),
-            _ => Err(DggrsUidError::Unsupported { id }.into()),
+            _ => Err(FactoryError::UnsupportedCombination {
+                tool: DggrsTool::H3O,
+                id,
+            }),
         },
 
         DggrsTool::DGGAL => match id {
@@ -36,16 +41,16 @@ pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
             | DggrsUid::ISEA9R
             | DggrsUid::IVEA9R
             | DggrsUid::RTEA3H
-            | DggrsUid::RTEA9R
-            | DggrsUid::IVEA7H => Ok(Arc::new(DggalImpl::new(id))), // change DggalImpl::new to take DggrsId
-            _ => Err(DggrsUidError::Unsupported { id }.into()),
+            | DggrsUid::RTEA9R => Ok(Arc::new(DggalImpl::new(id))), // change DggalImpl::new to take DggrsId
+            _ => Err(FactoryError::UnsupportedCombination {
+                tool: DggrsTool::DGGAL,
+                id,
+            }),
         },
 
-        DggrsTool::Native => Err(DggrsUidError::Unsupported { id }.into()),
+        DggrsTool::Native => Err(FactoryError::UnsupportedCombination {
+            tool: DggrsTool::Native,
+            id,
+        }),
     }
-}
-
-#[inline]
-pub fn registry() -> &'static [DggrsSpec] {
-    &DGGRS_SPECS
 }

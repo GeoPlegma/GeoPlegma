@@ -35,8 +35,8 @@ pub mod dggrid {
 }
 
 pub mod write {
+    use crate::api::DggrsApiConfig;
     use crate::models::common::RefinementLevel;
-    use crate::ports::dggrs::DggrsPortConfig;
     use geo::Rect;
     use std::fs;
     use std::io::{self, Write};
@@ -51,7 +51,7 @@ pub mod write {
         cell_output_file_name: &PathBuf,
         children_output_file_name: &PathBuf,
         neighbor_output_file_name: &PathBuf,
-        conf: &DggrsPortConfig,
+        conf: &DggrsApiConfig,
     ) -> io::Result<()> {
         debug!("Writing to {:?}", metafile);
         let mut file = fs::File::create(metafile)?;
@@ -138,8 +138,8 @@ pub mod write {
 }
 
 pub mod read {
-    use crate::error::dggrid::DggridError;
     use crate::error::DggrsError;
+    use crate::error::dggrid::DggridError;
     use crate::models::common::{Zone, ZoneId};
     use core::f64;
     use geo::{LineString, Point, Polygon};
@@ -273,9 +273,9 @@ pub mod read {
 }
 
 pub mod output {
+    use crate::api::DggrsApiConfig;
     use crate::error::DggrsError;
     use crate::models::common::{ZoneId, Zones};
-    use crate::ports::dggrs::DggrsPortConfig;
     use geo::GeodesicArea;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -284,7 +284,7 @@ pub mod output {
         aigen_path: &PathBuf,
         children_path: &PathBuf,
         neighbors_path: &PathBuf,
-        conf: &DggrsPortConfig,
+        conf: &DggrsApiConfig,
     ) -> Result<Zones, DggrsError> {
         // the default output
         let aigen_text = super::read::file(&aigen_path)?;

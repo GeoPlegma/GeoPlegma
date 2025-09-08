@@ -1,0 +1,22 @@
+
+[package]
+authors = ["João Manuel <joao.manuel@geoinsight.ai>"]
+edition = "2024"
+name = "gp-bindings-js"
+version = "0.0.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+geo = "0.30.0"
+napi = "3.0.0"
+napi-derive = "3.0.0"
+api = { path = "../../api" }   # depends on your core crate
+
+[build-dependencies]
+napi-build = "2"
+
+[profile.release]
+lto = true
+strip = "symbols"

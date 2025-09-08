@@ -27,6 +27,7 @@ pub const DGGRS_SPECS: [DggrsSpec; 10] = [
         id: DggrsUid::ISEA3HDGGRID,
         name: DggrsName::ISEA3H,
         tool: DggrsTool::DGGRID,
+
         title: None, // NOTE: Use Some() for optional values.
         description: None,
         uri: None,

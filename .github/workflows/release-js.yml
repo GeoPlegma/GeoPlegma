@@ -1,0 +1,44 @@
+name: Build & Release JavaScript Bindings
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        # , macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install NAPI-RS CLI
+        run: npm install -g @napi-rs/cli
+        working-directory: gp-bindings/js
+
+      - name: Install NPM libraries
+        run: npm install
+        working-directory: gp-bindings/js
+
+      - name: Build native bindings
+        run: napi build --release
+        working-directory: gp-bindings/js
+
+      - name: Upload binaries
+        uses: actions/checkout@v4
+        with:
+          files: "gp-bindings/js/*.node"
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
