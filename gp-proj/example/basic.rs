@@ -7,8 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use gp_proj::Vector3D;
+use geo::Point;
+use gp_proj::{projections::{layout::icosahedron_net::IcosahedronNet, polyhedron::icosahedron::new, projections::{traits::Projection, vgc::Vgc}}, Vector3D};
 
 pub fn main() -> () {
-    println!("Basic example for gp-proj")
+    println!("Basic example for gp-proj");
+
+    let position = Point::new(-9.222154, 38.695125);
+    let projection = Vgc;
+    let icosahedron = new();
+    let result = projection.forward(vec![position], Some(&icosahedron), &IcosahedronNet {});
+
+    println!("{:?}", result);
 }
