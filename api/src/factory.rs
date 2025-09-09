@@ -13,23 +13,23 @@ use crate::adapters::{
 use crate::api::DggrsApi;
 use crate::constants::DGGRS_SPECS;
 use crate::error::factory::{DggrsUidError, FactoryError};
-use crate::models::common::{DggrsSpec, DggrsTool, DggrsUid};
+use crate::models::common::{DggrsImplementation, DggrsSpec, DggrsUid};
 use std::sync::Arc;
 
 pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
     match id.spec().tool {
-        DggrsTool::DGGRID => match id {
+        DggrsImplementation::DGGRID => match id {
             DggrsUid::ISEA3HDGGRID => Ok(Arc::new(Isea3hImpl::default())),
             DggrsUid::IGEO7 => Ok(Arc::new(Igeo7Impl::default())),
             _ => Err(DggrsUidError::Unsupported { id }.into()),
         },
 
-        DggrsTool::H3O => match id {
+        DggrsImplementation::H3O => match id {
             DggrsUid::H3 => Ok(Arc::new(H3Impl::default())),
             _ => Err(DggrsUidError::Unsupported { id }.into()),
         },
 
-        DggrsTool::DGGAL => match id {
+        DggrsImplementation::DGGAL => match id {
             // All the DGGAL-backed IDs you support:
             DggrsUid::ISEA3HDGGAL
             | DggrsUid::IVEA3H
@@ -40,7 +40,7 @@ pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
             _ => Err(DggrsUidError::Unsupported { id }.into()),
         },
 
-        DggrsTool::Native => Err(DggrsUidError::Unsupported { id }.into()),
+        DggrsImplementation::Native => Err(DggrsUidError::Unsupported { id }.into()),
     }
 }
 

@@ -8,6 +8,7 @@
 // except according to those terms.
 use crate::constants::DGGRS_SPECS;
 use crate::error::DggrsError;
+use crate::error::factory::DggrsUidError;
 use geo::{Point, Polygon};
 use std::convert::{From, TryFrom};
 use std::fmt;
@@ -49,22 +50,48 @@ impl DggrsUid {
     }
 }
 
-impl fmt::Display for DggrsUid {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = match self {
-            DggrsUid::ISEA3HDGGRID => "ISEA3HDGGRID",
-            DggrsUid::IGEO7 => "IGEO7",
-            DggrsUid::H3 => "H3",
-            DggrsUid::ISEA3HDGGAL => "ISEA3HDGGAL",
-            DggrsUid::IVEA3H => "IVEA3H",
-            DggrsUid::IVEA9R => "IVEA9R",
-            DggrsUid::ISEA9R => "ISEA9R",
-            DggrsUid::RTEA3H => "RTEA3H",
-            DggrsUid::RTEA9R => "RTEA9R",
-        };
-        f.write_str(s)
+impl FromStr for DggrsUid {
+    type Err = DggrsUidError;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let norm = input.trim().to_ascii_lowercase().replace('_', "-");
+
+        for spec in DGGRS_SPECS.iter() {
+            // 1. canonical form: NAME-TOOL
+            let canonical = format!("{}{}", spec.name, spec.tool).to_ascii_lowercase();
+            if norm == canonical {
+                return Ok(spec.id);
+            }
+
+            // 2. short form: just the name (works if unambiguous)
+            let short = spec.name.to_string().to_ascii_lowercase();
+            if norm == short {
+                return Ok(spec.id);
+            }
+        }
+
+        // fallthrough: build candidates straight from specs
+        let candidates = DGGRS_SPECS.iter().map(|s| s.id).collect();
+        Err(DggrsUidError::Unknown {
+            input: input.to_string(),
+            candidates,
+        })
     }
 }
+
+impl fmt::Display for DggrsUid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let spec = self.spec();
+
+        // Policy: print `name-tool` if tool != Native, else just name.
+        // You can adjust (e.g. special-case H3/IGEO7) as needed.
+        match spec.tool {
+            DggrsImplementation::Native => write!(f, "{}", spec.name),
+            _ => write!(f, "{}{}", spec.name, spec.tool),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DggrsName {
     ISEA3H,
@@ -93,20 +120,20 @@ impl fmt::Display for DggrsName {
 }
 
 #[derive(Debug, Clone)]
-pub enum DggrsTool {
+pub enum DggrsImplementation {
     Native,
     DGGRID,
     DGGAL,
     H3O,
 }
 
-impl fmt::Display for DggrsTool {
+impl fmt::Display for DggrsImplementation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            DggrsTool::Native => "Native",
-            DggrsTool::DGGRID => "DGGRID",
-            DggrsTool::DGGAL => "DGGAL",
-            DggrsTool::H3O => "H3O",
+            DggrsImplementation::Native => "Native",
+            DggrsImplementation::DGGRID => "DGGRID",
+            DggrsImplementation::DGGAL => "DGGAL",
+            DggrsImplementation::H3O => "H3O",
         };
         f.write_str(s)
     }
@@ -116,7 +143,11 @@ impl fmt::Display for DggrsTool {
 pub struct DggrsSpec {
     pub id: DggrsUid,
     pub name: DggrsName,
-    pub tool: DggrsTool,
+    pub tool: DggrsImplementation,
+    pub title: &'static str,
+    pub description: &'static str,
+    pub uri: &'static str,
+    pub crs: &'static str,
     pub min_refinement_level: RefinementLevel,
     pub max_refinement_level: RefinementLevel,
     pub default_refinement_level: RefinementLevel,

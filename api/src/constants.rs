@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use crate::models::common::{
-    DggrsName, DggrsSpec, DggrsTool, DggrsUid, RefinementLevel, RelativeDepth,
+    DggrsImplementation, DggrsName, DggrsSpec, DggrsUid, RefinementLevel, RelativeDepth,
 };
 use geo::{Coord, Rect};
 
@@ -26,7 +26,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::ISEA3HDGGRID,
         name: DggrsName::ISEA3H,
-        tool: DggrsTool::DGGRID,
+        tool: DggrsImplementation::DGGRID,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(36),
         default_refinement_level: RefinementLevel::new_const(3),
@@ -36,7 +40,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::IGEO7,
         name: DggrsName::IGEO7,
-        tool: DggrsTool::DGGRID,
+        tool: DggrsImplementation::DGGRID,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(20),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -46,7 +54,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::H3,
         name: DggrsName::H3,
-        tool: DggrsTool::H3O,
+        tool: DggrsImplementation::H3O,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -56,7 +68,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::ISEA3HDGGAL,
         name: DggrsName::ISEA3H,
-        tool: DggrsTool::DGGAL,
+        tool: DggrsImplementation::DGGAL,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(33),
         default_refinement_level: RefinementLevel::new_const(3),
@@ -66,7 +82,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::IVEA3H,
         name: DggrsName::IVEA3H,
-        tool: DggrsTool::DGGAL,
+        tool: DggrsImplementation::DGGAL,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(33),
         default_refinement_level: RefinementLevel::new_const(3),
@@ -76,7 +96,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::ISEA9R,
         name: DggrsName::ISEA9R,
-        tool: DggrsTool::DGGAL,
+        tool: DggrsImplementation::DGGAL,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -86,7 +110,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::IVEA9R,
         name: DggrsName::IVEA9R,
-        tool: DggrsTool::DGGAL,
+        tool: DggrsImplementation::DGGAL,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -96,7 +124,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::RTEA3H,
         name: DggrsName::RTEA3H,
-        tool: DggrsTool::DGGAL,
+        tool: DggrsImplementation::DGGAL,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(33),
         default_refinement_level: RefinementLevel::new_const(2),
@@ -106,7 +138,11 @@ pub const DGGRS_SPECS: [DggrsSpec; 9] = [
     DggrsSpec {
         id: DggrsUid::RTEA9R,
         name: DggrsName::RTEA9R,
-        tool: DggrsTool::DGGAL,
+        title: "",
+        description: "",
+        uri: "",
+        crs: "",
+        tool: DggrsImplementation::DGGAL,
         min_refinement_level: RefinementLevel::new_const(0),
         max_refinement_level: RefinementLevel::new_const(16),
         default_refinement_level: RefinementLevel::new_const(2),
