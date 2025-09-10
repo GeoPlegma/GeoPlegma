@@ -186,7 +186,7 @@ impl HexString {
         if s.len() <= 16 && s.chars().all(|c| c.is_ascii_hexdigit()) {
             Ok(Self(s.to_string()))
         } else {
-            Err("HexId must be exactly 16 hexadecimal characters.".to_string())
+            Err("HexId can have a maximum length of 16 hexadecimal characters.".to_string())
         }
     }
 
