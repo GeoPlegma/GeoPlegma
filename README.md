@@ -75,6 +75,14 @@ This library provides an interface to DGGRID (and potentinally other tools) to g
 
 ## Requirments
 
+Basic tools:
+ - git
+ - GCC or Clang, with C support
+ - GNU Make
+ - cmake
+ - zlib, including the "dev" package with header files (for dggal)
+ - GDAL (for DGGRID)
+
 Make sure DGGRID is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
 
 ## Usage Example
