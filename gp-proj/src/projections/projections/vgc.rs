@@ -14,7 +14,7 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Face, Polyhedron, polyhedron},
+        polyhedron::{ArcLengths, Face, Polyhedron, polyhedron, spherical_geometry},
         projections::traits::Projection,
     },
 };
@@ -33,7 +33,7 @@ impl Projection for Vgc {
         polyhedron: Option<&Polyhedron>,
         layout: &dyn Layout,
     ) -> Vec<Coord> {
-        let out: Vec<Coord> = vec![];
+        let mut out: Vec<Coord> = vec![];
         let polyhedron = polyhedron.unwrap();
 
         // Need the coeficcients to convert from geodetic to authalic
@@ -69,82 +69,90 @@ impl Projection for Vgc {
             // - the 3d vertexes of the icosahedron
             // - the 2d vertexes of the layout
             // Polyhedron faces
-            // let faces_length = polyhedron.num_faces();
-            // for index in 0..faces_length {
-            //     let face = usize::from(index);
-            //     // let ids = triangles_ids[face];
-            //     // let triangle_3d = vec![
-            //     //     ico_vectors[ids[0] as usize],
-            //     //     ico_vectors[ids[1] as usize],
-            //     //     ico_vectors[ids[2] as usize],
-            //     // ];
-            //     if polyhedron.is_point_in_face(vector_3d, index) {
-            //         println!("here{:?}", polyhedron.face_vertices(index));
-            //         println!("hrere{:?}", vector_3d);
-            //         // // if polyhedron.is_point_in_face(vector_3d, triangle_3d.clone()) {
-            //         //     let (triangle_3d, triangle_2d) =
-            //         //         triangles(polyhedron, layout, vector_3d, triangle_3d, v2d[face]);
+            let faces_length = polyhedron.num_faces();
+            for index in 0..faces_length {
+                let face = usize::from(index);
+                // let ids = triangles_ids[face];
+                // let triangle_3d = vec![
+                //     ico_vectors[ids[0] as usize],
+                //     ico_vectors[ids[1] as usize],
+                //     ico_vectors[ids[2] as usize],
+                // ];
+                if polyhedron.is_point_in_face(vector_3d, index) {
+                    println!("here{:?}", polyhedron.face_vertices(index));
+                    println!("hrere{:?}", vector_3d);
+                    // // if polyhedron.is_point_in_face(vector_3d, triangle_3d.clone()) {
+                    let triangle_3d = triangles(
+                        polyhedron,
+                        vector_3d,
+                        polyhedron.face_vertices(face).unwrap(),
+                        face,
+                    );
+                    // triangles(polyhedron, layout, vector_3d, triangle_3d, v2d[face], face);
 
-            //         // need to find in which triangle the point is in
-            //         let ArcLengths { ab, bp, ap, .. } = polyhedron.face_arc_lengths(
-            //             [
-            //                 Vector3D {
-            //                     x: 0.0,
-            //                     y: 0.0,
-            //                     z: 0.0,
-            //                 },
-            //                 Vector3D {
-            //                     x: 0.0,
-            //                     y: 0.0,
-            //                     z: 0.0,
-            //                 },
-            //                 Vector3D {
-            //                     x: 0.0,
-            //                     y: 0.0,
-            //                     z: 0.0,
-            //                 },
-            //             ],
-            //             vector_3d,
-            //         );
+                    // need to find in which triangle the point is in
+                    let ArcLengths { ab, bp, ap, .. } = polyhedron.face_arc_lengths(
+                        triangle_3d,
+                        // [
+                        //     Vector3D {
+                        //         x: 0.0,
+                        //         y: 0.0,
+                        //         z: 0.0,
+                        //     },
+                        //     Vector3D {
+                        //         x: 0.0,
+                        //         y: 0.0,
+                        //         z: 0.0,
+                        //     },
+                        //     Vector3D {
+                        //         x: 0.0,
+                        //         y: 0.0,
+                        //         z: 0.0,
+                        //     },
+                        // ],
+                        vector_3d,
+                    );
 
-            //         // ==== Slice and Dice formulas ====
-            //         // angle ρ
-            //         let rho: f64 =
-            //             f64::acos(ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin());
+                    // ==== Slice and Dice formulas ====
+                    // angle ρ
+                    let rho: f64 =
+                        f64::acos(ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin());
 
-            //         // 1. Calculate delta (δ)
-            //         let delta = f64::acos(rho.sin() * ab.cos());
+                    // 1. Calculate delta (δ)
+                    let delta = f64::acos(rho.sin() * ab.cos());
 
-            //         // 2. Calculate u
-            //         let uv = (angle_beta + angle_gamma - rho - delta)
-            //             / (angle_beta + angle_gamma - PI / 2.0);
+                    // 2. Calculate the ratio of the spherical areas u and v
+                    let uv = (angle_beta + angle_gamma - rho - delta)
+                        / (angle_beta + angle_gamma - PI / 2.0);
 
-            //         let cos_xp_y;
-            //         if rho <= E.powi(-9) {
-            //             cos_xp_y = ab.cos();
-            //         } else {
-            //             cos_xp_y = 1.0 / (rho.tan() * delta.tan())
-            //         }
+                    let cos_xp_y;
+                    if rho <= E.powi(-9) {
+                        cos_xp_y = ab.cos();
+                    } else {
+                        cos_xp_y = 1.0 / (rho.tan() * delta.tan())
+                    }
 
-            //         let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
-            //         // =================================
+                    let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
 
-            //         // ==== Interpolation ====
-            //         // Triangle vertexes
-            //         let (p0, p1, p2) = (&triangle_2d[0], &triangle_2d[1], &triangle_2d[2]);
+                    // =================================
 
-            //         // Between A e o C it gives point D
-            //         let pd_x = p2.x + (p0.x - p2.x) * uv;
-            //         let pd_y = p2.y + (p0.y - p2.y) * uv;
+                    // ==== Interpolation ====
+                    // Triangle vertexes
+                    let (p0, p1, p2) = (Coord { x: 0.0_f64, y:  0.0 }, Coord { x: 0.5_f64, y: (3.0_f64).sqrt() * 0.5 },Coord { x: 1.0_f64, y:  0.0 });
+                    // let (p0, p1, p2) = (&triangle_2d[0], &triangle_2d[1], &triangle_2d[2]);
 
-            //         // Between D and B it gives point P
-            //         let p_x = pd_x + (pd_x - p1.x) * xy;
-            //         let p_y = pd_y + (pd_x - p1.y) * xy;
-            //         // ======================
+                    // Between A e o C it gives point D
+                    let pd_x = p2.x + (p0.x - p2.x) * uv;
+                    let pd_y = p2.y + (p0.y - p2.y) * uv;
 
-            //         out.push(Coord { x: p_x, y: p_y });
-            //     }
-            // }
+                    // Between D and B it gives point P
+                    let p_x = pd_x + (pd_x - p1.x) * xy;
+                    let p_y = pd_y + (pd_x - p1.y) * xy;
+                    // ======================
+
+                    out.push(Coord { x: p_x, y: p_y });
+                }
+            }
         }
 
         out
@@ -154,60 +162,68 @@ impl Projection for Vgc {
     }
 }
 
-// fn triangles(
-//     polyhedron: &Polyhedron,
-//     layout: &dyn Layout,
-//     vector: Vector3D,
-//     face_vectors: Vec<Vector3D>,
-//     face_vertices: [(u8, u8); 3],
-// ) -> ([Vector3D; 3], [Po; 3]) {
-//     let [p1, p2, p3] = face_vertices;
+fn triangles(
+    polyhedron: &Polyhedron,
+    // layout: &dyn Layout,
+    vector: Vector3D,
+    face_vectors: Vec<Vector3D>,
+    // face_vertices: [(u8, u8); 3],
+    face_id: usize,
+) -> [Vector3D; 3]
+// , [Po; 3])
+{
+    // let [p1, p2, p3] = face_vertices;
 
-//     let (p1, p2, p3) = (
-//         Position2D::from_tuple(p1),
-//         Position2D::from_tuple(p2),
-//         Position2D::from_tuple(p3),
-//     );
-//     let point_center = layout.face_center(face_vertices);
+    // let (p1, p2, p3) = (
+    //     Position2D::from_tuple(p1),
+    //     Position2D::from_tuple(p2),
+    //     Position2D::from_tuple(p3),
+    // );
+    // let point_center = layout.face_center(face_vertices);
 
-//     let (v1, v2, v3) = (face_vectors[0], face_vectors[1], face_vectors[2]);
-//     let mut vector_center = polyhedron.face_center(v1, v2, v3);
+    let (v1, v2, v3) = (face_vectors[0], face_vectors[1], face_vectors[2]);
+    let mut vector_center = polyhedron.face_center(face_id);
 
-//     let (mut v_mid, p_mid, corner): (Vector3D, Position2D, (Vector3D, Position2D)) =
-//         if polyhedron.is_point_in_triangle(vector, vec![vector_center, v2, v3]) {
-//             let p_mid = Position2D::mid(p2.clone(), p3.clone());
-//             let v_mid = Vector3D::mid(v2, v3);
-//             if polyhedron.is_point_in_triangle(vector, vec![vector_center, v_mid, v3]) {
-//                 (v_mid, p_mid, (v3, p3))
-//             } else {
-//                 (v_mid, p_mid, (v2, p2))
-//             }
-//         } else if polyhedron.is_point_in_triangle(vector, vec![vector_center, v3, v1]) {
-//             let p_mid = Position2D::mid(p3.clone(), p1.clone());
-//             let v_mid = Vector3D::mid(v3, v1);
-//             if polyhedron.is_point_in_triangle(vector, vec![vector_center, v_mid, v3]) {
-//                 (v_mid, p_mid, (v3, p3))
-//             } else {
-//                 (v_mid, p_mid, (v1, p1))
-//             }
-//         } else {
-//             let p_mid = Position2D::mid(p1.clone(), p2.clone());
-//             let v_mid = Vector3D::mid(v1, v2);
-//             if polyhedron.is_point_in_triangle(vector, vec![vector_center, v_mid, v2]) {
-//                 (v_mid, p_mid, (v2, p2))
-//             } else {
-//                 (v_mid, p_mid, (v1, p1))
-//             }
-//         };
+    let (mut v_mid,  corner): (Vector3D, Vector3D) =
+    // let (mut v_mid, p_mid, corner): (Vector3D, Position2D, (Vector3D, Position2D)) =
+        if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v2, v3]) {
+            // let p_mid = Position2D::mid(p2.clone(), p3.clone());
+            let v_mid = Vector3D::mid(v2, v3);
+            if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v_mid, v3]) {
+                // (v_mid, p_mid, (v3, p3))
+                (v_mid, v3)
+            } else {
+                (v_mid, v2)
+                // (v_mid, p_mid, (v2, p2))
+            }
+        } else if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v3, v1]) {
+            // let p_mid = Position2D::mid(p3.clone(), p1.clone());
+            let v_mid = Vector3D::mid(v3, v1);
+            if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v_mid, v3]) {
+                (v_mid,v3)
+            } else {
+                (v_mid, v1)
+            }
+        } else {
+            // let p_mid = Position2D::mid(p1.clone(), p2.clone());
+            let v_mid = Vector3D::mid(v1, v2);
+            if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v_mid, v2]) {
+                (v_mid, v2)
+                // (v_mid, p_mid, (v2, p2))
+            } else {
+                // (v_mid, p_mid, (v1, p1))
+                (v_mid, v1)
+            }
+        };
 
-//     vector_center = vector_center.normalize();
-//     v_mid = v_mid.normalize();
+    vector_center = vector_center.normalize();
+    v_mid = v_mid.normalize();
 
-//     (
-//         [v_mid, corner.0, vector_center],
-//         [p_mid, corner.1, point_center],
-//     )
-// }
+    // (
+    [v_mid, corner, vector_center]
+    // [p_mid, corner.1, point_center],
+    // )
+}
 
 #[cfg(test)]
 mod tests {

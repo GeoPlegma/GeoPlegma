@@ -14,6 +14,10 @@ use geo::Coord;
 pub struct IcosahedronNet {}
 
 impl Layout for IcosahedronNet {
+    fn new(&self) {
+        todo!()
+    }
+
     fn face_center(&self, p: [(u8, u8); 3]) -> Coord {
         Coord {
             x: f64::from((p[0].0 + p[1].0 + p[2].0) / 3),

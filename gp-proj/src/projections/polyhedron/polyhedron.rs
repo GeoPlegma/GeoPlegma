@@ -88,7 +88,7 @@ impl Polyhedron {
     // Geometric operations (work on pre-computed data)
 
     /// Get the center of a specific face (O(1) lookup)
-    pub fn face_center(&self, face_id: usize) -> Option<Vector3D> {
+    pub fn face_center(&self, face_id: usize) -> Vector3D {
         self.face_centers.get(face_id).copied()
     }
 
