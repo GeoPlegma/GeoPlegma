@@ -10,4 +10,7 @@ rust-version = "1.88"
 geo = "0.30.0"
 thiserror = "2.0.12"
 
+[[example]]
+name = "basic"
+path = "example/basic.rs"
 
