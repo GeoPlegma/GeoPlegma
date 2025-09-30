@@ -6,7 +6,6 @@ pub enum Aperture {
 }
 
 impl Aperture {
-    /// Radix for the denominator growth per level.
     pub fn base(self) -> u32 {
         match self {
             Aperture::A3 => 3,

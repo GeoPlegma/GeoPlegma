@@ -1,109 +1,60 @@
-use plotters::prelude::*;
 mod models;
-use models::aperture::Aperture;
-use models::bary::{BaryI, hex_vertices_world_regular_from_baryi};
-
-// ======== tiny utils just for debugging ========
-
-fn angle(p: [f64; 2], c: [f64; 2]) -> f64 {
-    (p[1] - c[1]).atan2(p[0] - c[0])
-}
-
-fn poly_area2(verts: &[[f64; 2]]) -> f64 {
-    let mut a = 0.0;
-    for i in 0..verts.len() {
-        let (x1, y1) = (verts[i][0], verts[i][1]);
-        let (x2, y2) = (
-            verts[(i + 1) % verts.len()][0],
-            verts[(i + 1) % verts.len()][1],
-        );
-        a += x1 * y2 - x2 * y1;
-    }
-    a
-}
+use models::bary::BaryI;
+use models::cart::{cPoint, cTriangle};
+mod svg;
+use svg::Svg;
+mod canvas;
+use canvas::Canvas;
+mod colors;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // pick aperture & level
-    let ap = Aperture::A3;
-    let level = 1;
-    let denom = ap.denom_for_level(level);
-    let frequency = 1;
+    let p0 = cPoint::new(0.0, 0.0);
+    let p1 = cPoint::new(1.0, 0.0);
+    let p2 = cPoint::new(0.5, (3.0f64).sqrt() / 2.0);
 
-    println!("=== DEBUG ===");
-    println!(
-        "aperture = {:?}, level = {}, denom = {}",
-        ap, level, frequency
-    );
+    let base_triangle = cTriangle::new(p0, p1, p2);
 
-    let root = BitMapBackend::new("tri_grid.png", (1100, 1100)).into_drawing_area();
-    root.fill(&WHITE)?;
+    let mut svg = Svg::new_viewbox(0.0, -1.0, 1.0, 1.1, 1000, 1000);
+    let canvas = Canvas::y_up();
 
-    // world triangle (equilateral unit-ish)
-    let v0 = [0.0, 0.0];
-    let v1 = [1.0, 0.0];
-    let v2 = [0.5, (3.0f64).sqrt() / 2.0];
+    svg.tri(&base_triangle, 0.005, colors::BASE, &canvas);
+    // svg.dot(p0, colors::SAPPHIRE, 12.0, &canvas);
+    // svg.dot(p1, colors::TEAL, 12.0, &canvas);
+    // svg.dot(p2, colors::FLAMINGO, 12.0, &canvas);
 
-    // orientation
-    let tri_area2 = (v1[0] - v0[0]) * (v2[1] - v0[1]) - (v2[0] - v0[0]) * (v1[1] - v0[1]);
-    println!(
-        "triangle signed area*2 = {} ({}-winding)",
-        tri_area2,
-        if tri_area2 > 0.0 { "CCW" } else { "CW" }
-    );
+    let b0 = BaryI::new(1, 0, 0, 1);
+    svg.dot_bary(b0, &base_triangle, colors::RED, 12.0, &canvas);
 
-    // screen mapping
-    let scale = 1000.0;
-    let offset = (50.0, 1050.0);
-    let to_screen = |p: [f64; 2]| -> (i32, i32) {
-        (
-            (p[0] * scale + offset.0) as i32,
-            (offset.1 - p[1] * scale) as i32,
-        )
-    };
+    let b1 = BaryI::new(0, 1, 0, 1);
+    svg.dot_bary(b1, &base_triangle, colors::RED, 12.0, &canvas);
 
-    // base triangle outline
-    let tri_pts = vec![to_screen(v0), to_screen(v1), to_screen(v2)];
-    let mut outline = tri_pts.clone();
-    outline.push(to_screen(v0));
-    root.draw(&PathElement::new(
-        outline,
-        ShapeStyle::from(&RGBColor(120, 120, 120)).stroke_width(2),
-    ))?;
+    let b2 = BaryI::new(0, 0, 1, 1);
+    svg.dot_bary(b2, &base_triangle, colors::RED, 12.0, &canvas);
 
-    // draw centers + labels (as before)
-    for i in 0..=frequency {
-        for j in 0..=(frequency - i) {
-            let k = frequency - i - j;
-            let b = BaryI {
-                i,
-                j,
-                k,
-                denom: frequency,
-            };
-            let p = b.to_cart2(v0, v1, v2);
-            let (x, y) = to_screen(p);
-            root.draw(&Circle::new((x, y), 2, RED.filled()))?;
-            // label only a subset to keep the image readable at higher levels
-            let label = format!("({}, {}, {})", b.i, b.j, b.k);
-            root.draw(&Text::new(
-                label,
-                (x + 8, y - 8),
-                ("sans-serif", 16).into_font().color(&RED),
-            ))?;
-        }
-    }
+    let bx = BaryI::new(1, 5, 3, 9);
+    svg.dot_bary(bx, &base_triangle, colors::PEACH, 12.0, &canvas);
 
-    let c = BaryI {
-        i: 0,
-        j: 1,
-        k: 1,
-        denom: frequency,
-    };
-    let p = c.to_cart2(v0, v1, v2);
-    let (x, y) = to_screen(p);
-    root.draw(&Circle::new((x, y), 2, GREEN.filled()))?;
+    let h0 = BaryI::new(0, 1, 2, 3);
+    svg.dot_bary(h0, &base_triangle, colors::MANTLE, 12.0, &canvas);
 
-    root.present()?;
-    println!("wrote tri_grid.png");
+    let h1 = BaryI::new(0, 2, 1, 3);
+    svg.dot_bary(h1, &base_triangle, colors::MANTLE, 12.0, &canvas);
+
+    let h2 = BaryI::new(1, 0, 2, 3);
+    svg.dot_bary(h2, &base_triangle, colors::MANTLE, 12.0, &canvas);
+
+    let h3 = BaryI::new(2, 0, 1, 3);
+    svg.dot_bary(h3, &base_triangle, colors::MANTLE, 12.0, &canvas);
+
+    let h4 = BaryI::new(1, 2, 0, 3);
+    svg.dot_bary(h4, &base_triangle, colors::MANTLE, 12.0, &canvas);
+
+    let h5 = BaryI::new(2, 1, 0, 3);
+    svg.dot_bary(h5, &base_triangle, colors::MANTLE, 12.0, &canvas);
+
+    let ox = BaryI::new(2, 1, 2, 3);
+    svg.dot_bary(h5, &base_triangle, colors::MANTLE, 12.0, &canvas);
+
+    std::fs::write("tri.svg", svg.finish())?;
     Ok(())
 }
