@@ -73,15 +73,15 @@ How to use it
 
 This library provides an interface to DGGRID (and potentinally other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
 
-## Requirments
+## Requirements
 
 Make sure DGGRID is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
 
 ## Usage Example
 
-Check out `dggrs/example/basic.rs` for a simple example of how to use the `dggrs` crate of GeoPlegma.
+Check out `api/example/basic.rs` for a simple example of how to use the `api` crate of GeoPlegma.
 ```bash
-cd dggrs
+cd api/example
 cargo run --example basic
 ```
 
