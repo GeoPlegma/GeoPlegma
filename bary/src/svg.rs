@@ -1,7 +1,7 @@
 use crate::canvas::Canvas;
 use crate::models::bary::BaryI;
 use crate::models::bary::BaryIHex;
-use crate::models::cart::{cPoint, cTriangle};
+use crate::models::cart::{CPoint, CTriangle};
 use std::fmt::Write;
 
 pub struct Svg {
@@ -19,7 +19,7 @@ impl Svg {
         Self { buf }
     }
 
-    pub fn dot(&mut self, p: cPoint, color: &str, dot_size: f64, c: &Canvas) {
+    pub fn dot(&mut self, p: CPoint, color: &str, dot_size: f64, c: &Canvas) {
         // Hardcoded ~3px dot, independent of viewBox scale
         let (x, y) = c.map(p);
         let _ = write!(
@@ -29,13 +29,13 @@ impl Svg {
         );
     }
 
-    pub fn dot_bary(&mut self, b: BaryI, tri: &cTriangle, color: &str, size_px: f64, c: &Canvas) {
+    pub fn dot_bary(&mut self, b: BaryI, tri: &CTriangle, color: &str, size_px: f64, c: &Canvas) {
         let p = b.to_cpoint_on(tri);
         self.dot(p, color, size_px, c);
     }
 
     /// Draw a closed triangle outline at `tri` with given line width and color
-    pub fn tri(&mut self, tri: &cTriangle, line_width: f64, color: &str, c: &Canvas) {
+    pub fn tri(&mut self, tri: &CTriangle, line_width: f64, color: &str, c: &Canvas) {
         let (a, b, c1) = (c.map(tri.v0), c.map(tri.v1), c.map(tri.v2));
         let d = format!("M{},{} L{},{} L{},{} Z", a.0, a.1, b.0, b.1, c1.0, c1.1);
         let _ = write!(
@@ -51,7 +51,7 @@ impl Svg {
     pub fn hex(
         &mut self,
         hex: &BaryIHex,
-        tri: &cTriangle,
+        tri: &CTriangle,
         line_width: f64,
         color: &str,
         fill: Option<&str>,

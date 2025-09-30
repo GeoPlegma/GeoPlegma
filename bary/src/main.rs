@@ -1,6 +1,6 @@
 mod models;
-use models::bary::BaryI;
-use models::cart::{cPoint, cTriangle};
+use models::bary::{BaryI, BaryIHex};
+use models::cart::{CPoint, CTriangle};
 mod svg;
 use svg::Svg;
 mod canvas;
@@ -8,11 +8,11 @@ use canvas::Canvas;
 mod colors;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let p0 = cPoint::new(0.0, 0.0);
-    let p1 = cPoint::new(1.0, 0.0);
-    let p2 = cPoint::new(0.5, (3.0f64).sqrt() / 2.0);
+    let p0 = CPoint::new(0.0, 0.0);
+    let p1 = CPoint::new(1.0, 0.0);
+    let p2 = CPoint::new(0.5, (3.0f64).sqrt() / 2.0);
 
-    let base_triangle = cTriangle::new(p0, p1, p2);
+    let base_triangle = CTriangle::new(p0, p1, p2);
 
     let mut svg = Svg::new_viewbox(0.0, -1.0, 1.0, 1.1, 1000, 1000);
     let canvas = Canvas::y_up();
@@ -52,8 +52,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let h5 = BaryI::new(2, 1, 0, 3);
     svg.dot_bary(h5, &base_triangle, colors::MANTLE, 12.0, &canvas);
 
-    let ox = BaryI::new(2, 1, 2, 3);
-    svg.dot_bary(ox, &base_triangle, colors::MANTLE, 12.0, &canvas);
+    let hex = BaryIHex::inscribed_hex();
+    svg.hex(&hex, &base_triangle, 0.004, colors::OVERLAY1, None, &canvas);
+
+    let chd = BaryIHex::hex_from_center(
+        BaryI {
+            i: 1,
+            j: 1,
+            k: 1,
+            denom: 3,
+        },
+        3,
+    );
+    svg.hex(&chd, &base_triangle, 0.004, colors::PINK, None, &canvas);
 
     std::fs::write("tri.svg", svg.finish())?;
     Ok(())
