@@ -10,13 +10,7 @@ pub struct BaryI {
     pub denom: u32,
 }
 
-
 impl BaryI {
-    // pub fn new(i: u32, j: u32, k: u32) -> Self {
-    //     let denom = i + j + k;
-    //     Self { i, j, k, denom }
-    // }
-
     pub fn new(i: u32, j: u32, k: u32, denom: u32) -> Self {
         assert!(i + j + k == denom, "i+j+k must equal denom");
         Self { i, j, k, denom }
@@ -49,8 +43,25 @@ impl BaryI {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct BaryIHex([BaryI; 6]);
+pub struct BaryIHex(pub [BaryI; 6]);
 
-impl BaryIHex{
-pub fn new(hex: [BaryI; 6])->BaryIHex
+impl BaryIHex {
+    pub fn inscribed_with_denom(denom: u32) -> Self {
+        assert!(denom % 3 == 0, "denom must be divisible by 3");
+        let t = denom / 3;
+        let mk = |i, j, k| BaryI::new(i, j, k, denom);
+        Self([
+            mk(2 * t, 1 * t, 0),
+            mk(1 * t, 2 * t, 0),
+            mk(0, 2 * t, 1 * t),
+            mk(0, 1 * t, 2 * t),
+            mk(1 * t, 0, 2 * t),
+            mk(2 * t, 0, 1 * t),
+        ])
+    }
+
+    #[inline]
+    pub fn to_cpoints_on(&self, tri: &cTriangle) -> [cPoint; 6] {
+        self.0.map(|b| b.to_cpoint_on(tri))
+    }
 }

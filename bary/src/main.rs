@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     svg.dot_bary(h5, &base_triangle, colors::MANTLE, 12.0, &canvas);
 
     let ox = BaryI::new(2, 1, 2, 3);
-    svg.dot_bary(h5, &base_triangle, colors::MANTLE, 12.0, &canvas);
+    svg.dot_bary(ox, &base_triangle, colors::MANTLE, 12.0, &canvas);
 
     std::fs::write("tri.svg", svg.finish())?;
     Ok(())

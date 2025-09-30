@@ -1,5 +1,6 @@
 use crate::canvas::Canvas;
 use crate::models::bary::BaryI;
+use crate::models::bary::BaryIHex;
 use crate::models::cart::{cPoint, cTriangle};
 use std::fmt::Write;
 
@@ -46,5 +47,45 @@ impl Svg {
     pub fn finish(mut self) -> String {
         self.buf.push_str("</svg>");
         self.buf
+    }
+    pub fn hex(
+        &mut self,
+        hex: &BaryIHex,
+        tri: &cTriangle,
+        line_width: f64,
+        color: &str,
+        fill: Option<&str>,
+        c: &Canvas,
+    ) {
+        let pts = hex.to_cpoints_on(tri).map(|p| c.map(p));
+        let d = format!(
+            "M{},{} L{},{} L{},{} L{},{} L{},{} L{},{} Z",
+            pts[0].0,
+            pts[0].1,
+            pts[1].0,
+            pts[1].1,
+            pts[2].0,
+            pts[2].1,
+            pts[3].0,
+            pts[3].1,
+            pts[4].0,
+            pts[4].1,
+            pts[5].0,
+            pts[5].1
+        );
+        match fill {
+            Some(f) => {
+                let _ = write!(
+                    self.buf,
+                    r#"<path d="{d}" stroke="{color}" stroke-width="{line_width}" fill="{f}"/>"#
+                );
+            }
+            None => {
+                let _ = write!(
+                    self.buf,
+                    r#"<path d="{d}" stroke="{color}" stroke-width="{line_width}" fill="none"/>"#
+                );
+            }
+        }
     }
 }
