@@ -89,7 +89,7 @@ impl Polyhedron {
 
     /// Get the center of a specific face (O(1) lookup)
     pub fn face_center(&self, face_id: usize) -> Vector3D {
-        self.face_centers.get(face_id).copied()
+        self.face_centers[face_id]
     }
 
     /// Find the face containing a point on the unit sphere
@@ -102,9 +102,7 @@ impl Polyhedron {
                 point,
                 [triangle[0], triangle[1], triangle[2]],
             ) {
- println!("{:?} {:?}{:?} {:?}", point, triangle[0], triangle[1], triangle[2]);
-
-                // return Some(face_idx);
+                return Some(face_idx);
             }
         }
         None
@@ -133,7 +131,7 @@ impl Polyhedron {
     /// Check if point lies within a face
     pub fn is_point_in_face(&self, point: Vector3D, face_id: usize) -> bool {
         if let Some(face_vertices) = self.face_vertices(face_id) {
-            spherical_geometry::point_in_planar_triangle(
+            spherical_geometry::point_in_spherical_triangle(
                 point,
                 [face_vertices[0], face_vertices[1], face_vertices[2]],
             )

@@ -14,8 +14,8 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Face, Polyhedron, polyhedron, spherical_geometry},
-        projections::traits::Projection,
+        polyhedron::{polyhedron, spherical_geometry, ArcLengths, Face, Polyhedron},
+        projections::traits::{Forward, Projection},
     },
 };
 use geo::{Coord, Point};
@@ -32,8 +32,8 @@ impl Projection for Vgc {
         positions: Vec<Point>,
         polyhedron: Option<&Polyhedron>,
         layout: &dyn Layout,
-    ) -> Vec<Coord> {
-        let mut out: Vec<Coord> = vec![];
+    ) -> Vec<Forward> {
+        let mut out: Vec<Forward> = vec![];
         let polyhedron = polyhedron.unwrap();
 
         // Need the coeficcients to convert from geodetic to authalic
@@ -51,7 +51,7 @@ impl Projection for Vgc {
         // BAC
         let angle_alpha: f64 = PI / 2.0;
 
-        let v2d = layout.vertices();
+        // let v2d = layout.vertices();
 
         for position in positions {
             let lon = position.x().to_radians();
@@ -60,9 +60,9 @@ impl Projection for Vgc {
                 &coef_fourier_geod_to_auth,
             );
             // Calculate 3d unit vectors for point P
-            let vector_3d = Vector3D::from_array(Self::to_3d(lat, lon));
+            let point_p = Vector3D::from_array(Self::to_3d(lat, lon));
 
-            println!("{:?}", polyhedron.find_face(vector_3d));
+            println!("{:?}", polyhedron.find_face(point_p));
 
             // starting from here, you need:
             // - the 3d point that you want to project
@@ -78,39 +78,25 @@ impl Projection for Vgc {
                 //     ico_vectors[ids[1] as usize],
                 //     ico_vectors[ids[2] as usize],
                 // ];
-                if polyhedron.is_point_in_face(vector_3d, index) {
+                if polyhedron.is_point_in_face(point_p, index) {
                     println!("here{:?}", polyhedron.face_vertices(index));
-                    println!("hrere{:?}", vector_3d);
-                    // // if polyhedron.is_point_in_face(vector_3d, triangle_3d.clone()) {
+                    println!("hrere{:?}", point_p);
+                    // // if polyhedron.is_point_in_face(point_p, triangle_3d.clone()) {
+
+                    // the icosahedron triangle gets divided into six equilateral triangles,
+                    // and we find the one where the point is
                     let triangle_3d = triangles(
                         polyhedron,
-                        vector_3d,
+                        point_p,
                         polyhedron.face_vertices(face).unwrap(),
                         face,
                     );
-                    // triangles(polyhedron, layout, vector_3d, triangle_3d, v2d[face], face);
+                    // triangles(polyhedron, layout, point_p, triangle_3d, v2d[face], face);
 
                     // need to find in which triangle the point is in
                     let ArcLengths { ab, bp, ap, .. } = polyhedron.face_arc_lengths(
                         triangle_3d,
-                        // [
-                        //     Vector3D {
-                        //         x: 0.0,
-                        //         y: 0.0,
-                        //         z: 0.0,
-                        //     },
-                        //     Vector3D {
-                        //         x: 0.0,
-                        //         y: 0.0,
-                        //         z: 0.0,
-                        //     },
-                        //     Vector3D {
-                        //         x: 0.0,
-                        //         y: 0.0,
-                        //         z: 0.0,
-                        //     },
-                        // ],
-                        vector_3d,
+                        point_p,
                     );
 
                     // ==== Slice and Dice formulas ====
@@ -137,11 +123,10 @@ impl Projection for Vgc {
                     // =================================
 
                     // ==== Interpolation ====
-                    // Triangle vertexes
+                    // Triangle vertexes for local barycentric system (A,B,C)
                     let (p0, p1, p2) = (Coord { x: 0.0_f64, y:  0.0 }, Coord { x: 0.5_f64, y: (3.0_f64).sqrt() * 0.5 },Coord { x: 1.0_f64, y:  0.0 });
-                    // let (p0, p1, p2) = (&triangle_2d[0], &triangle_2d[1], &triangle_2d[2]);
 
-                    // Between A e o C it gives point D
+                    // Between A and C it gives point D
                     let pd_x = p2.x + (p0.x - p2.x) * uv;
                     let pd_y = p2.y + (p0.y - p2.y) * uv;
 
@@ -150,7 +135,7 @@ impl Projection for Vgc {
                     let p_y = pd_y + (pd_x - p1.y) * xy;
                     // ======================
 
-                    out.push(Coord { x: p_x, y: p_y });
+                    out.push(Forward { coords: Coord { x: p_x, y: p_y }, face: index });
                 }
             }
         }
@@ -162,62 +147,44 @@ impl Projection for Vgc {
     }
 }
 
+
+/// This will divide the icosahedron face in six equilateral triangles
 fn triangles(
     polyhedron: &Polyhedron,
-    // layout: &dyn Layout,
-    vector: Vector3D,
+    point_p: Vector3D,
     face_vectors: Vec<Vector3D>,
-    // face_vertices: [(u8, u8); 3],
     face_id: usize,
 ) -> [Vector3D; 3]
-// , [Po; 3])
 {
-    // let [p1, p2, p3] = face_vertices;
-
-    // let (p1, p2, p3) = (
-    //     Position2D::from_tuple(p1),
-    //     Position2D::from_tuple(p2),
-    //     Position2D::from_tuple(p3),
-    // );
-    // let point_center = layout.face_center(face_vertices);
-
     let (v1, v2, v3) = (face_vectors[0], face_vectors[1], face_vectors[2]);
     let mut vector_center = polyhedron.face_center(face_id);
 
     let (mut v_mid,  corner): (Vector3D, Vector3D) =
-    // let (mut v_mid, p_mid, corner): (Vector3D, Position2D, (Vector3D, Position2D)) =
-        if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v2, v3]) {
-            // let p_mid = Position2D::mid(p2.clone(), p3.clone());
+        if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v2, v3]) {
             let v_mid = Vector3D::mid(v2, v3);
-            if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v_mid, v3]) {
-                // (v_mid, p_mid, (v3, p3))
+            if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3]) {
                 (v_mid, v3)
             } else {
                 (v_mid, v2)
-                // (v_mid, p_mid, (v2, p2))
             }
-        } else if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v3, v1]) {
-            // let p_mid = Position2D::mid(p3.clone(), p1.clone());
+        } else if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v3, v1]) {
             let v_mid = Vector3D::mid(v3, v1);
-            if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v_mid, v3]) {
+            if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3]) {
                 (v_mid,v3)
             } else {
                 (v_mid, v1)
             }
         } else {
-            // let p_mid = Position2D::mid(p1.clone(), p2.clone());
             let v_mid = Vector3D::mid(v1, v2);
-            if spherical_geometry::point_in_spherical_triangle(vector, [vector_center, v_mid, v2]) {
+            if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v2]) {
                 (v_mid, v2)
-                // (v_mid, p_mid, (v2, p2))
             } else {
-                // (v_mid, p_mid, (v1, p1))
                 (v_mid, v1)
             }
         };
 
-    vector_center = vector_center.normalize();
-    v_mid = v_mid.normalize();
+    // vector_center = vector_center.normalize();
+    // v_mid = v_mid.normalize();
 
     // (
     [v_mid, corner, vector_center]
@@ -249,6 +216,7 @@ mod tests {
         let projection = Vgc;
         let icosahedron = new();
         let result = projection.forward(vec![position], Some(&icosahedron), &IcosahedronNet {});
-        println!("{:?}", result);
+        println!("forward {:?}", result);
+        
     }
 }

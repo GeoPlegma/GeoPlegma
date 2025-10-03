@@ -13,13 +13,19 @@ use crate::{
 };
 use geo::{Point, Coord};
 
+#[derive(Debug)]
+pub struct Forward {
+    pub coords: Coord,
+    pub face: usize
+}
+
 pub trait Projection {
     fn forward(
         &self,
         positions: Vec<Point>,
         polyhedron: Option<&Polyhedron>,
         layout: &dyn Layout,
-    ) -> Vec<Coord>;
+    ) -> Vec<Forward>;
     fn inverse(&self) -> String;
 
     fn to_3d(lat: f64, lon: f64) -> [f64; 3] {
