@@ -10,7 +10,6 @@
 use geo::Coord;
 
 pub trait Layout {
-    fn new(&self);
     fn face_center(&self, vertices: [(u8, u8); 3]) -> Coord;
     fn grid_size(&self) -> (usize, usize);
     fn vertices(&self) -> Vec<[(u8, u8); 3]>;

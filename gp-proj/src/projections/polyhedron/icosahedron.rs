@@ -99,22 +99,22 @@ mod tests {
     }
     #[test]
     fn test_face_centers_on_unit_sphere() {
-        // let ico = new();
+        let ico = new();
 
-        // for i in 0..ico.num_faces() {
-        //     let center = ico.face_center(i).expect("Face should exist");
-        //     let norm = center.dot(center);
-        //     assert!((norm - 1.0).abs() < 1e-5, "Face center {} not normalized", i);
-        // }
+        for i in 0..ico.num_faces() {
+            let center = ico.face_center(i);
+            let norm = center.dot(center);
+            assert!((norm - 1.0).abs() < 1e-5, "Face center {} not normalized", i);
+        }
     }
 
     #[test]
     fn test_face_centers_inside_faces() {
-        // let ico = new();
+        let ico = new();
 
-        // for i in 0..ico.num_faces() {
-        //     let center = ico.face_center(i).expect("Face should exist");
-        //     assert!(ico.is_point_in_face(center, i), "Face center not inside face {}", i);
-        // }
+        for i in 0..ico.num_faces() {
+            let center = ico.face_center(i);
+            assert!(ico.is_point_in_face(center, i), "Face center not inside face {}", i);
+        }
     }
 }
