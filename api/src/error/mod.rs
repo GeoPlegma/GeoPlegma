@@ -11,12 +11,14 @@ pub mod dggal;
 pub mod dggrid;
 pub mod factory;
 pub mod h3o;
+pub mod healpixgeo;
 pub mod port;
 
 use crate::error::dggal::DggalError;
 use crate::error::dggrid::DggridError;
 use crate::error::factory::FactoryError;
 use crate::error::h3o::H3oError;
+use crate::error::healpixgeo::HEALPixGeoError;
 use crate::models::common::{RefinementLevel, RelativeDepth};
 use std::num::ParseFloatError;
 use thiserror::Error;

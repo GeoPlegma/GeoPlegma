@@ -9,6 +9,7 @@
 
 use crate::adapters::{
     dggal::grids::DggalImpl, dggrid::igeo7::Igeo7Impl, dggrid::isea3h::Isea3hImpl, h3o::h3::H3Impl,
+    healpixgeo::healpix::HEALPixImpl,
 };
 use crate::api::DggrsApi;
 use crate::constants::DGGRS_SPECS;
@@ -26,6 +27,11 @@ pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {
 
         DggrsImplementation::H3O => match id {
             DggrsUid::H3 => Ok(Arc::new(H3Impl::default())),
+            _ => Err(DggrsUidError::Unsupported { id }.into()),
+        },
+
+        DggrsImplementation::HEALPIXGEO => match id {
+            DggrsUid::HEALPIX => Ok(Arc::new(HEALPixImpl::default())),
             _ => Err(DggrsUidError::Unsupported { id }.into()),
         },
 
