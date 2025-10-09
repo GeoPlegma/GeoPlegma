@@ -6,6 +6,7 @@
 // <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
+
 use crate::constants::DGGRS_SPECS;
 use crate::error::DggrsError;
 use crate::error::factory::DggrsUidError;
@@ -26,6 +27,7 @@ pub enum DggrsUid {
     ISEA9R,
     RTEA3H,
     RTEA9R,
+    HEALPIX,
 }
 
 impl DggrsUid {
@@ -41,6 +43,7 @@ impl DggrsUid {
             DggrsUid::IVEA9R => 6,
             DggrsUid::RTEA3H => 7,
             DggrsUid::RTEA9R => 8,
+            DggrsUid::HEALPIX => 9,
         }
     }
 
@@ -86,6 +89,7 @@ pub enum DggrsName {
     ISEA9R,
     RTEA3H,
     RTEA9R,
+    HEALPIX,
 }
 impl fmt::Display for DggrsName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -98,6 +102,7 @@ impl fmt::Display for DggrsName {
             DggrsName::ISEA9R => "ISEA9R",
             DggrsName::RTEA3H => "RTEA3H",
             DggrsName::RTEA9R => "RTEA9R",
+            DggrsName::HEALPIX => "HEALPIX",
         };
         f.write_str(s)
     }
@@ -109,6 +114,7 @@ pub enum DggrsImplementation {
     DGGRID,
     DGGAL,
     H3O,
+    HEALPIXGEO,
 }
 
 impl fmt::Display for DggrsImplementation {
@@ -118,6 +124,7 @@ impl fmt::Display for DggrsImplementation {
             DggrsImplementation::DGGRID => "DGGRID",
             DggrsImplementation::DGGAL => "DGGAL",
             DggrsImplementation::H3O => "H3O",
+            DggrsImplementation::HEALPIXGEO => "HEALPIXGEO",
         };
         f.write_str(s)
     }

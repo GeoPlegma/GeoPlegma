@@ -7,7 +7,16 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub mod dggal;
-pub mod dggrid;
-pub mod h3o;
-pub mod healpixgeo;
+pub struct HEALPixGeoAdapter {}
+
+impl HEALPixGeoAdapter {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Default for HEALPixGeoAdapter {
+    fn default() -> Self {
+        Self {}
+    }
+}
