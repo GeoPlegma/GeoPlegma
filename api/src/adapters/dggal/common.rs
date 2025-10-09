@@ -8,6 +8,7 @@
 // except according to those terms.
 
 use crate::api::DggrsApiConfig;
+use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
 use crate::models::common::{Zone, ZoneId, Zones};
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
@@ -22,6 +23,11 @@ pub fn to_zones(
         .into_iter()
         .map(|dggal_zone| {
             let id = ZoneId::new_int(dggal_zone);
+            let txt = dggrs.getZoneTextID(dggal_zone);
+            let id_string = ZoneId::new_str(&txt).map_err(|e: DggrsError| {
+                // pick an existing specific variant if it fits better
+                DggalError::InvalidZoneIdFormat(format!("{txt} ({e})"))
+            })?;
 
             let center = if conf.center {
                 let center_point = dggrs.getZoneWGS84Centroid(dggal_zone);
@@ -50,7 +56,7 @@ pub fn to_zones(
             let vertex_count = if conf.vertex_count {
                 let vc = dggrs.countZoneEdges(dggal_zone).try_into().map_err(|e| {
                     DggalError::EdgeCountConversion {
-                        zone_id: dggal_zone.to_string(),
+                        zone_id: id_string.to_string(),
                         source: e,
                     }
                 })?;
@@ -60,30 +66,32 @@ pub fn to_zones(
             };
 
             let children = if conf.children {
-                let c: Vec<ZoneId> = dggrs
-                    .getZoneChildren(dggal_zone)
-                    .into_iter()
-                    .map(to_u64_zone_id)
-                    .collect();
-                Some(c)
+                Some(
+                    dggrs
+                        .getZoneChildren(dggal_zone)
+                        .into_iter()
+                        .map(|z| to_str_zone_id(&dggrs, z))
+                        .collect::<Result<Vec<_>, DggalError>>()?,
+                )
             } else {
                 None
             };
 
             let neighbors = if conf.neighbors {
                 let mut nb_types: [i32; 6] = [0; 6]; // WARN: don't replace this
-                let n: Vec<ZoneId> = dggrs
-                    .getZoneNeighbors(dggal_zone, &mut nb_types)
-                    .into_iter()
-                    .map(to_u64_zone_id)
-                    .collect();
-                Some(n)
+                Some(
+                    dggrs
+                        .getZoneNeighbors(dggal_zone, &mut nb_types)
+                        .into_iter()
+                        .map(|n| to_str_zone_id(&dggrs, n))
+                        .collect::<Result<Vec<_>, DggalError>>()?,
+                )
             } else {
                 None
             };
 
             Ok(Zone {
-                id,
+                id: id_string,
                 region,
                 center,
                 vertex_count,
@@ -115,8 +123,14 @@ fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
 }
 
 fn to_u64_zone_id(id: DGGRSZone) -> ZoneId {
-    // NOTE: Expand this to do the conversion automaticallt
+    // NOTE: Expand this to do the conversion automatically
     ZoneId::IntId(id)
+}
+
+fn to_str_zone_id(dggrs: &DGGRS, zone: DGGRSZone) -> Result<ZoneId, DggalError> {
+    let txt = dggrs.getZoneTextID(zone);
+    ZoneId::new_str(&txt)
+        .map_err(|e: DggrsError| DggalError::InvalidZoneIdFormat(format!("{txt} ({e})")))
 }
 
 pub fn to_geo_point(pt: Point) -> GeoPoint {
