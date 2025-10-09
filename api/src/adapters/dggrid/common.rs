@@ -277,6 +277,7 @@ pub mod output {
     use crate::error::DggrsError;
     use crate::models::common::{ZoneId, Zones};
     use geo::GeodesicArea;
+    use itertools::Itertools;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -348,7 +349,10 @@ pub mod output {
             }
         }
         Ok(Zones {
-            zones: zones_map.into_values().collect(),
+            zones: zones_map
+                .into_values()
+                .sorted_by(|a, b| b.id.cmp(&a.id))
+                .collect(),
         })
     }
 }
