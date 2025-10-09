@@ -14,6 +14,7 @@ use crate::error::DggrsError;
 use crate::error::healpixgeo::HEALPixGeoError;
 use crate::models::common::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use geo::{Point, Rect};
+use healpix_geo::healpix;
 
 pub struct HEALPixImpl {
     id: DggrsUid,
@@ -46,6 +47,7 @@ impl DggrsApi for HEALPixImpl {
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         todo!();
+        //healpix::
     }
 
     /// Get zones for a geo::Point.
