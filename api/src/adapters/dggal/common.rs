@@ -22,12 +22,14 @@ pub fn to_zones(
     let zones: Vec<Zone> = dggal_zones
         .into_iter()
         .map(|dggal_zone| {
-            let id = ZoneId::new_int(dggal_zone);
             let txt = dggrs.getZoneTextID(dggal_zone);
+
             let id_string = ZoneId::new_str(&txt).map_err(|e: DggrsError| {
                 // pick an existing specific variant if it fits better
                 DggalError::InvalidZoneIdFormat(format!("{txt} ({e})"))
             })?;
+
+            println!("I have the id_string {}", id_string);
 
             let center = if conf.center {
                 let center_point = dggrs.getZoneWGS84Centroid(dggal_zone);
@@ -35,6 +37,7 @@ pub fn to_zones(
             } else {
                 None
             };
+            println!("I have the center");
 
             let region = if conf.neighbors || conf.area_sqm {
                 let dggal_geo_points = if conf.densify {
@@ -47,6 +50,7 @@ pub fn to_zones(
                 None
             };
 
+            println!("I have the region");
             let area_sqm = if conf.area_sqm {
                 region.as_ref().map(|r| r.geodesic_area_unsigned()) // NOTE: It is also an option to use the build in area function of H3o
             } else {
