@@ -28,8 +28,8 @@ pub fn main() -> () {
 
     println!("{:?}", barycentric_coords);
 
-    let position = barycentric_coords.iter().map(|f| f.coords).collect();
-    let geo_coords = projection.bary_to_geo(position);
+    // let position = barycentric_coords.iter().map(|f| f.coords).collect();
+    // let geo_coords = projection.bary_to_geo(position);
 
-    println!("{:?}", geo_coords);
+    // println!("{:?}", geo_coords);
 }
