@@ -73,7 +73,15 @@ How to use it
 
 This library provides an interface to DGGRID (and potentinally other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
 
-## Requirments
+## Requirements
+
+Basic tools:
+ - git
+ - GCC or Clang, with C support
+ - GNU Make
+ - cmake
+ - zlib, including the "dev" package with header files (for dggal)
+ - GDAL (for DGGRID)
 
 Make sure DGGRID is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
 
