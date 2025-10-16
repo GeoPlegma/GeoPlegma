@@ -90,13 +90,11 @@ impl DggrsApi for DggalImpl {
         let dggrs = self.get_dggrs()?;
 
         // Check if ParentZoneId is Int
-        let zone_u64 = match &parent_zone_id {
+        let parent_zone_u64 = match &parent_zone_id {
             ZoneId::IntId(id) => *id,
             ZoneId::StrId(s) => dggrs.getZoneFromTextID(s),
             ZoneId::HexId(h) => dggrs.getZoneFromTextID(&h.to_string()),
         };
-
-        let parent_zone_u64 = dggrs.getZoneFromTextID(&parent_zone_id.to_string());
 
         if relative_depth > self.max_relative_depth()? {
             return Err(DggrsError::RelativeDepthLimitReached {
@@ -137,8 +135,6 @@ impl DggrsApi for DggalImpl {
             ZoneId::HexId(h) => dggrs.getZoneFromTextID(&h.to_string()),
         };
 
-        //let zone_u64 = dggrs.getZoneFromTextID(&zone_id.to_string());
-        println!("I have a zone_u64 {}", zone_u64);
         let zones = vec![zone_u64];
 
         Ok(to_zones(dggrs, zones, cfg)?)
