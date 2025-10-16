@@ -11,7 +11,6 @@ use geo::Point;
 use gp_proj::{
     Vector3D,
     projections::{
-        layout::icosahedron_net::IcosahedronNet,
         polyhedron::icosahedron::new,
         projections::{traits::Projection, vgc::Vgc},
     },

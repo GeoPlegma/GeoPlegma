@@ -14,7 +14,7 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Face, Polyhedron, spherical_geometry},
+        polyhedron::{ArcLengths, Polyhedron, spherical_geometry},
         projections::traits::{Forward, Projection},
     },
 };
@@ -40,7 +40,7 @@ impl Projection for Vgc {
         // BCA
         let angle_gamma: f64 = 60.0f64.to_radians();
         // BAC
-        let angle_alpha: f64 = PI / 2.0;
+        // let angle_alpha: f64 = PI / 2.0;
 
         for position in positions {
             let lon = position.x().to_radians();
@@ -50,7 +50,7 @@ impl Projection for Vgc {
             );
             // Calculate 3d unit vectors for point P
             let point_p = Vector3D::from_array(Self::to_3d(lat, lon));
-            
+
             // Triangle vertexes for local barycentric system (A,B,C)
             let (p0, p1, p2) = (
                 Coord { x: 0.0_f64, y: 0.0 },
@@ -60,7 +60,7 @@ impl Projection for Vgc {
                 },
                 Coord { x: 1.0_f64, y: 0.0 },
             );
-            
+
             // starting from here, you need:
             // - the 3d point that you want to project
             // Polyhedron faces
@@ -189,7 +189,6 @@ mod tests {
     use geo::Point;
 
     use crate::projections::{
-        layout::icosahedron_net::IcosahedronNet,
         polyhedron::icosahedron::{self, new},
         projections::{traits::Projection, vgc::Vgc},
     };
@@ -206,6 +205,7 @@ mod tests {
     fn project_forward() {
         let position = Point::new(-9.222154, 38.695125);
         let projection = Vgc;
+        let icosahedron = new();
         let result = projection.geo_to_bary(vec![position], Some(&icosahedron));
     }
 }
