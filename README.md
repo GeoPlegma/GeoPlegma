@@ -73,7 +73,7 @@ How to use it
 
 This library provides an interface to DGGRID (and potentinally other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
 
-## Requirments
+## Requirements
 
 Basic tools:
  - git
