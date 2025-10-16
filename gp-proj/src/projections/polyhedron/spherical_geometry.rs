@@ -31,7 +31,7 @@
 //! let triangle = [vertex_a, vertex_b, vertex_c];
 //! let test_point = Vector3D::new(0.3, 0.3, 0.3).normalize();
 //! let is_inside = spherical_geometry::point_in_planar_triangle(test_point, triangle);
-//! 
+//!
 //! let vec_a = Vector3D::new(1.0, 0.0, 0.0);
 //! let vec_b = Vector3D::new(0.0, 1.0, 0.0);
 //! let angle = spherical_geometry::stable_angle_between(vec_a, vec_b);
@@ -40,16 +40,16 @@
 use crate::models::vector_3d::Vector3D;
 
 /// Numerical tolerance for geometric calculations
-/// 
+///
 /// This tolerance accounts for floating-point precision errors in
 /// barycentric coordinate calculations and angle computations.
-/// 
+///
 /// The value is chosen to be small enough to maintain precision while
 /// being large enough to handle typical floating-point rounding errors.
 pub const GEOMETRIC_TOLERANCE: f64 = 1e-10;
 
 /// Degenerate triangle detection threshold
-/// 
+///
 /// Triangles with determinants smaller than this threshold are considered
 /// degenerate and will cause point-in-triangle tests to return false.
 pub const DEGENERATE_TRIANGLE_THRESHOLD: f64 = 1e-10;
@@ -68,7 +68,7 @@ pub const DEGENERATE_TRIANGLE_THRESHOLD: f64 = 1e-10;
 /// `true` if point is inside triangle (including boundaries with tolerance), `false` otherwise
 ///
 /// # Algorithm
-/// 
+///
 /// Uses standard planar barycentric coordinates computed via dot products of Cartesian edge vectors.
 /// A point is inside the triangle if all barycentric coordinates are non-negative
 /// (with tolerance for numerical stability).
@@ -77,7 +77,7 @@ pub const DEGENERATE_TRIANGLE_THRESHOLD: f64 = 1e-10;
 /// ```
 /// use gp_proj::models::vector_3d::Vector3D;
 /// use gp_proj::projections::polyhedron::spherical_geometry::point_in_planar_triangle;
-/// 
+///
 /// let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
 /// let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
 /// let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
@@ -91,7 +91,7 @@ pub const DEGENERATE_TRIANGLE_THRESHOLD: f64 = 1e-10;
 /// O(1) - constant time computation with ~20 floating-point operations
 pub fn point_in_planar_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> bool {
     let [v0, v1, v2] = triangle;
-    
+
     // Convert to barycentric coordinates using Cartesian edge vectors
     let v0v1 = v1 - v0;
     let v0v2 = v2 - v0;
@@ -116,15 +116,57 @@ pub fn point_in_planar_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> boo
 
     // Point is in triangle if all barycentric coordinates are non-negative
     // Use tolerance to handle floating-point precision near boundaries
-    u >= -GEOMETRIC_TOLERANCE 
-        && v >= -GEOMETRIC_TOLERANCE 
-        && (u + v) <= 1.0 + GEOMETRIC_TOLERANCE
+    u >= -GEOMETRIC_TOLERANCE && v >= -GEOMETRIC_TOLERANCE && (u + v) <= 1.0 + GEOMETRIC_TOLERANCE
+}
+
+/// Test if a point lies inside a spherical triangle using barycentric coordinates
+///
+/// This function uses standard Spherical barycentric coordinate calculation in 3D space.
+/// It treats the triangle vertices as points on a sphere.
+///
+/// # Arguments
+/// * `point` - Point to test (3D Spherical coordinates)
+/// * `triangle` - Three vertices of triangle (3D Spherical coordinates)
+///
+/// # Returns
+/// `true` if point is inside triangle, `false` otherwise
+///
+/// # Algorithm
+///
+/// Computes the spherical barycentric areas.
+/// A point is inside the triangle if all barycentric weights are non-negative or the it's sum is 1.
+///
+/// # Examples
+/// ```
+pub fn point_in_spherical_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> bool {
+    let [v0, v1, v2] = triangle;
+
+    let area_total = spherical_triangle_area(triangle);
+    let area_pbc = spherical_triangle_area([point, v1, v2]);
+    let area_pca = spherical_triangle_area([point, v2, v0]);
+    let area_pab = spherical_triangle_area([point, v0, v1]);
+    let mut alpha = -1.0;
+    let mut beta = -1.0;
+    let mut gamma = -1.0;
+    if let Some(area) = area_total {
+        if let Some(pbc) = area_pbc {
+            alpha = pbc / area;
+        }
+        if let Some(pca) = area_pca {
+            beta = pca / area;
+        }
+        if let Some(pab) = area_pab {
+            gamma = pab / area;
+        }
+    }
+
+    alpha + beta + gamma == 1.0
 }
 
 /// Compute angle between two unit vectors using numerically stable method
 ///
-/// This function uses the atan2 method with cross product magnitude for better 
-/// numerical stability than the traditional acos(dot_product) approach, especially 
+/// This function uses the atan2 method with cross product magnitude for better
+/// numerical stability than the traditional acos(dot_product) approach, especially
 /// for small angles and vectors that are nearly parallel or antiparallel.
 ///
 /// # Arguments  
@@ -146,7 +188,7 @@ pub fn point_in_planar_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> boo
 /// use gp_proj::models::vector_3d::Vector3D;
 /// use gp_proj::projections::polyhedron::spherical_geometry::stable_angle_between;
 /// use std::f64::consts::PI;
-/// 
+///
 /// let vec_a = Vector3D::new(1.0, 0.0, 0.0);
 /// let vec_b = Vector3D::new(0.0, 1.0, 0.0);
 /// let angle = stable_angle_between(vec_a, vec_b);
@@ -160,7 +202,7 @@ pub fn stable_angle_between(u: Vector3D, v: Vector3D) -> f64 {
     let cross = u.cross(v);
     let cross_magnitude = cross.length();
     let dot = u.dot(v);
-    
+
     // atan2 handles all quadrants correctly and is more stable than acos
     cross_magnitude.atan2(dot)
 }
@@ -188,22 +230,25 @@ pub fn stable_angle_between(u: Vector3D, v: Vector3D) -> f64 {
 /// ```
 /// use gp_proj::models::vector_3d::Vector3D;
 /// use gp_proj::projections::polyhedron::spherical_geometry::barycentric_coordinates;
-/// 
+///
 /// let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
 /// let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
 /// let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
 /// let triangle = [vertex_a, vertex_b, vertex_c];
 /// let point = Vector3D::new(0.3, 0.3, 0.3).normalize();
-/// 
+///
 /// if let Some((u, v, w)) = barycentric_coordinates(point, triangle) {
 ///     let interpolated = u * triangle[0] + v * triangle[1] + w * triangle[2];
 ///     // interpolated ≈ point (for points inside triangle)
 ///     assert!((u + v + w - 1.0).abs() < 1e-10); // coordinates sum to 1
 /// }
 /// ```
-pub fn barycentric_coordinates(point: Vector3D, triangle: [Vector3D; 3]) -> Option<(f64, f64, f64)> {
+pub fn barycentric_coordinates(
+    point: Vector3D,
+    triangle: [Vector3D; 3],
+) -> Option<(f64, f64, f64)> {
     let [v0, v1, v2] = triangle;
-    
+
     // Check if point is very close to any vertex (handle special case)
     let vertex_tolerance = 1e-12;
     if (point - v0).length() < vertex_tolerance {
@@ -215,7 +260,7 @@ pub fn barycentric_coordinates(point: Vector3D, triangle: [Vector3D; 3]) -> Opti
     if (point - v2).length() < vertex_tolerance {
         return Some((0.0, 0.0, 1.0));
     }
-    
+
     let v0v1 = v1 - v0;
     let v0v2 = v2 - v0;
     let v0p = point - v0;
@@ -256,36 +301,36 @@ pub fn barycentric_coordinates(point: Vector3D, triangle: [Vector3D; 3]) -> Opti
 /// use gp_proj::models::vector_3d::Vector3D;
 /// use gp_proj::projections::polyhedron::spherical_geometry::spherical_triangle_area;
 /// use std::f64::consts::PI;
-/// 
+///
 /// // Create a triangle that covers 1/8 of the sphere (octant)
 /// let vertex_a = Vector3D::new(1.0, 0.0, 0.0);
 /// let vertex_b = Vector3D::new(0.0, 1.0, 0.0);
 /// let vertex_c = Vector3D::new(0.0, 0.0, 1.0);
 /// let triangle = [vertex_a, vertex_b, vertex_c];
 /// let area = spherical_triangle_area(triangle).unwrap_or(0.0);
-/// 
+///
 /// // Area should be π/2 (1/8 of sphere surface area 4π)
 /// let expected_area = PI / 2.0;
 /// assert!((area - expected_area).abs() < 1e-10);
 /// ```
 pub fn spherical_triangle_area(triangle: [Vector3D; 3]) -> Option<f64> {
     let [a, b, c] = triangle;
-    
+
     // Use the vector triple product formula for spherical triangle area
     // Area = 2 * atan2(|a·(b×c)|, 1 + a·b + b·c + c·a)
     let cross_bc = b.cross(c);
     let triple_product = a.dot(cross_bc).abs();
-    
+
     let dot_ab = a.dot(b);
-    let dot_bc = b.dot(c); 
+    let dot_bc = b.dot(c);
     let dot_ca = c.dot(a);
-    
+
     let denominator = 1.0 + dot_ab + dot_bc + dot_ca;
-    
+
     if denominator.abs() < DEGENERATE_TRIANGLE_THRESHOLD {
         return None; // Degenerate triangle
     }
-    
+
     Some(2.0 * triple_product.atan2(denominator))
 }
 
@@ -293,83 +338,158 @@ pub fn spherical_triangle_area(triangle: [Vector3D; 3]) -> Option<f64> {
 mod tests {
     use super::*;
     use std::f64::consts::{FRAC_PI_2, PI};
-    
-    
+
     #[test]
     fn test_point_in_planar_triangle_center() {
         // Test that triangle center is inside triangle
         let triangle = [
-            Vector3D { x: 1.0, y: 0.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 1.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 0.0, z: 1.0 },
+            Vector3D {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
         ];
-        
+
         let center = (triangle[0] + triangle[1] + triangle[2]).normalize();
         assert!(point_in_planar_triangle(center, triangle));
     }
-    
+
     #[test]
     fn test_point_in_planar_triangle_outside() {
         let triangle = [
-            Vector3D { x: 1.0, y: 0.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 1.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 0.0, z: 1.0 },
+            Vector3D {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
         ];
-        
+
         // Point clearly outside the triangle
-        let outside_point = Vector3D { x: -1.0, y: 0.0, z: 0.0 };
+        let outside_point = Vector3D {
+            x: -1.0,
+            y: 0.0,
+            z: 0.0,
+        };
         assert!(!point_in_planar_triangle(outside_point, triangle));
     }
-    
+
     #[test]
     fn test_point_in_planar_triangle_vertex() {
         let triangle = [
-            Vector3D { x: 1.0, y: 0.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 1.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 0.0, z: 1.0 },
+            Vector3D {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
         ];
-        
+
         // Vertices should be considered inside (on boundary)
         assert!(point_in_planar_triangle(triangle[0], triangle));
         assert!(point_in_planar_triangle(triangle[1], triangle));
         assert!(point_in_planar_triangle(triangle[2], triangle));
     }
-    
+
     #[test]
     fn test_stable_angle_between_orthogonal() {
-        let u = Vector3D { x: 1.0, y: 0.0, z: 0.0 };
-        let v = Vector3D { x: 0.0, y: 1.0, z: 0.0 };
-        
+        let u = Vector3D {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let v = Vector3D {
+            x: 0.0,
+            y: 1.0,
+            z: 0.0,
+        };
+
         let angle = stable_angle_between(u, v);
         assert!((angle - FRAC_PI_2).abs() < 1e-10);
     }
-    
+
     #[test]
     fn test_stable_angle_between_parallel() {
-        let u = Vector3D { x: 1.0, y: 0.0, z: 0.0 };
-        let v = Vector3D { x: 1.0, y: 0.0, z: 0.0 };
-        
+        let u = Vector3D {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let v = Vector3D {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        };
+
         let angle = stable_angle_between(u, v);
         assert!(angle.abs() < 1e-10);
     }
-    
+
     #[test]
     fn test_stable_angle_between_antiparallel() {
-        let u = Vector3D { x: 1.0, y: 0.0, z: 0.0 };
-        let v = Vector3D { x: -1.0, y: 0.0, z: 0.0 };
-        
+        let u = Vector3D {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+        };
+        let v = Vector3D {
+            x: -1.0,
+            y: 0.0,
+            z: 0.0,
+        };
+
         let angle = stable_angle_between(u, v);
         assert!((angle - PI).abs() < 1e-10);
     }
-    
+
     #[test]
     fn test_barycentric_coordinates_center() {
         let triangle = [
-            Vector3D { x: 1.0, y: 0.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 1.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 0.0, z: 1.0 },
+            Vector3D {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
         ];
-        
+
         let center = (triangle[0] + triangle[1] + triangle[2]).normalize();
         if let Some((u, v, w)) = barycentric_coordinates(center, triangle) {
             // All coordinates should be positive for center point
@@ -382,15 +502,27 @@ mod tests {
             panic!("Barycentric coordinates should exist for valid triangle");
         }
     }
-    
+
     #[test]
     fn test_barycentric_coordinates_vertex() {
         let triangle = [
-            Vector3D { x: 1.0, y: 0.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 1.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 0.0, z: 1.0 },
+            Vector3D {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
         ];
-        
+
         // Test vertex coordinates - use looser tolerance for vertex cases
         if let Some((u, v, w)) = barycentric_coordinates(triangle[0], triangle) {
             assert!((u - 1.0).abs() < 1e-6, "u = {}, expected ≈ 1.0", u);
@@ -398,30 +530,46 @@ mod tests {
             assert!(w.abs() < 1e-6, "w = {}, expected ≈ 0.0", w);
         }
     }
-    
+
     #[test]
     fn test_spherical_triangle_area_octant() {
         // Triangle covering 1/8 of sphere (π/2 steradians)
         let triangle = [
-            Vector3D { x: 1.0, y: 0.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 1.0, z: 0.0 },
-            Vector3D { x: 0.0, y: 0.0, z: 1.0 },
+            Vector3D {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
+            Vector3D {
+                x: 0.0,
+                y: 0.0,
+                z: 1.0,
+            },
         ];
-        
+
         if let Some(area) = spherical_triangle_area(triangle) {
             // Should be π/2 steradians for this triangle
-            assert!((area - FRAC_PI_2).abs() < 1e-2, "Expected π/2, got {}", area);
+            assert!(
+                (area - FRAC_PI_2).abs() < 1e-2,
+                "Expected π/2, got {}",
+                area
+            );
         } else {
             panic!("Area calculation should succeed for valid triangle");
         }
     }
-    
+
     #[test]
     fn test_constants_are_reasonable() {
         // Tolerance should be small but not too small
         assert!(GEOMETRIC_TOLERANCE > 0.0);
         assert!(GEOMETRIC_TOLERANCE < 1e-5);
-        
+
         assert!(DEGENERATE_TRIANGLE_THRESHOLD > 0.0);
         assert!(DEGENERATE_TRIANGLE_THRESHOLD < 1e-5);
     }

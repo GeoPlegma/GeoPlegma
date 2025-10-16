@@ -6,9 +6,9 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use crate::models::vector_3d::Vector3D;
-use super::geometry::{Face, ArcLengths};
+use super::geometry::{ArcLengths, Face};
 use super::spherical_geometry;
+use crate::models::vector_3d::Vector3D;
 
 /// A concrete polyhedron with pre-computed geometric data.
 /// This design separates data from operations for better performance
@@ -29,21 +29,22 @@ pub struct Polyhedron {
 }
 
 impl Polyhedron {
-     /// Create a new polyhedron with pre-computed data
+    /// Create a new polyhedron with pre-computed data
     pub fn new(vertices: Vec<Vector3D>, faces: Vec<Face>, num_edges: usize) -> Self {
         let num_vertices = vertices.len();
         let num_faces = faces.len();
 
         // Pre-compute face centers
-        let face_centers = faces.iter()
+        let face_centers = faces
+            .iter()
             .map(|face| {
-                let face_vertices: Vec<Vector3D> = face.indices()
-                    .iter()
-                    .map(|&i| vertices[i])
-                    .collect();
+                let face_vertices: Vec<Vector3D> =
+                    face.indices().iter().map(|&i| vertices[i]).collect();
 
                 // Compute spherical centroid by averaging and normalizing
-                let sum: Vector3D = face_vertices.iter().fold(Vector3D::zero(), |acc, &v| acc + v);
+                let sum: Vector3D = face_vertices
+                    .iter()
+                    .fold(Vector3D::zero(), |acc, &v| acc + v);
                 sum.normalize()
             })
             .collect();
@@ -83,23 +84,24 @@ impl Polyhedron {
     pub fn num_faces(&self) -> usize {
         self.num_faces
     }
-    
+
     // Geometric operations (work on pre-computed data)
 
     /// Get the center of a specific face (O(1) lookup)
-    pub fn face_center(&self, face_id: usize) -> Option<Vector3D> {
-        self.face_centers.get(face_id).copied()
+    pub fn face_center(&self, face_id: usize) -> Vector3D {
+        self.face_centers[face_id]
     }
 
     /// Find the face containing a point on the unit sphere
     pub fn find_face(&self, point: Vector3D) -> Option<usize> {
         for (face_idx, face) in self.faces.iter().enumerate() {
-            let triangle: Vec<Vector3D> = face.indices()
-                .iter()
-                .map(|&i| self.vertices[i])
-                .collect();
+            let triangle: Vec<Vector3D> =
+                face.indices().iter().map(|&i| self.vertices[i]).collect();
 
-            if spherical_geometry::point_in_planar_triangle(point, [triangle[0], triangle[1], triangle[2]]) {
+            if spherical_geometry::point_in_spherical_triangle(
+                point,
+                [triangle[0], triangle[1], triangle[2]],
+            ) {
                 return Some(face_idx);
             }
         }
@@ -108,12 +110,9 @@ impl Polyhedron {
 
     /// Get vertices of a specific face
     pub fn face_vertices(&self, face_id: usize) -> Option<Vec<Vector3D>> {
-        self.faces.get(face_id).map(|face| {
-            face.indices()
-                .iter()
-                .map(|&i| self.vertices[i])
-                .collect()
-        })
+        self.faces
+            .get(face_id)
+            .map(|face| face.indices().iter().map(|&i| self.vertices[i]).collect())
     }
 
     /// Compute arc lengths for a triangle and point
@@ -129,10 +128,13 @@ impl Polyhedron {
         }
     }
 
-      /// Check if point lies within a face
+    /// Check if point lies within a face
     pub fn is_point_in_face(&self, point: Vector3D, face_id: usize) -> bool {
         if let Some(face_vertices) = self.face_vertices(face_id) {
-            spherical_geometry::point_in_planar_triangle(point, [face_vertices[0], face_vertices[1], face_vertices[2]])
+            spherical_geometry::point_in_spherical_triangle(
+                point,
+                [face_vertices[0], face_vertices[1], face_vertices[2]],
+            )
         } else {
             false
         }

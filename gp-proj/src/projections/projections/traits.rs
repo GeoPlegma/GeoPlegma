@@ -13,15 +13,28 @@ use crate::{
 };
 use geo::{Point, Coord};
 
+#[derive(Debug)]
+pub struct Forward {
+    pub coords: Coord,
+    pub face: usize
+}
+
 pub trait Projection {
-    fn forward(
+    fn geo_to_bary(
+        &self,
+        positions: Vec<Point>,
+        polyhedron: Option<&Polyhedron>,
+    ) -> Vec<Forward>;
+    fn bary_to_geo(&self, coords: Vec<Coord>) -> Point;
+
+    fn geo_to_cartesian(
         &self,
         positions: Vec<Point>,
         polyhedron: Option<&Polyhedron>,
         layout: &dyn Layout,
-    ) -> Vec<Coord>;
-    fn inverse(&self) -> String;
-
+    ) -> Vec<Forward>;
+    fn cartesian_to_geo(&self, coords: Vec<Coord>) -> Point;
+    
     fn to_3d(lat: f64, lon: f64) -> [f64; 3] {
         let x = lat.cos() * lon.cos();
         let y = lat.cos() * lon.sin();
