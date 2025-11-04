@@ -73,9 +73,12 @@ How to use it
 
 This library provides an interface to DGGRID (and potentinally other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
 
-## Requirments
+## Requirements
 
 Make sure DGGRID is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
+
+## Build and testing
+> **_NOTE:_**  If you want to build the project and start developing and contributing, go [here](DEVELOPMENT.md).
 
 ## Usage Example
 
@@ -87,14 +90,20 @@ cargo run --example basic
 
 Instead of printing out the length of `result.zones.len()` you can also print out the struct itself.
 
+To run on watch mode and see living changes:
+
+Install cargo-watch:
+```bash
+cargo install cargo-watch
+```
+Then run (this also clears the screen):
+```bash
+cargo watch -c -x 'run --example basic'
+```
+
 Dependencies
 ------------
 This crate depends on `dggal-rust` from https://github.com/GeoPlegma/dggal-rust.
-
-Testing
--------
-There is a test setup for grids in `tests/grids` which you can run with `cargo test --test` (if you only run `cargo test` it will fail as it would also test the documentation and the code in this `README.md`
-
 
 # Release Workflow for bindings (Step by Step)
 
