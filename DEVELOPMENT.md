@@ -60,7 +60,7 @@ cargo update
 ```
 
 ### Adding a dependency from crates.io
-If your Cargo.toml doesn't already have a [dependencies] section, add that, then list the crate name and version that you would like to use. This example adds a dependency of the time crate:
+If your Cargo.toml doesn't already have a [dependencies] section, add it. Then list the crate name and version that you would like to use. This example adds a dependency of the time crate:
 ```rust
 [dependencies]
 time = "0.1.12"
