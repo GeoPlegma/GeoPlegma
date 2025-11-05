@@ -77,7 +77,7 @@ This library provides an interface to DGGRID (and potentinally other tools) to g
 
 Make sure DGGRID is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
 
-## Build and testing
+## Building and testing
 > **_NOTE:_**  If you want to build the project and start developing and contributing, go [here](DEVELOPMENT.md).
 
 ## Usage Example
