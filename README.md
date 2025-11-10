@@ -40,7 +40,7 @@ A library or programme implementing a Discrete Global Grid Reference System offe
 
 Kevin Sahr first observed the capacity of a DGGS as a geo-spatial reference system in the work titled "[Location coding on icosahedral aperture 3 hexagon discrete global grids](https://doi.org/10.1016/j.compenvurbsys.2007.11.005)". By complementing the topology of a DGGS with a function mapping zones to unique identifiers, a DGGS is able to locate any location on the Earth's surface, at any desired spatial resolution.
 
-The DGGRS interface is meant as the connection point to existing libraries, in particular DGGRID, but also H3, S2 and more.
+The DGGRS interface is meant as the connection point to existing libraries, in particular [DGGRID](https://github.com/sahrk/DGGRID), but also H3, S2 and more.
 
 ## Data Strucutres
 
@@ -71,11 +71,11 @@ These assets define behaviour allowing data structures to persist. The method si
 How to use it
 -------------
 
-This library provides an interface to DGGRID (and potentially other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
+This library provides an interface to [DGGRID](https://github.com/sahrk/DGGRID) (and potentially other tools) to generate zones. The output of the three public functions is a `Zones` struct with the cell ID and an vector of coordinates that describes the cell polygon using the [geo](https://github.com/georust/geo) primitive [Polygon](https://docs.rs/geo/latest/geo/geometry/struct.Polygon.html).
 
 ## Requirements
 
-Make sure DGGRID is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
+Make sure [DGGRID](https://github.com/sahrk/DGGRID) is compiled and available on your system. Remember the path where the `dggrid` executable is, or add `dggrid` to your `$PATH`.
 
 ## Building and testing
 > **_NOTE:_**  If you want to build the project and start developing and contributing, go [here](DEVELOPMENT.md).
