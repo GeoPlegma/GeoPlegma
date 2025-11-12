@@ -25,6 +25,8 @@ pub fn main() -> Result<(), error::DggrsError> {
         DggrsUid::IVEA3H,
         DggrsUid::RTEA9R,
         DggrsUid::RTEA3H,
+        DggrsUid::IVEA7H,
+        DggrsUid::IVEA7H_Z7,
     ];
 
     let points = vec![
