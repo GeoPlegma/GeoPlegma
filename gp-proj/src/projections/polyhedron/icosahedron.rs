@@ -41,7 +41,11 @@ fn create_vertices() -> Vec<Vector3D> {
     let r = (1.0 - z.powi(2)).sqrt();
 
     // North Pole (Vertex 0)
-    vertices.push(Vector3D {x: 0.0, y: 0.0, z: 1.0});
+    vertices.push(Vector3D {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    });
 
     // Upper ring (Vertices 1-5)
     for i in 0..5 {
@@ -55,7 +59,7 @@ fn create_vertices() -> Vec<Vector3D> {
 
     // Lower ring (Vertices 6-10, rotated by 36°)
     for i in 0..5 {
-        let angle  = 2.0 * PI * (i as f64) / 5.0 + PI / 5.0;
+        let angle = 2.0 * PI * (i as f64) / 5.0 + PI / 5.0;
         vertices.push(Vector3D {
             x: r * angle.cos(),
             y: r * angle.sin(),
@@ -64,27 +68,43 @@ fn create_vertices() -> Vec<Vector3D> {
     }
 
     // South Pole (Vertex 11)
-    vertices.push(Vector3D { x: 0.0, y: 0.0, z: -1.0});
+    vertices.push(Vector3D {
+        x: 0.0,
+        y: 0.0,
+        z: -1.0,
+    });
+
 
     vertices
 }
 
 /// Create the 20 triangular faces of the icosahedron
 fn create_faces() -> Vec<Face> {
+    // A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, 
+    // G => 6, H => 7, I => 8, J => 9, K => 10, L => 11 
     vec![
-        Face::Triangle([0, 11, 5]), Face::Triangle([0, 5, 1]),
-        Face::Triangle([0, 1, 7]), Face::Triangle([0, 7, 10]),
-        Face::Triangle([0, 10, 11]), Face::Triangle([1, 5, 9]),
-        Face::Triangle([5, 11, 4]),   Face::Triangle([11, 10, 2]),
-        Face::Triangle([10, 7, 6]),   Face::Triangle([7, 1, 8]),
-        Face::Triangle([3, 9, 4]),    Face::Triangle([3, 4, 2]),
-        Face::Triangle([3, 2, 6]),    Face::Triangle([3, 6, 8]),
-        Face::Triangle([3, 8, 9]),    Face::Triangle([4, 9, 5]),
-        Face::Triangle([2, 4, 11]),   Face::Triangle([6, 2, 10]),
-        Face::Triangle([8, 6, 7]),    Face::Triangle([9, 8, 1])
+        Face::Triangle([1, 0, 2]), // B, A, C
+        Face::Triangle([1, 6, 2]), // B, G, C
+        Face::Triangle([2, 0, 3]), // C, A, D
+        Face::Triangle([2, 7, 3]), // C, H, D
+        Face::Triangle([3, 0, 4]), // D, A, E
+        Face::Triangle([3, 8, 4]), // D, I, E
+        Face::Triangle([4, 0, 5]), // E, A, F
+        Face::Triangle([4, 9, 5]), // E, J, F
+        Face::Triangle([5, 0, 1]), // F, A, B
+        Face::Triangle([5, 10, 1]), // F, K, B
+        Face::Triangle([6, 2, 7]), // G, C, H
+        Face::Triangle([6, 11, 7]), // G, L, H
+        Face::Triangle([7, 3, 8]), // H, D, I
+        Face::Triangle([7, 11, 8]), // H, L, I
+        Face::Triangle([8, 4, 9]), // I, E, J
+        Face::Triangle([8, 11, 9]), // I, L, J
+        Face::Triangle([9, 5, 10]), // J, F, K
+        Face::Triangle([9, 11, 10]), // J, L, K
+        Face::Triangle([10, 1, 6]), // K, B, G
+        Face::Triangle([10, 11, 6]), // K, L, G
     ]
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -104,7 +124,11 @@ mod tests {
         for i in 0..ico.num_faces() {
             let center = ico.face_center(i);
             let norm = center.dot(center);
-            assert!((norm - 1.0).abs() < 1e-5, "Face center {} not normalized", i);
+            assert!(
+                (norm - 1.0).abs() < 1e-5,
+                "Face center {} not normalized",
+                i
+            );
         }
     }
 
@@ -114,7 +138,11 @@ mod tests {
 
         for i in 0..ico.num_faces() {
             let center = ico.face_center(i);
-            assert!(ico.is_point_in_face(center, i), "Face center not inside face {}", i);
+            assert!(
+                ico.is_point_in_face(center, i),
+                "Face center not inside face {}",
+                i
+            );
         }
     }
 }

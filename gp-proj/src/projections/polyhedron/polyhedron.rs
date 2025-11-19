@@ -131,7 +131,7 @@ impl Polyhedron {
     /// Check if point lies within a face
     pub fn is_point_in_face(&self, point: Vector3D, face_id: usize) -> bool {
         if let Some(face_vertices) = self.face_vertices(face_id) {
-            spherical_geometry::point_in_spherical_triangle(
+            spherical_geometry::point_in_planar_triangle(
                 point,
                 [face_vertices[0], face_vertices[1], face_vertices[2]],
             )

@@ -42,6 +42,13 @@ impl Projection for Vgc {
         // BAC
         // let angle_alpha: f64 = PI / 2.0;
 
+        // Triangle vertexes for local barycentric system (A,B,C)
+        // Barycentric mapped into Cartesian coordinates of the unit equilateral triangle.
+        let (p0, p2) = (
+            Coord { x: 0.0_f64, y: 0.0 },
+            Coord { x: 1.0_f64, y: 0.0 },
+        );
+
         for position in positions {
             let lon = position.x().to_radians();
             let lat = Self::lat_geodetic_to_authalic(
@@ -51,16 +58,6 @@ impl Projection for Vgc {
             // Calculate 3d unit vectors for point P
             let point_p = Vector3D::from_array(Self::to_3d(lat, lon));
 
-            // Triangle vertexes for local barycentric system (A,B,C)
-            let (p0, p1, p2) = (
-                Coord { x: 0.0_f64, y: 0.0 },
-                Coord {
-                    x: 0.5_f64,
-                    y: (3.0_f64).sqrt() * 0.5,
-                },
-                Coord { x: 1.0_f64, y: 0.0 },
-            );
-
             // starting from here, you need:
             // - the 3d point that you want to project
             // Polyhedron faces
@@ -68,6 +65,20 @@ impl Projection for Vgc {
             for index in 0..faces_length {
                 let face = usize::from(index);
 
+                // Need to know if the triangle is facing up or down
+                let p1 = if (face%2 == 0) {
+                    Coord {
+                        x: 0.5_f64,
+                        y: (3.0_f64).sqrt() * 0.5,
+                    }
+                } else {
+                    Coord {
+                        x: -0.5_f64,
+                        y: -(3.0_f64).sqrt() * 0.5,
+                    }
+                };
+
+                println!("{:?}", p1);
                 if polyhedron.is_point_in_face(point_p, index) {
                     // the icosahedron triangle gets divided into six equilateral triangles,
                     // and we find the one where the point is
@@ -77,6 +88,7 @@ impl Projection for Vgc {
                         polyhedron.face_vertices(face).unwrap(),
                         face,
                     );
+                    println!("{:?}", triangle_3d);
 
                     // need to find in which triangle the point is in
                     let ArcLengths { ab, bp, ap, .. } =
