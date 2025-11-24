@@ -138,29 +138,19 @@ pub fn point_in_planar_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> boo
 ///
 /// # Examples
 /// ```
-pub fn point_in_spherical_triangle(point: Vector3D, triangle: [Vector3D; 3]) -> bool {
-    let [v0, v1, v2] = triangle;
+pub fn point_in_spherical_triangle(p: Vector3D, triangle: [Vector3D; 3]) -> bool {
+    let [a, b, c] = triangle;
 
-    let area_total = spherical_triangle_area(triangle);
-    let area_pbc = spherical_triangle_area([point, v1, v2]);
-    let area_pca = spherical_triangle_area([point, v2, v0]);
-    let area_pab = spherical_triangle_area([point, v0, v1]);
-    let mut alpha = -1.0;
-    let mut beta = -1.0;
-    let mut gamma = -1.0;
-    if let Some(area) = area_total {
-        if let Some(pbc) = area_pbc {
-            alpha = pbc / area;
-        }
-        if let Some(pca) = area_pca {
-            beta = pca / area;
-        }
-        if let Some(pab) = area_pab {
-            gamma = pab / area;
-        }
-    }
+    let n_ab = a.cross(b);
+    let n_bc = b.cross(c);
+    let n_ca = c.cross(a);
 
-    alpha + beta + gamma == 1.0
+    // Check if P is on same side as opposite vertex
+    let inside_ab = n_ab.dot(c) * n_ab.dot(p) >= 0.0;
+    let inside_bc = n_bc.dot(a) * n_bc.dot(p) >= 0.0;
+    let inside_ca = n_ca.dot(b) * n_ca.dot(p) >= 0.0;
+
+    inside_ab && inside_bc && inside_ca
 }
 
 /// Compute angle between two unit vectors using numerically stable method

@@ -42,12 +42,6 @@ impl Projection for Vgc {
         // BAC
         // let angle_alpha: f64 = PI / 2.0;
 
-        // Triangle vertexes for local barycentric system (A,B,C)
-        // Barycentric mapped into Cartesian coordinates of the unit equilateral triangle.
-        let (p0, p2) = (
-            Coord { x: 0.0_f64, y: 0.0 },
-            Coord { x: 1.0_f64, y: 0.0 },
-        );
 
         for position in positions {
             let lon = position.x().to_radians();
@@ -57,6 +51,7 @@ impl Projection for Vgc {
             );
             // Calculate 3d unit vectors for point P
             let point_p = Vector3D::from_array(Self::to_3d(lat, lon));
+            println!("point3d {:?}", point_p);
 
             // starting from here, you need:
             // - the 3d point that you want to project
@@ -65,30 +60,21 @@ impl Projection for Vgc {
             for index in 0..faces_length {
                 let face = usize::from(index);
 
-                // Need to know if the triangle is facing up or down
-                let p1 = if (face%2 == 0) {
-                    Coord {
-                        x: 0.5_f64,
-                        y: (3.0_f64).sqrt() * 0.5,
-                    }
-                } else {
-                    Coord {
-                        x: -0.5_f64,
-                        y: -(3.0_f64).sqrt() * 0.5,
-                    }
-                };
 
-                println!("{:?}", p1);
                 if polyhedron.is_point_in_face(point_p, index) {
                     // the icosahedron triangle gets divided into six equilateral triangles,
                     // and we find the one where the point is
-                    let triangle_3d = triangles(
+                    let triangle_3d = triangle(
                         polyhedron,
                         point_p,
                         polyhedron.face_vertices(face).unwrap(),
                         face,
                     );
-                    println!("{:?}", triangle_3d);
+                    println!(
+                        "{:?} {:?}",
+                        polyhedron.is_point_in_face(point_p, index),
+                        index
+                    );
 
                     // need to find in which triangle the point is in
                     let ArcLengths { ab, bp, ap, .. } =
@@ -97,7 +83,7 @@ impl Projection for Vgc {
                     // ==== Slice and Dice formulas ====
                     // angle ρ
                     let rho: f64 =
-                        f64::acos(ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin());
+                        f64::acos(((ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin())).clamp(-1.0, 1.0));
 
                     // 1. Calculate delta (δ)
                     let delta = f64::acos(rho.sin() * ab.cos());
@@ -117,14 +103,13 @@ impl Projection for Vgc {
                     // =================================
 
                     // ==== Interpolation ====
-
                     // Between A and C it gives point D
-                    let pd_x = p2.x + (p0.x - p2.x) * uv;
-                    let pd_y = p2.y + (p0.y - p2.y) * uv;
+                    let pd_x = triangle_3d[2].x + (triangle_3d[0].x - triangle_3d[2].x) * uv;
+                    let pd_y = triangle_3d[2].y + (triangle_3d[0].y - triangle_3d[2].y) * uv;
 
                     // Between D and B it gives point P
-                    let p_x = pd_x + (pd_x - p1.x) * xy;
-                    let p_y = pd_y + (pd_y - p1.y) * xy;
+                    let p_x = triangle_3d[1].x + (pd_x - triangle_3d[1].x) * xy;
+                    let p_y = triangle_3d[1].y + (pd_y - triangle_3d[1].y) * xy;
                     // ======================
 
                     out.push(Forward {
@@ -155,8 +140,8 @@ impl Projection for Vgc {
     }
 }
 
-/// This will divide the icosahedron face in six equilateral triangles
-fn triangles(
+/// This will divide the icosahedron face in six equilateral triangles and get the triangle where the point is in
+fn triangle(
     polyhedron: &Polyhedron,
     point_p: Vector3D,
     face_vectors: Vec<Vector3D>,
@@ -215,9 +200,28 @@ mod tests {
     // Forward projection test disabled until Icosahedron implementation is complete
     #[test]
     fn project_forward() {
-        let position = Point::new(-9.222154, 38.695125);
+        let p1 = Point::new(-9.222154, 38.695125);
+        let p2 = Point::new(-138.97503, 47.7022);
+        let p3 = Point::new(99.72721, 25.82577);
+        let p4 = Point::new(-64.10552, 12.89276);
+        let p5 = Point::new(-128.28185, -50.60992);
+        let p6 = Point::new(-70.47681, -0.81784);
+        let p7 = Point::new(152.44705, -21.59114);
+        let p8 = Point::new(66.665798, -77.717034);
+        let p9 = Point::new(63.501735, 80.099071);
         let projection = Vgc;
         let icosahedron = new();
-        let result = projection.geo_to_bary(vec![position], Some(&icosahedron));
+        let result =
+            projection.geo_to_bary(vec![p1, p2, p3, p4, p5, p6, p7, p8, p9], Some(&icosahedron));
+
+        assert_eq!(result[0].face, 8);
+        assert_eq!(result[1].face, 6);
+        assert_eq!(result[2].face, 3);
+        assert_eq!(result[3].face, 16);
+        assert_eq!(result[4].face, 15);
+        assert_eq!(result[5].face, 16);
+        assert_eq!(result[6].face, 12);
+        assert_eq!(result[7].face, 11);
+        assert_eq!(result[8].face, 0);
     }
 }
