@@ -153,6 +153,7 @@ pub fn point_in_spherical_triangle(p: Vector3D, triangle: [Vector3D; 3]) -> bool
     inside_ab && inside_bc && inside_ca
 }
 
+
 /// Compute angle between two unit vectors using numerically stable method
 ///
 /// This function uses the atan2 method with cross product magnitude for better

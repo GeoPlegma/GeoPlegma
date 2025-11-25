@@ -35,14 +35,6 @@ impl Projection for Vgc {
         let coef_fourier_geod_to_auth =
             Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
 
-        // ABC
-        let angle_beta: f64 = 36.0f64.to_radians();
-        // BCA
-        let angle_gamma: f64 = 60.0f64.to_radians();
-        // BAC
-        // let angle_alpha: f64 = PI / 2.0;
-
-
         for position in positions {
             let lon = position.x().to_radians();
             let lat = Self::lat_geodetic_to_authalic(
@@ -51,7 +43,6 @@ impl Projection for Vgc {
             );
             // Calculate 3d unit vectors for point P
             let point_p = Vector3D::from_array(Self::to_3d(lat, lon));
-            println!("point3d {:?}", point_p);
 
             // starting from here, you need:
             // - the 3d point that you want to project
@@ -60,9 +51,8 @@ impl Projection for Vgc {
             for index in 0..faces_length {
                 let face = usize::from(index);
 
-
                 if polyhedron.is_point_in_face(point_p, index) {
-                    // the icosahedron triangle gets divided into six equilateral triangles,
+                    // the icosahedron triangle gets divided into six rectangle triangles,
                     // and we find the one where the point is
                     let triangle_3d = triangle(
                         polyhedron,
@@ -70,55 +60,64 @@ impl Projection for Vgc {
                         polyhedron.face_vertices(face).unwrap(),
                         face,
                     );
-                    println!(
-                        "{:?} {:?}",
-                        polyhedron.is_point_in_face(point_p, index),
-                        index
-                    );
 
                     // need to find in which triangle the point is in
-                    let ArcLengths { ab, bp, ap, .. } =
-                        polyhedron.face_arc_lengths(triangle_3d, point_p);
+                    let ArcLengths {
+                        ab, bp, ap, bc, ac, ..
+                    } = polyhedron.face_arc_lengths(triangle_3d, point_p);
+
+                    // Map the 3D triangle to 2D
+                    let triangle_2d = triangle3d_to_2d(ab, bc, ac);
+
+                    // Spherical angles for point B and point C
+                    let beta = ((ac.cos() - ab.cos() * bc.cos()) / (ab.sin() * bc.sin()))
+                        .clamp(-1.0, 1.0)
+                        .acos();
+                    let gamma = ((ab.cos() - bc.cos() * ac.cos()) / (bc.sin() * ac.sin()))
+                        .clamp(-1.0, 1.0)
+                        .acos();
 
                     // ==== Slice and Dice formulas ====
                     // angle ρ
-                    let rho: f64 =
-                        f64::acos(((ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin())).clamp(-1.0, 1.0));
+                    let rho: f64 = f64::acos(
+                        ((ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin())).clamp(-1.0, 1.0),
+                    );
 
                     // 1. Calculate delta (δ)
                     let delta = f64::acos(rho.sin() * ab.cos());
 
                     // 2. Calculate the ratio of the spherical areas u and v
-                    let uv = (angle_beta + angle_gamma - rho - delta)
-                        / (angle_beta + angle_gamma - PI / 2.0);
+                    let uv = (beta + gamma - rho - delta) / (beta + gamma - PI / 2.0);
 
-                    let cos_xp_y;
-                    if rho <= E.powi(-9) {
-                        cos_xp_y = ab.cos();
-                    } else {
-                        cos_xp_y = 1.0 / (rho.tan() * delta.tan())
-                    }
+                    // 3. Calculate cos(x + y) by applying the spherical law of cosines
+                    // being that the x and y are the spherical lenghts from B to P and P to D, respectively.
+                    let cos_x_y = 1.0 / (rho.tan() * delta.tan());
 
-                    let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
+                    // 4. Calculate the ratio of the spherical areas x and y
+                    let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_x_y));
+
                     // =================================
-
                     // ==== Interpolation ====
                     // Between A and C it gives point D
-                    let pd_x = triangle_3d[2].x + (triangle_3d[0].x - triangle_3d[2].x) * uv;
-                    let pd_y = triangle_3d[2].y + (triangle_3d[0].y - triangle_3d[2].y) * uv;
+                    let pd_x = triangle_2d[2].0 + (triangle_2d[0].0 - triangle_2d[2].0) * uv;
+                    let pd_y = triangle_2d[2].1 + (triangle_2d[0].1 - triangle_2d[2].1) * uv;
 
                     // Between D and B it gives point P
-                    let p_x = triangle_3d[1].x + (pd_x - triangle_3d[1].x) * xy;
-                    let p_y = triangle_3d[1].y + (pd_y - triangle_3d[1].y) * xy;
+                    let p_x = triangle_2d[1].0 + (pd_x - triangle_2d[1].0) * xy;
+                    let p_y = triangle_2d[1].1 + (pd_y - triangle_2d[1].1) * xy;
                     // ======================
 
                     out.push(Forward {
                         coords: Coord { x: p_x, y: p_y },
                         face: index,
                     });
+
+                    // in case the point is on the edge of two faces, we return the first face.
+                    break;
                 }
             }
         }
+        println!("{:?}", out);
 
         out
     }
@@ -140,6 +139,24 @@ impl Projection for Vgc {
     }
 }
 
+fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
+    // Place vertex B (triangle_3d[1] / corner) at origin
+    let b_2d = (0.0, 0.0);
+
+    // Place vertex A (triangle_3d[0] / v_mid) on the positive x-axis at distance ab
+    let a_2d = (ab, 0.0);
+
+    // Use law of cosines to find angle at B
+    // cos(angle_B) = (ab² + bc² - ac²) / (2·ab·bc)
+    let cos_angle_b = (bc.powi(2) + ac.powi(2) - ac.powi(2)) / (2.0 * bc * ac);
+    let angle_b = cos_angle_b.clamp(-1.0, 1.0).acos();
+
+    // Place vertex C (triangle_3d[2] / vector_center) using angle and distance bc
+    let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
+
+    [a_2d, b_2d, c_2d]
+}
+
 /// This will divide the icosahedron face in six equilateral triangles and get the triangle where the point is in
 fn triangle(
     polyhedron: &Polyhedron,
@@ -148,9 +165,9 @@ fn triangle(
     face_id: usize,
 ) -> [Vector3D; 3] {
     let (v1, v2, v3) = (face_vectors[0], face_vectors[1], face_vectors[2]);
-    let mut vector_center = polyhedron.face_center(face_id);
+    let vector_center = polyhedron.face_center(face_id);
 
-    let (mut v_mid, corner): (Vector3D, Vector3D) =
+    let (v_mid, corner): (Vector3D, Vector3D) =
         if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v2, v3]) {
             let v_mid = Vector3D::mid(v2, v3);
             if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])

@@ -17,16 +17,19 @@ use gp_proj::{
 
 pub fn main() -> () {
     println!(
-        "Basic example for gp-proj. Convert geographic coordinates to barycentric coordinates, and vice-versa."
+        "Polygon example for gp-proj. Convert geographic coordinates to barycentric coordinates, and vice-versa."
     );
 
-    let edge1 = Point::new(0.0, 45.0);
-    let edge2 = Point::new(30.0, 30.0);
-    let random_point = Point::new(-9.49420, 38.68499);
+    let p1 = Point::new(-9.192722996293583, 38.72423364219293);
+    let p2 = Point::new(-10.681508330872333, 37.83692529759742);
+    let p3 = Point::new(-9.027302403562487, 36.23040220266431);
+    let p4 = Point::new(-6.049731734403736, 37.48772339897228);
+    let p5 = Point::new(-7.180105784733257, 39.57941279302861);
+    let p6 = Point::new(-9.192722996293583, 38.72423364219293);
 
     let projection = Vgc;
     let icosahedron = new();
-    let coords = projection.geo_to_bary(vec![edge1, edge2, random_point], Some(&icosahedron));
+    let coords = projection.geo_to_bary(vec![p1, p2, p3, p4, p5, p6], Some(&icosahedron));
 
     println!("{:?}", coords.len());
 }
