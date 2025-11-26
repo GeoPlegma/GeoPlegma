@@ -108,7 +108,7 @@ impl Projection for Vgc {
                     // ======================
 
                     out.push(Forward {
-                        coords: Coord { x: p_x * 6378137.0, y: p_y *  6378137.0},
+                        coords: Coord { x: p_x, y: p_y },
                         face: index,
                         sub_triangle: triangle_3d.1,
                     });
@@ -118,7 +118,6 @@ impl Projection for Vgc {
                 }
             }
         }
-        println!("{:?}", out);
 
         out
     }
