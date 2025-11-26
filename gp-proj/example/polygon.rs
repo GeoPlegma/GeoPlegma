@@ -31,5 +31,5 @@ pub fn main() -> () {
     let icosahedron = new();
     let coords = projection.geo_to_bary(vec![p1, p2, p3, p4, p5, p6], Some(&icosahedron));
 
-    println!("{:?}", coords.len());
+    println!("{:?}", coords);
 }

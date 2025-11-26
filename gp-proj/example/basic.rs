@@ -8,11 +8,9 @@
 // except according to those terms.
 
 use geo::Point;
-use gp_proj::{
-    projections::{
-        polyhedron::icosahedron::new,
-        projections::{traits::Projection, vgc::Vgc},
-    },
+use gp_proj::projections::{
+    polyhedron::icosahedron::new,
+    projections::{traits::Projection, vgc::Vgc},
 };
 
 pub fn main() -> () {
@@ -28,5 +26,17 @@ pub fn main() -> () {
     let icosahedron = new();
     let coords = projection.geo_to_bary(vec![edge1, edge2, random_point], Some(&icosahedron));
 
-    println!("{:?}", coords.len());
+    println!("{:?}", coords);
+    
+    let distortion = projection.compute_distortion(38.68499, -9.49420, &icosahedron);
+    println!("h: {} (expected: 0.7580403)", distortion.h);
+    println!("k: {} (expected: 1.333174)", distortion.k);
+    println!(
+        "Angular deformation: {}° (expected: 33.045°)",
+        distortion.angular_deformation
+    );
+    println!(
+        "Areal scale: {} (expected: ~1.0 for equal-area)",
+        distortion.areal_scale
+    );
 }

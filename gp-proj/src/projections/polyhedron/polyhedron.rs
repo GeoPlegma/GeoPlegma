@@ -139,4 +139,30 @@ impl Polyhedron {
             false
         }
     }
+
+    pub fn are_faces_adjacent(&self, face1: usize, face2: usize) -> bool {
+        // Get the vertices for both faces
+        let vertices1 = self.face_vertices(face1).unwrap();
+        let vertices2 = self.face_vertices(face2).unwrap();
+
+        // Count how many vertices are shared
+        // Two faces are adjacent if they share exactly 2 vertices (an edge)
+        let mut shared_vertices = 0;
+
+        for v1 in &vertices1 {
+            for v2 in &vertices2 {
+                // Compare vertices (check if they're the same point in 3D space)
+                let distance =
+                    ((v1.x - v2.x).powi(2) + (v1.y - v2.y).powi(2) + (v1.z - v2.z).powi(2)).sqrt();
+
+                if distance < 1e-10 {
+                    // Tolerance for floating point comparison
+                    shared_vertices += 1;
+                }
+            }
+        }
+
+        // Adjacent faces share exactly 2 vertices (an edge)
+        shared_vertices == 2
+    }
 }

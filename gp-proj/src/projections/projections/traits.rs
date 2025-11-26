@@ -9,22 +9,27 @@
 
 use crate::{
     constants::WGS84,
-    projections::{layout::traits::Layout, polyhedron::Polyhedron}
+    projections::{layout::traits::Layout, polyhedron::Polyhedron},
 };
-use geo::{Point, Coord};
+use geo::{Coord, Point};
 
 #[derive(Debug)]
 pub struct Forward {
     pub coords: Coord,
-    pub face: usize
+    pub face: usize,
+    pub sub_triangle: u8,
+}
+
+#[derive(Debug)]
+pub struct DistortionMetrics {
+    pub h: f64,
+    pub k: f64,
+    pub angular_deformation: f64,
+    pub areal_scale: f64,
 }
 
 pub trait Projection {
-    fn geo_to_bary(
-        &self,
-        positions: Vec<Point>,
-        polyhedron: Option<&Polyhedron>,
-    ) -> Vec<Forward>;
+    fn geo_to_bary(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward>;
     fn bary_to_geo(&self, coords: Vec<Coord>) -> Point;
 
     fn geo_to_cartesian(
@@ -34,7 +39,14 @@ pub trait Projection {
         layout: &dyn Layout,
     ) -> Vec<Forward>;
     fn cartesian_to_geo(&self, coords: Vec<Coord>) -> Point;
-    
+
+    fn compute_distortion(
+        &self,
+        lat: f64,
+        lon: f64,
+        polyhedron: &Polyhedron,
+    ) -> DistortionMetrics;
+
     fn to_3d(lat: f64, lon: f64) -> [f64; 3] {
         let x = lat.cos() * lon.cos();
         let y = lat.cos() * lon.sin();

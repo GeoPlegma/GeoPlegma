@@ -15,7 +15,7 @@ use crate::{
     projections::{
         layout::traits::Layout,
         polyhedron::{ArcLengths, Polyhedron, spherical_geometry},
-        projections::traits::{Forward, Projection},
+        projections::traits::{DistortionMetrics, Forward, Projection},
     },
 };
 use geo::{Coord, Point};
@@ -64,7 +64,7 @@ impl Projection for Vgc {
                     // need to find in which triangle the point is in
                     let ArcLengths {
                         ab, bp, ap, bc, ac, ..
-                    } = polyhedron.face_arc_lengths(triangle_3d, point_p);
+                    } = polyhedron.face_arc_lengths(triangle_3d.0, point_p);
 
                     // Map the 3D triangle to 2D
                     let triangle_2d = triangle3d_to_2d(ab, bc, ac);
@@ -108,8 +108,9 @@ impl Projection for Vgc {
                     // ======================
 
                     out.push(Forward {
-                        coords: Coord { x: p_x, y: p_y },
+                        coords: Coord { x: p_x * 6378137.0, y: p_y *  6378137.0},
                         face: index,
+                        sub_triangle: triangle_3d.1,
                     });
 
                     // in case the point is on the edge of two faces, we return the first face.
@@ -137,6 +138,60 @@ impl Projection for Vgc {
     fn cartesian_to_geo(&self, coords: Vec<Coord>) -> Point {
         todo!()
     }
+
+    // Calculate distortion and compare with Geocart values
+    fn compute_distortion(&self, lat: f64, lon: f64, polyhedron: &Polyhedron) -> DistortionMetrics {
+        let epsilon = 1e-7; // Small perturbation for numerical derivatives
+
+        // Project the original point
+        let center = &self.geo_to_bary(vec![Point::new(lon, lat)], Some(polyhedron))[0];
+
+        // Perturb latitude (north-south)
+        let north = &self.geo_to_bary(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
+
+        // Perturb longitude (east-west)
+        let east = &self.geo_to_bary(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
+
+        // Calculate partial derivatives
+        // dx/dφ, dy/dφ
+        let dx_dphi = (north.coords.x - center.coords.x) / epsilon.to_radians();
+        let dy_dphi = (north.coords.y - center.coords.y) / epsilon.to_radians();
+
+        // dx/dλ, dy/dλ
+        let dx_dlambda = (east.coords.x - center.coords.x) / epsilon.to_radians();
+        let dy_dlambda = (east.coords.y - center.coords.y) / epsilon.to_radians();
+
+        // Radius of curvature for WGS84
+        let a = 6378137.0; // semi-major axis
+        let e2 = 0.00669437999014; // first eccentricity squared
+        let lat_rad = lat.to_radians();
+
+        let sin_lat = lat_rad.sin();
+        let cos_lat = lat_rad.cos();
+
+        // Meridional radius of curvature
+        let m = a * (1.0 - e2) / (1.0 - e2 * sin_lat * sin_lat).powf(1.5);
+
+        // Prime vertical radius of curvature
+        let n = a / (1.0 - e2 * sin_lat * sin_lat).sqrt();
+
+        // Scale factors
+        let h = (dx_dphi.powi(2) + dy_dphi.powi(2)).sqrt() / m;
+        let k = (dx_dlambda.powi(2) + dy_dlambda.powi(2)).sqrt() / (n * cos_lat);
+
+        // Angular deformation
+        // sin(ω/2) = |h - k| / (h + k) where ω is the maximum angular distortion
+        let sin_half_omega = (h - k).abs() / (h + k);
+        let omega = 2.0 * sin_half_omega.asin();
+        let angular_deformation_degrees = omega.to_degrees();
+
+        DistortionMetrics {
+            h,
+            k,
+            angular_deformation: angular_deformation_degrees,
+            areal_scale: h * k, // For equal-area projections, this should be ~1.0
+        }
+    }
 }
 
 fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
@@ -163,39 +218,39 @@ fn triangle(
     point_p: Vector3D,
     face_vectors: Vec<Vector3D>,
     face_id: usize,
-) -> [Vector3D; 3] {
+) -> ([Vector3D; 3], u8) {
     let (v1, v2, v3) = (face_vectors[0], face_vectors[1], face_vectors[2]);
     let vector_center = polyhedron.face_center(face_id);
 
-    let (v_mid, corner): (Vector3D, Vector3D) =
+    let (v_mid, corner, sub_triangle_id): (Vector3D, Vector3D, u8) =
         if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v2, v3]) {
             let v_mid = Vector3D::mid(v2, v3);
             if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])
             {
-                (v_mid, v3)
+                (v_mid, v3, 1)
             } else {
-                (v_mid, v2)
+                (v_mid, v2, 0)
             }
         } else if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v3, v1])
         {
             let v_mid = Vector3D::mid(v3, v1);
             if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])
             {
-                (v_mid, v3)
+                (v_mid, v3, 3)
             } else {
-                (v_mid, v1)
+                (v_mid, v1, 4)
             }
         } else {
             let v_mid = Vector3D::mid(v1, v2);
             if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v2])
             {
-                (v_mid, v2)
+                (v_mid, v2, 6)
             } else {
-                (v_mid, v1)
+                (v_mid, v1, 5)
             }
         };
 
-    [v_mid, corner, vector_center]
+    ([v_mid, corner, vector_center], sub_triangle_id)
 }
 
 #[cfg(test)]
@@ -216,7 +271,7 @@ mod tests {
 
     // Forward projection test disabled until Icosahedron implementation is complete
     #[test]
-    fn project_forward() {
+    fn test_project_forward() {
         let p1 = Point::new(-9.222154, 38.695125);
         let p2 = Point::new(-138.97503, 47.7022);
         let p3 = Point::new(99.72721, 25.82577);
@@ -240,5 +295,76 @@ mod tests {
         assert_eq!(result[6].face, 12);
         assert_eq!(result[7].face, 11);
         assert_eq!(result[8].face, 0);
+    }
+
+    #[test]
+    fn test_spatial_consistency() {
+        let projection = Vgc;
+        let icosahedron = new();
+        // Test points
+        let lisbon = Point::new(-9.49420, 38.68499);
+        let porto = Point::new(-8.61099, 41.14961); // ~300km north of Lisbon
+        let madrid = Point::new(-3.70379, 40.41678); // ~500km east of Lisbon
+
+        let results = projection.geo_to_bary(vec![lisbon, porto, madrid], Some(&icosahedron));
+
+        // Check they're on reasonable faces
+        println!("Lisbon face: {}", results[0].face);
+        println!("Porto face: {}", results[1].face);
+        println!("Madrid face: {}", results[2].face);
+
+        // Porto should be on same or adjacent face to Lisbon
+        // (they're only 300km apart)
+        assert!(
+            results[0].face == results[1].face
+                || icosahedron.are_faces_adjacent(results[0].face, results[1].face)
+        );
+    }
+
+    #[test]
+    fn test_pole_behavior() {
+        let projection = Vgc;
+        let icosahedron = new();
+
+        // Points around the pole should be on adjacent faces
+        let points = vec![
+            Point::new(0.0, 89.0),
+            Point::new(72.0, 89.0),
+            Point::new(144.0, 89.0),
+            Point::new(216.0, 89.0),
+            Point::new(288.0, 89.0),
+        ];
+
+        let results = projection.geo_to_bary(points, Some(&icosahedron));
+
+        // All should be near pole (check they're on the 5 faces around the north pole)
+        for (i, result) in results.iter().enumerate() {
+            println!(
+                "Point {} - Face: {}, Coords: {:?}",
+                i, result.face, result.coords
+            );
+            let is_in_north_pole = match result.face {
+                0 | 2 | 4 | 6 | 8 => true,
+                _ => false,
+            };
+            assert!(is_in_north_pole, "Its not on the north pole");
+        }
+    }
+
+    #[test]
+    fn test_equator_distribution() {
+        let projection = Vgc;
+        let icosahedron = new();
+
+        // Points evenly distributed around equator
+        let points: Vec<Point> = (0..10).map(|i| Point::new(i as f64 * 36.0, 0.0)).collect();
+
+        let results = projection.geo_to_bary(points, Some(&icosahedron));
+
+        // Should hit multiple different faces
+        let unique_faces: std::collections::HashSet<_> = results.iter().map(|r| r.face).collect();
+
+        println!("Unique faces at equator: {:?}", unique_faces);
+        assert!(unique_faces.len() >= 5, "Should span multiple faces");
     }
 }
