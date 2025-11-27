@@ -14,9 +14,12 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Polyhedron, spherical_geometry},
+        polyhedron::{
+            ArcLengths, Polyhedron,
+            spherical_geometry::{self, barycentric_coordinates, stable_angle_between},
+        },
         projections::traits::{DistortionMetrics, Forward, Projection},
-    },
+    }, utils::shape::triangle,
 };
 use geo::{Coord, Point};
 
@@ -55,11 +58,10 @@ impl Projection for Vgc {
                     // the icosahedron triangle gets divided into six rectangle triangles,
                     // and we find the one where the point is
                     let triangle_3d = triangle(
-                        polyhedron,
-                        point_p,
-                        polyhedron.face_vertices(face).unwrap(),
+                        polyhedron, point_p, // polyhedron.face_vertices(face).unwrap(),
                         face,
-                    );
+                    )
+                    .unwrap();
 
                     // need to find in which triangle the point is in
                     let ArcLengths {
@@ -108,7 +110,7 @@ impl Projection for Vgc {
                     // ======================
 
                     out.push(Forward {
-                        coords: Coord { x: p_x, y: p_y },
+                        coords: Coord { x: p_x * 6378137.0 , y: p_y* 6378137.0 },
                         face: index,
                         sub_triangle: triangle_3d.1,
                     });
@@ -209,47 +211,6 @@ fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
     let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
 
     [a_2d, b_2d, c_2d]
-}
-
-/// This will divide the icosahedron face in six equilateral triangles and get the triangle where the point is in
-fn triangle(
-    polyhedron: &Polyhedron,
-    point_p: Vector3D,
-    face_vectors: Vec<Vector3D>,
-    face_id: usize,
-) -> ([Vector3D; 3], u8) {
-    let (v1, v2, v3) = (face_vectors[0], face_vectors[1], face_vectors[2]);
-    let vector_center = polyhedron.face_center(face_id);
-
-    let (v_mid, corner, sub_triangle_id): (Vector3D, Vector3D, u8) =
-        if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v2, v3]) {
-            let v_mid = Vector3D::mid(v2, v3);
-            if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])
-            {
-                (v_mid, v3, 1)
-            } else {
-                (v_mid, v2, 0)
-            }
-        } else if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v3, v1])
-        {
-            let v_mid = Vector3D::mid(v3, v1);
-            if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])
-            {
-                (v_mid, v3, 3)
-            } else {
-                (v_mid, v1, 4)
-            }
-        } else {
-            let v_mid = Vector3D::mid(v1, v2);
-            if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v2])
-            {
-                (v_mid, v2, 6)
-            } else {
-                (v_mid, v1, 5)
-            }
-        };
-
-    ([v_mid, corner, vector_center], sub_triangle_id)
 }
 
 #[cfg(test)]

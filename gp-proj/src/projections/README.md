@@ -22,7 +22,7 @@ let position = PositionGeo {
 // The projection which will be used
 let projection = Vgc;
 
-let result = projection.forward(vec![position], Some(&Icosahedron {}), &IcosahedronNet {});
+let result = projection.geo_to_bary(vec![position], Some(&Icosahedron {}), &IcosahedronNet {});
 ```
 
 The inverse will share the same behiaviour.
@@ -43,7 +43,7 @@ This projection comes from this [article](https://www.tandfonline.com/doi/abs/10
     b. Loops through all faces in the polyhedron
         * Finds the face where the point lies
         * Slits the face into rectangular triangles and finds in triangle the point lies 
-        * Calculate arc lengths for triangle and maps into 2D in a local barycentric system. A => (0,0) B => (BA,0) C => (BC x cos(angle_B), BC x sin(angle_B))
+        * Calculate arc lengths for triangle and maps into 2D in a local barycentric system. A => (0,0) B => (BA,0) C => (BC*cos(angle_B), BC*sin(angle_B))
         ![alt text](assets/image003.png)
         * Get sperichal angles for point B and C
         * Apply slice and dice formulas and get `uv` and `xy` parameterization
@@ -59,3 +59,5 @@ NOTE: The splitting of the triangles only works for the icosahedron, this will b
 - Testing if the points have spatial consistency (this mean if the point is correct)
 - Testing if point hit the north pole
 - Testing if point falls in the equator
+
+ESCREVER EMAIL PARA O DAN E CHECKAR SE ESTÁ TUDO BEM
