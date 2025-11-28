@@ -29,8 +29,8 @@ pub struct DistortionMetrics {
 }
 
 pub trait Projection {
-    fn geo_to_bary(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward>;
-    fn bary_to_geo(&self, coords: Vec<Coord>) -> Point;
+    fn geo_to_face(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward>;
+    fn face_to_geo(&self, coords: Vec<Coord>) -> Point;
 
     fn geo_to_cartesian(
         &self,

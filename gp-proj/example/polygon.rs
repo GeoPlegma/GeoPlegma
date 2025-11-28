@@ -8,11 +8,9 @@
 // except according to those terms.
 
 use geo::Point;
-use gp_proj::{
-    projections::{
-        polyhedron::icosahedron::new,
-        projections::{traits::Projection, vgc::Vgc},
-    },
+use gp_proj::projections::{
+    polyhedron::icosahedron::new,
+    projections::{traits::Projection, vgc::Vgc},
 };
 
 pub fn main() -> () {
@@ -29,7 +27,7 @@ pub fn main() -> () {
 
     let projection = Vgc;
     let icosahedron = new();
-    let coords = projection.geo_to_bary(vec![p1, p2, p3, p4, p5, p6], Some(&icosahedron));
+    let coords = projection.geo_to_face(vec![p1, p2, p3, p4, p5, p6], Some(&icosahedron));
 
     println!("{:?}", coords);
 }

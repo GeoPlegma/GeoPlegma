@@ -14,9 +14,7 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{
-            ArcLengths, Polyhedron,
-        },
+        polyhedron::{ArcLengths, Polyhedron},
         projections::traits::{DistortionMetrics, Forward, Projection},
     },
     utils::shape::{triangle, triangle3d_to_2d},
@@ -30,7 +28,7 @@ use geo::{Coord, Point};
 pub struct Vgc;
 
 impl Projection for Vgc {
-    fn geo_to_bary(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward> {
+    fn geo_to_face(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward> {
         let mut out: Vec<Forward> = vec![];
         let polyhedron = polyhedron.unwrap();
 
@@ -123,7 +121,7 @@ impl Projection for Vgc {
 
         out
     }
-    fn bary_to_geo(&self, positions: Vec<Coord>) -> Point {
+    fn face_to_geo(&self, positions: Vec<Coord>) -> Point {
         todo!()
     }
 
@@ -145,13 +143,13 @@ impl Projection for Vgc {
         let epsilon = 1e-7; // Small perturbation for numerical derivatives
 
         // Project the original point
-        let center = &self.geo_to_bary(vec![Point::new(lon, lat)], Some(polyhedron))[0];
+        let center = &self.geo_to_face(vec![Point::new(lon, lat)], Some(polyhedron))[0];
 
         // Perturb latitude (north-south)
-        let north = &self.geo_to_bary(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
+        let north = &self.geo_to_face(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
 
         // Perturb longitude (east-west)
-        let east = &self.geo_to_bary(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
+        let east = &self.geo_to_face(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
 
         // Calculate partial derivatives
         // dx/dφ, dy/dφ
@@ -226,7 +224,7 @@ mod tests {
         let projection = Vgc;
         let icosahedron = new();
         let result =
-            projection.geo_to_bary(vec![p1, p2, p3, p4, p5, p6, p7, p8, p9], Some(&icosahedron));
+            projection.geo_to_face(vec![p1, p2, p3, p4, p5, p6, p7, p8, p9], Some(&icosahedron));
 
         assert_eq!(result[0].face, 8);
         assert_eq!(result[1].face, 6);
@@ -248,7 +246,7 @@ mod tests {
         let porto = Point::new(-8.61099, 41.14961); // ~300km north of Lisbon
         let madrid = Point::new(-3.70379, 40.41678); // ~500km east of Lisbon
 
-        let results = projection.geo_to_bary(vec![lisbon, porto, madrid], Some(&icosahedron));
+        let results = projection.geo_to_face(vec![lisbon, porto, madrid], Some(&icosahedron));
 
         // Check they're on reasonable faces
         println!("Lisbon face: {}", results[0].face);
@@ -277,7 +275,7 @@ mod tests {
             Point::new(288.0, 89.0),
         ];
 
-        let results = projection.geo_to_bary(points, Some(&icosahedron));
+        let results = projection.geo_to_face(points, Some(&icosahedron));
 
         // All should be near pole (check they're on the 5 faces around the north pole)
         for (i, result) in results.iter().enumerate() {
@@ -301,7 +299,7 @@ mod tests {
         // Points evenly distributed around equator
         let points: Vec<Point> = (0..10).map(|i| Point::new(i as f64 * 36.0, 0.0)).collect();
 
-        let results = projection.geo_to_bary(points, Some(&icosahedron));
+        let results = projection.geo_to_face(points, Some(&icosahedron));
 
         // Should hit multiple different faces
         let unique_faces: std::collections::HashSet<_> = results.iter().map(|r| r.face).collect();

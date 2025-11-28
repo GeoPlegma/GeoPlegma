@@ -31,8 +31,7 @@ impl Triangle {
     }
 }
 
-// [Forward { coords: COORD(0.406882134198423 0.02037749900224545), face: 0, sub_triangle: 0 }, Forward { coords: COORD(0.1338295046010688 0.06516388444493568), face: 1, sub_triangle: 2 }, Forward { coords: COORD(0.4288013997674573 0.0049096528745127275), face: 8, sub_triangle: 2 }]
-/// This will divide the icosahedron face in six equilateral triangles and get the triangle where the point is in
+/// This will divide the polyhedron face in equilateral triangles (each matches a vertice), then divides each triangle into two rectangular triangles, and gets the triangle where the point is in. Use for the van Leeuwen projection.
 pub fn triangle(
     polyhedron: &Polyhedron,
     point_p: Vector3D,
@@ -128,6 +127,7 @@ pub fn triangle(
     }
 }
 
+// Map spherical triangle into a planar triangle.
 pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
     // Place vertex B (triangle_3d[1] / corner) at origin
     let b_2d = (0.0, 0.0);

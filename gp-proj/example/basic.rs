@@ -24,7 +24,7 @@ pub fn main() -> () {
 
     let projection = Vgc;
     let icosahedron = new();
-    let coords = projection.geo_to_bary(vec![edge1, edge2, random_point], Some(&icosahedron));
+    let coords = projection.geo_to_face(vec![edge1, edge2, random_point], Some(&icosahedron));
 
     println!("{:?}", coords);
 }
