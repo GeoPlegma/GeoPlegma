@@ -114,9 +114,27 @@ impl Polyhedron {
             .get(face_id)
             .map(|face| face.indices().iter().map(|&i| self.vertices[i]).collect())
     }
-
+    /// Compute arc lengths for a polyhedron face
+    pub fn face_arc_lengths(&self, face_id: usize) -> Option<Vec<f64>> {
+        if let Some(face) = self.face_vertices(face_id) {
+            let mut arc_lengths: Vec<f64> = [].to_vec();
+            for i in 0..face.len() {
+                if i == face.len() {
+                    arc_lengths.push(spherical_geometry::stable_angle_between(face[i], face[0]));
+                } else {
+                    arc_lengths.push(spherical_geometry::stable_angle_between(
+                        face[i],
+                        face[i + 1],
+                    ));
+                }
+            }
+            Some(arc_lengths)
+        } else {
+            None
+        }
+    }
     /// Compute arc lengths for a triangle and point
-    pub fn face_arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
+    pub fn arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
         let [mid, corner, center] = triangle;
         ArcLengths {
             ab: spherical_geometry::stable_angle_between(corner, mid),

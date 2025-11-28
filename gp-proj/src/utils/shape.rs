@@ -126,34 +126,22 @@ pub fn triangle(
     } else {
         Some(([mid, v1, c], i1 as u8))
     }
+}
 
-    // let (v_mid, corner, sub_triangle_id): (Vector3D, Vector3D, u8) =
-    //     if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v2, v3]) {
-    //         let v_mid = Vector3D::mid(v2, v3);
-    //         if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])
-    //         {
-    //             (v_mid, v3, 1)
-    //         } else {
-    //             (v_mid, v2, 0)
-    //         }
-    //     } else if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v3, v1])
-    //     {
-    //         let v_mid = Vector3D::mid(v3, v1);
-    //         if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v3])
-    //         {
-    //             (v_mid, v3, 3)
-    //         } else {
-    //             (v_mid, v1, 4)
-    //         }
-    //     } else {
-    //         let v_mid = Vector3D::mid(v1, v2);
-    //         if spherical_geometry::point_in_spherical_triangle(point_p, [vector_center, v_mid, v2])
-    //         {
-    //             (v_mid, v2, 6)
-    //         } else {
-    //             (v_mid, v1, 5)
-    //         }
-    //     };
+pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
+    // Place vertex B (triangle_3d[1] / corner) at origin
+    let b_2d = (0.0, 0.0);
 
-    // ([v_mid, corner, vector_center], sub_triangle_id)
+    // Place vertex A (triangle_3d[0] / v_mid) on the positive x-axis at distance ab
+    let a_2d = (ab, 0.0);
+
+    // Use law of cosines to find angle at B
+    // cos(angle_B) = (ab² + bc² - ac²) / (2·ab·bc)
+    let cos_angle_b = (bc.powi(2) + ac.powi(2) - ac.powi(2)) / (2.0 * bc * ac);
+    let angle_b = cos_angle_b.clamp(-1.0, 1.0).acos();
+
+    // Place vertex C (triangle_3d[2] / vector_center) using angle and distance bc
+    let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
+
+    [a_2d, b_2d, c_2d]
 }

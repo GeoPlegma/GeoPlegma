@@ -16,10 +16,10 @@ use crate::{
         layout::traits::Layout,
         polyhedron::{
             ArcLengths, Polyhedron,
-            spherical_geometry::{self, barycentric_coordinates, stable_angle_between},
         },
         projections::traits::{DistortionMetrics, Forward, Projection},
-    }, utils::shape::triangle,
+    },
+    utils::shape::{triangle, triangle3d_to_2d},
 };
 use geo::{Coord, Point};
 
@@ -66,7 +66,7 @@ impl Projection for Vgc {
                     // need to find in which triangle the point is in
                     let ArcLengths {
                         ab, bp, ap, bc, ac, ..
-                    } = polyhedron.face_arc_lengths(triangle_3d.0, point_p);
+                    } = polyhedron.arc_lengths(triangle_3d.0, point_p);
 
                     // Map the 3D triangle to 2D
                     let triangle_2d = triangle3d_to_2d(ab, bc, ac);
@@ -110,7 +110,7 @@ impl Projection for Vgc {
                     // ======================
 
                     out.push(Forward {
-                        coords: Coord { x: p_x * 6378137.0 , y: p_y* 6378137.0 },
+                        coords: Coord { x: p_x, y: p_y },
                         face: index,
                         sub_triangle: triangle_3d.1,
                     });
@@ -193,24 +193,6 @@ impl Projection for Vgc {
             areal_scale: h * k, // For equal-area projections, this should be ~1.0
         }
     }
-}
-
-fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
-    // Place vertex B (triangle_3d[1] / corner) at origin
-    let b_2d = (0.0, 0.0);
-
-    // Place vertex A (triangle_3d[0] / v_mid) on the positive x-axis at distance ab
-    let a_2d = (ab, 0.0);
-
-    // Use law of cosines to find angle at B
-    // cos(angle_B) = (ab² + bc² - ac²) / (2·ab·bc)
-    let cos_angle_b = (bc.powi(2) + ac.powi(2) - ac.powi(2)) / (2.0 * bc * ac);
-    let angle_b = cos_angle_b.clamp(-1.0, 1.0).acos();
-
-    // Place vertex C (triangle_3d[2] / vector_center) using angle and distance bc
-    let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
-
-    [a_2d, b_2d, c_2d]
 }
 
 #[cfg(test)]
@@ -326,5 +308,21 @@ mod tests {
 
         println!("Unique faces at equator: {:?}", unique_faces);
         assert!(unique_faces.len() >= 5, "Should span multiple faces");
+    }
+    #[test]
+    fn test_distortion() {
+        let projection = Vgc;
+        let icosahedron = new();
+        let distortion = projection.compute_distortion(38.68499, -9.49420, &icosahedron);
+        println!("h: {} (expected: 0.7580403)", distortion.h);
+        println!("k: {} (expected: 1.333174)", distortion.k);
+        println!(
+            "Angular deformation: {}° (expected: 33.045°)",
+            distortion.angular_deformation
+        );
+        println!(
+            "Areal scale: {} (expected: ~1.0 for equal-area)",
+            distortion.areal_scale
+        );
     }
 }
