@@ -19,10 +19,12 @@ pub fn main() {
 
     let p1 = Point::new(0.45, 0.22);
     let p2 = Point::new(0.21, 0.64);
+    let p3 = Point::new(0.75, 0.11);
 
     let system = IVEA3HBary {};
-    let level = RefinementLevel::new(3).unwrap();
+    let mut level = RefinementLevel::new(3).unwrap();
 
+    println!("== Resolution 3 ==");
     println!("Point 1 {} {}", p1.x(), p1.y());
     let zone1 = system.zone_from_point(level, p1);
     assert_eq!(zone1.0, 5);
@@ -35,6 +37,7 @@ pub fn main() {
     
     let level = RefinementLevel::new(4).unwrap();
 
+    println!("\n== Resolution 4 ==");
     println!("Point 1 {} {}", p1.x(), p1.y());
     let zone3 = system.zone_from_point(level, p1);
     assert_eq!(zone3.0, 4);
@@ -44,4 +47,35 @@ pub fn main() {
     let zone4 = system.zone_from_point(level, p2);
     assert_eq!(zone4.0, 2);
     assert_eq!(zone4.1, 6);   
+    
+    let level = RefinementLevel::new(5).unwrap();
+
+    println!("\n== Resolution 5 ==");
+    println!("Point 1 {} {}", p1.x(), p1.y());
+    let zone3 = system.zone_from_point(level, p1);
+    assert_eq!(zone3.0, 12);
+    assert_eq!(zone3.1, 6);   
+
+    println!("Point 2 {} {}", p2.x(), p2.y());
+    let zone4 = system.zone_from_point(level, p2);
+    assert_eq!(zone4.0, 5);
+    assert_eq!(zone4.1, 17);   
+    
+    let level = RefinementLevel::new(6).unwrap();
+
+    println!("\n== Resolution 6 ==");
+    println!("Point 1 {} {}", p1.x(), p1.y());
+    let zone3 = system.zone_from_point(level, p1);
+    assert_eq!(zone3.0, 12);
+    assert_eq!(zone3.1, 6);   
+
+    println!("Point 2 {} {}", p2.x(), p2.y());
+    let zone4 = system.zone_from_point(level, p2);
+    assert_eq!(zone4.0, 6);
+    assert_eq!(zone4.1, 17);   
+
+    println!("Point 3 {} {}", p3.x(), p3.y());
+    let zone5 = system.zone_from_point(level, p3);
+    assert_eq!(zone5.0, 20);
+    assert_eq!(zone5.1, 3);   
 }
