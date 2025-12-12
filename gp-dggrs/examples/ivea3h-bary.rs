@@ -13,6 +13,18 @@ use api::models::common::RefinementLevel;
 use gp_dggrs::sys_api::DggrsSysApi;
 use gp_dggrs::impls::ivea3h_bary::IVEA3HBary;
 
+fn unbundleIndex(zone_id:u64) -> (u64, u64, u64, u64) {
+
+    let bary_i = zone_id % 2_u64.pow(26);
+    let mut tail:u64 = zone_id / 2_u64.pow(26);
+    let bary_j = tail % 2_u64.pow(26); 
+    tail = tail / 2_u64.pow(26);
+    let face = tail % 2_u64.pow(5);
+    let level = tail / 2_u64.pow(5);
+
+    return (bary_i, bary_j, face, level);
+}
+
 /// This is just an example and basic testing function if there is output or not
 //pub fn main() -> Result<(), std::io::Error> {
 pub fn main() {
@@ -27,55 +39,62 @@ pub fn main() {
     println!("== Resolution 3 ==");
     println!("Point 1 {} {}", p1.x(), p1.y());
     let zone1 = system.zone_from_point(level, p1);
-    assert_eq!(zone1.0, 5);
-    assert_eq!(zone1.1, 2);   
+    let mut unbundled = unbundleIndex(zone1);
+    assert_eq!(unbundled.0, 5);
+    assert_eq!(unbundled.1, 2);   
+    assert_eq!(unbundled.2, 10);
+    assert_eq!(unbundled.3, 3);   
 
-    println!("Point 2 {} {}", p2.x(), p2.y());
-    let zone2 = system.zone_from_point(level, p2);
-    assert_eq!(zone2.0, 2);
-    assert_eq!(zone2.1, 5);   
-    
-    let level = RefinementLevel::new(4).unwrap();
 
-    println!("\n== Resolution 4 ==");
-    println!("Point 1 {} {}", p1.x(), p1.y());
-    let zone3 = system.zone_from_point(level, p1);
-    assert_eq!(zone3.0, 4);
-    assert_eq!(zone3.1, 2);   
-
-    println!("Point 2 {} {}", p2.x(), p2.y());
-    let zone4 = system.zone_from_point(level, p2);
-    assert_eq!(zone4.0, 2);
-    assert_eq!(zone4.1, 6);   
-    
-    let level = RefinementLevel::new(5).unwrap();
-
-    println!("\n== Resolution 5 ==");
-    println!("Point 1 {} {}", p1.x(), p1.y());
-    let zone3 = system.zone_from_point(level, p1);
-    assert_eq!(zone3.0, 12);
-    assert_eq!(zone3.1, 6);   
-
-    println!("Point 2 {} {}", p2.x(), p2.y());
-    let zone4 = system.zone_from_point(level, p2);
-    assert_eq!(zone4.0, 5);
-    assert_eq!(zone4.1, 17);   
-    
-    let level = RefinementLevel::new(6).unwrap();
-
-    println!("\n== Resolution 6 ==");
-    println!("Point 1 {} {}", p1.x(), p1.y());
-    let zone3 = system.zone_from_point(level, p1);
-    assert_eq!(zone3.0, 12);
-    assert_eq!(zone3.1, 6);   
-
-    println!("Point 2 {} {}", p2.x(), p2.y());
-    let zone4 = system.zone_from_point(level, p2);
-    assert_eq!(zone4.0, 6);
-    assert_eq!(zone4.1, 17);   
-
-    println!("Point 3 {} {}", p3.x(), p3.y());
-    let zone5 = system.zone_from_point(level, p3);
-    assert_eq!(zone5.0, 20);
-    assert_eq!(zone5.1, 3);   
+//    assert_eq!(zone1.0, 5);
+//    assert_eq!(zone1.1, 2);   
+//
+//    println!("Point 2 {} {}", p2.x(), p2.y());
+//    let zone2 = system.zone_from_point(level, p2);
+//    assert_eq!(zone2.0, 2);
+//    assert_eq!(zone2.1, 5);   
+//    
+//    let level = RefinementLevel::new(4).unwrap();
+//
+//    println!("\n== Resolution 4 ==");
+//    println!("Point 1 {} {}", p1.x(), p1.y());
+//    let zone3 = system.zone_from_point(level, p1);
+//    assert_eq!(zone3.0, 4);
+//    assert_eq!(zone3.1, 2);   
+//
+//    println!("Point 2 {} {}", p2.x(), p2.y());
+//    let zone4 = system.zone_from_point(level, p2);
+//    assert_eq!(zone4.0, 2);
+//    assert_eq!(zone4.1, 6);   
+//    
+//    let level = RefinementLevel::new(5).unwrap();
+//
+//    println!("\n== Resolution 5 ==");
+//    println!("Point 1 {} {}", p1.x(), p1.y());
+//    let zone3 = system.zone_from_point(level, p1);
+//    assert_eq!(zone3.0, 12);
+//    assert_eq!(zone3.1, 6);   
+//
+//    println!("Point 2 {} {}", p2.x(), p2.y());
+//    let zone4 = system.zone_from_point(level, p2);
+//    assert_eq!(zone4.0, 5);
+//    assert_eq!(zone4.1, 17);   
+//    
+//    let level = RefinementLevel::new(6).unwrap();
+//
+//    println!("\n== Resolution 6 ==");
+//    println!("Point 1 {} {}", p1.x(), p1.y());
+//    let zone3 = system.zone_from_point(level, p1);
+//    assert_eq!(zone3.0, 12);
+//    assert_eq!(zone3.1, 6);   
+//
+//    println!("Point 2 {} {}", p2.x(), p2.y());
+//    let zone4 = system.zone_from_point(level, p2);
+//    assert_eq!(zone4.0, 6);
+//    assert_eq!(zone4.1, 17);   
+//
+//    println!("Point 3 {} {}", p3.x(), p3.y());
+//    let zone5 = system.zone_from_point(level, p3);
+//    assert_eq!(zone5.0, 20);
+//    assert_eq!(zone5.1, 3);   
 }

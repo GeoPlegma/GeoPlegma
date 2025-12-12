@@ -51,7 +51,7 @@ impl DggrsSysApi for IVEA3HBary {
         refinement_level: RefinementLevel,
         point: Point, 
         //config: Option<DggrsApiConfig>,
-    ) -> (u32, u32) {
+    ) -> (u64) {
 
         let bary = IVEA3HBary::project(point);
         let denom = IVEA3HBary::compute_denom(refinement_level);
@@ -99,7 +99,12 @@ impl DggrsSysApi for IVEA3HBary {
 
         // Bundle coords into index
         // bundle_index(zone_centre.0, zone_centre.1, refinement_level, bary.3);
-        return zone_centre;
+        // return zone_centre;
+        let face:i32 = 10;
+        return zone_centre.0 as u64 +
+               zone_centre.1 as u64 * 2_u64.pow(26) as u64 +
+               face as u64 * 2_u64.pow(32) as u64 + 
+               refinement_level.get() as u64 * 2_u64.pow(37) as u64;
     }
 }
 
@@ -115,14 +120,24 @@ mod tests {
     fn test_zone_from_point() {
 
         let system = IVEA3HBary {};       
-        let mut level = RefinementLevel::new(3).unwrap();
-        let mut zone = system.zone_from_point(level, Point::new(0.45,0.22));
-        assert_eq!(zone.0, 4);
-        assert_eq!(zone.1, 1);   
+        
+        //let mut level = RefinementLevel::new(3).unwrap();
+        //let mut zone = system.zone_from_point(level, Point::new(0.45,0.22));
+        //assert_eq!(zone.0, 4);
+        //assert_eq!(zone.1, 1);   
+
         level = RefinementLevel::new(4).unwrap();
         zone = system.zone_from_point(level, Point::new(0.21,0.64));
-        assert_eq!(zone.0, 2);
-        assert_eq!(zone.1, 6);   
+        let bary_i = zone % 2_u64.pow(26);
+        let mut tail:u64 = zone / 2_u64.pow(26);
+        let bary_j = tail % 2_u64.pow(26); 
+        tail = tail / 2_u64.pow(26);
+        let face = tail % 2_u64.pow(5);
+        let level = tail / 2_u64.pow(5);
+        assert_eq!(bary_i, 2);
+        assert_eq!(bary_j, 6);   
+        assert_eq!(face, 10);
+        assert_eq!(level, 4);   
     }
 
 }

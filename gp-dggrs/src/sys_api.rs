@@ -11,9 +11,9 @@ pub trait DggrsSysApi {
         _refinement_level: RefinementLevel,
         _point: Point, 
         //config: Option<DggrsApiConfig>,
-    ) -> (u32, u32) {
+    ) -> (u64) {
 
-        return (0, 0); 
+        return (0); 
     }
 
     fn get_children(){}
