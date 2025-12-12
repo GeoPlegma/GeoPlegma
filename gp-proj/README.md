@@ -1,16 +1,16 @@
 ## Usage example for the projections
 
-The `projection trait` has different methods, but at this point only two should be used outside .
-The `geo_to_face`, in which you convert geographic coordinates to local 2D face coordinates and the face of the polyhedron, and the `face_to_geo` in which you do the opposite.
+The `projection trait` has different methods, but at this point only two should be used outside of it.
+The `geo_to_face`, in which you convert geographic coordinates to local 2D face coordinates and the face of the polyhedron, and the `face_to_geo` in which you do the inverse.
 
 To call both these methods, with the projection to be used on a grid, you need three parameters:
 - The latitude and longitude coordinates you want to project.
 - The polyhedron or 3D shape to use (icosahedron, dodecahedron, etc).
 
-Later on we will be adding, `geo_to_cartesian`, in which you convert geographic coordinates to cartesian coordinates and the `cartesian_to_geo` in which you do the opposite. Besids the parameters mentioned, another will be added:
+Later on we will be adding, `geo_to_cartesian`, in which you convert geographic coordinates to cartesian coordinates and the `cartesian_to_geo` in which you do the inverse. Besides the parameters mentioned, another will be added:
 - The 2D flat configuration.
 
-The projection is independent of the polyhedron, this means that it allows utilization of another polyhedron on that same projection.
+The projection is independent of the polyhedron, this means that it allows the usage of another polyhedron on that same projection.
 
 Example:
 
@@ -28,7 +28,7 @@ let result = projection.geo_to_face(vec![position], Some(&Icosahedron {}), &Icos
 
 The inverse will share the same behaviour.
 
-To see in action, please run of the examples:
+To see in action, please run one of the examples:
 ```
 cargo run --example basic
 ```
@@ -65,7 +65,7 @@ Projects geographic coordinates (latitude/longitude) onto a specific face of a p
 - `polyhedron`: Polyhedron definition to be used.
 
 **Returns:**  
-A vector of `Forward` structures, each containing the projected coordinates, face index, and sub-triangle identifier.
+A vector of `Forward` structures, each containing the projected coordinates, face index, and the sub-triangle identifier.
 
 ---
 
@@ -196,7 +196,7 @@ Implements equation (33) from *Karney (2023)*.
 
 
 ### Notes:
-- The method `compute_distortion` is used to measure the correctness of the projection and the area distortion of the projection (it will be useful if we need to get close to equal-areaness)
+- The method `compute_distortion` is used to measure the correctness and the area distortion of the projection (it will be useful if we need to get close to equal-areaness)
 
 
 # `Polyhedron` — Method Documentation
