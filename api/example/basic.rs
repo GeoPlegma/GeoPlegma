@@ -10,6 +10,7 @@ use api::error;
 use api::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
 use api::{get, registry};
 use geo::{Point, Rect};
+use std::time::Instant;
 
 /// This is just an example and basic testing function if there is output or not
 pub fn main() -> Result<(), error::DggrsError> {
@@ -31,66 +32,114 @@ pub fn main() -> Result<(), error::DggrsError> {
 
     let points = vec![
         Point::new(19.96, 5.34),
-        Point::new(9.06, 52.98),
-        Point::new(-29.11, -15.28),
+        //        Point::new(9.06, 52.98),
+        //      Point::new(-29.11, -15.28),
     ];
 
-    let refinment = vec![
-        RefinementLevel::new(3)?,
-        RefinementLevel::new(4)?,
-        RefinementLevel::new(5)?,
-    ];
-
-    let rd = RelativeDepth::new(3)?;
     let bbox = Rect::new(Point::new(-10.0, -10.0), Point::new(10.0, 10.0));
 
-    for p in points {
-        for rf in &refinment {
-            for did in &dt {
+    let mut options = api::config {
+        region: true,
+        children: false,
+        center: false,
+        neighbors: false,
+        densify: false,
+        area_sqm: false,
+        ..Default::default()
+    };
+    let mut now = Instant::now();
+    let mut elapsed = now.elapsed();
+    let print_first = false;
+    for did in &dt {
+        println!(
+            "\n\n=== DGGRS: {} TOOL: {} ===",
+            &did.spec().name,
+            &did.spec().tool,
+        );
+        let d = get(*did).unwrap();
+
+        for p in &points {
+            println!("=== POINT: {:?} ===", &p);
+
+            for lrf in 1..=4 {
+                let rf = RefinementLevel::new(lrf)?;
+
+                println!("=== Refinment Level: {:?} ===", &rf);
+                now = Instant::now();
+                let r = d.zone_from_point(rf, *p, Some(options))?;
+                elapsed = now.elapsed();
                 println!(
-                    "=== DGGRS: {} TOOL: {} POINT: {:?} RF: {:?}===",
-                    &did.spec().name,
-                    &did.spec().tool,
-                    &p,
-                    &rf
+                    "zone_from_point generated {} zones in {:.2?}",
+                    r.zones.len(),
+                    elapsed
                 );
-                let d = get(*did).unwrap();
-                let r = d.zone_from_point(*rf, p, None)?;
-                println!(
-                    "{:?} \nzone from point generated {} zones",
-                    r.zones,
-                    r.zones.len()
-                );
+                if print_first {
+                    if let Some(first) = r.zones.get(0) {
+                        println!("\nhere is the first entry\n{first:?}");
+                    }
+                }
 
                 let zone = &r.zones[0].id;
-                let r = d.zones_from_parent(rd, zone.clone(), None)?;
-                println!(
-                    "{:?} \nzones from parent generated {} zones",
-                    r.zones,
-                    r.zones.len()
-                );
+                for lrd in 1..=d.max_relative_depth()?.get() {
+                    let relative_depth = RelativeDepth::new(lrd)?;
+                    now = Instant::now();
+                    let r = d.zones_from_parent(relative_depth, zone.clone(), Some(options))?;
+                    elapsed = now.elapsed();
+                    println!(
+                        "zones_from_parent for relative depth {:>2} generated {:>10} zones in {:>12.2?}",
+                        relative_depth.get(),
+                        r.zones.len(),
+                        elapsed
+                    );
+                    if print_first {
+                        if let Some(first) = r.zones.get(0) {
+                            println!("\nhere is the first entry\n{first:?}");
+                        }
+                    }
+                }
 
-                let r = d.zone_from_id(zone.clone(), None)?;
+                now = Instant::now();
+                let r = d.zone_from_id(zone.clone(), Some(options))?;
+                elapsed = now.elapsed();
                 println!(
-                    "{:?} \nzone from id generated {} zones",
-                    r.zones,
-                    r.zones.len()
+                    "zone_from_id generated {} zones in {:.2?}",
+                    r.zones.len(),
+                    elapsed
                 );
+                if print_first {
+                    if let Some(first) = r.zones.get(0) {
+                        println!("\nhere is the first entry\n{first:?}");
+                    }
+                }
 
-                let r = d.zones_from_bbox(*rf, Some(bbox), None)?;
+                now = Instant::now();
+                let r = d.zones_from_bbox(rf, Some(bbox), Some(options))?;
+                elapsed = now.elapsed();
                 println!(
-                    "{:?} \nzones from bbox generated {} zones",
-                    r.zones,
-                    r.zones.len()
+                    "zone_from_bbox generated {} zones in {:.2?}",
+                    r.zones.len(),
+                    elapsed
                 );
+                if print_first {
+                    if let Some(first) = r.zones.get(0) {
+                        println!("\nhere is the first entry\n{first:?}");
+                    }
+                }
 
                 let global_rf = RefinementLevel::new(1)?;
-                let r = d.zones_from_bbox(global_rf, None, None)?;
+                now = Instant::now();
+                let r = d.zones_from_bbox(global_rf, None, Some(options))?;
+                elapsed = now.elapsed();
                 println!(
-                    "{:?} \nzones from NO bbox generated {} zones",
-                    r.zones,
-                    r.zones.len()
+                    "zone_from_bbox (global) generated {} zones in {:.2?}",
+                    r.zones.len(),
+                    elapsed
                 );
+                if print_first {
+                    if let Some(first) = r.zones.get(0) {
+                        println!("here is the first entry\n{first:?}");
+                    }
+                }
             }
         }
     }
