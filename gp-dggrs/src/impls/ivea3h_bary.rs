@@ -19,8 +19,6 @@ impl IVEA3HBary {
 
     // Denominator is a power of the APERTURE, but only increases every other resolution.
     fn compute_denom(refinement_level:RefinementLevel) -> u32 {
-        let rem = refinement_level.get() as u32 % 2;
-        let div = (refinement_level.get() as u32 + refinement_level.get() as u32 % 2) / 2;
         return Self::APERTURE.pow((
             refinement_level.get() as u32 + refinement_level.get() as u32 % 2) / 2) as u32; 
     }
@@ -51,7 +49,7 @@ impl DggrsSysApi for IVEA3HBary {
         refinement_level: RefinementLevel,
         point: Point, 
         //config: Option<DggrsApiConfig>,
-    ) -> (u64) {
+    ) -> u64 {
 
         let bary = IVEA3HBary::project(point);
         let denom = IVEA3HBary::compute_denom(refinement_level);
@@ -103,8 +101,8 @@ impl DggrsSysApi for IVEA3HBary {
         let face:i32 = 10;
         return zone_centre.0 as u64 +
                zone_centre.1 as u64 * 2_u64.pow(26) as u64 +
-               face as u64 * 2_u64.pow(32) as u64 + 
-               refinement_level.get() as u64 * 2_u64.pow(37) as u64;
+               face as u64 * 2_u64.pow(52) as u64 + 
+               refinement_level.get() as u64 * 2_u64.pow(57) as u64;
     }
 }
 
