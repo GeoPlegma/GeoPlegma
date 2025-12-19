@@ -24,6 +24,7 @@ use geo::{Point, Rect};
 /// - area_sqm (the area in squaremeter as calculated by `geo`'s geodesic_area_unsigned() function
 /// - densify (region geometry densification)
 ///
+#[derive(Debug, Copy, Clone)]
 pub struct DggrsApiConfig {
     pub region: bool,
     pub center: bool,

@@ -26,6 +26,8 @@ pub enum DggrsUid {
     ISEA9R,
     RTEA3H,
     RTEA9R,
+    IVEA7H,
+    IVEA7H_Z7,
 }
 
 impl DggrsUid {
@@ -41,6 +43,8 @@ impl DggrsUid {
             DggrsUid::IVEA9R => 6,
             DggrsUid::RTEA3H => 7,
             DggrsUid::RTEA9R => 8,
+            DggrsUid::IVEA7H => 9,
+            DggrsUid::IVEA7H_Z7 => 10,
         }
     }
 
@@ -86,6 +90,8 @@ pub enum DggrsName {
     ISEA9R,
     RTEA3H,
     RTEA9R,
+    IVEA7H,
+    IVEA7H_Z7,
 }
 impl fmt::Display for DggrsName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -98,6 +104,8 @@ impl fmt::Display for DggrsName {
             DggrsName::ISEA9R => "ISEA9R",
             DggrsName::RTEA3H => "RTEA3H",
             DggrsName::RTEA9R => "RTEA9R",
+            DggrsName::IVEA7H => "IVEA7H",
+            DggrsName::IVEA7H_Z7 => "IVEA7H_Z7",
         };
         f.write_str(s)
     }

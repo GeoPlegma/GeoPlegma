@@ -34,7 +34,7 @@ pub fn to_zones(
                 None
             };
 
-            let region = if conf.neighbors || conf.area_sqm {
+            let region = if conf.region || conf.area_sqm {
                 let dggal_geo_points = if conf.densify {
                     dggrs.getZoneRefinedWGS84Vertices(dggal_zone, 0)
                 } else {
