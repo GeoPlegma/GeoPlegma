@@ -114,9 +114,27 @@ impl Polyhedron {
             .get(face_id)
             .map(|face| face.indices().iter().map(|&i| self.vertices[i]).collect())
     }
-
+    /// Compute arc lengths for a polyhedron face
+    pub fn face_arc_lengths(&self, face_id: usize) -> Option<Vec<f64>> {
+        if let Some(face) = self.face_vertices(face_id) {
+            let mut arc_lengths: Vec<f64> = [].to_vec();
+            for i in 0..face.len() {
+                if i == face.len() {
+                    arc_lengths.push(spherical_geometry::stable_angle_between(face[i], face[0]));
+                } else {
+                    arc_lengths.push(spherical_geometry::stable_angle_between(
+                        face[i],
+                        face[i + 1],
+                    ));
+                }
+            }
+            Some(arc_lengths)
+        } else {
+            None
+        }
+    }
     /// Compute arc lengths for a triangle and point
-    pub fn face_arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
+    pub fn arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
         let [mid, corner, center] = triangle;
         ArcLengths {
             ab: spherical_geometry::stable_angle_between(corner, mid),
@@ -138,5 +156,31 @@ impl Polyhedron {
         } else {
             false
         }
+    }
+
+    pub fn are_faces_adjacent(&self, face1: usize, face2: usize) -> bool {
+        // Get the vertices for both faces
+        let vertices1 = self.face_vertices(face1).unwrap();
+        let vertices2 = self.face_vertices(face2).unwrap();
+
+        // Count how many vertices are shared
+        // Two faces are adjacent if they share exactly 2 vertices (an edge)
+        let mut shared_vertices = 0;
+
+        for v1 in &vertices1 {
+            for v2 in &vertices2 {
+                // Compare vertices (check if they're the same point in 3D space)
+                let distance =
+                    ((v1.x - v2.x).powi(2) + (v1.y - v2.y).powi(2) + (v1.z - v2.z).powi(2)).sqrt();
+
+                if distance < 1e-10 {
+                    // Tolerance for floating point comparison
+                    shared_vertices += 1;
+                }
+            }
+        }
+
+        // Adjacent faces share exactly 2 vertices (an edge)
+        shared_vertices == 2
     }
 }
