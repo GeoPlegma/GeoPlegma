@@ -38,4 +38,6 @@ pub enum DggalError {
         #[source]
         source: TryFromIntError,
     },
+    #[error("Invalid DGGAL ZoneId, checked with getZoneArea() resulted in inf")]
+    InvalidDggalZoneId,
 }

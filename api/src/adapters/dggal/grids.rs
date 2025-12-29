@@ -96,6 +96,10 @@ impl DggrsApi for DggalImpl {
             ZoneId::HexId(h) => dggrs.getZoneFromTextID(&h.to_string()),
         };
 
+        if dggrs.getZoneArea(parent_zone_u64).is_infinite() {
+            return Err(DggrsError::Dggal(DggalError::InvalidDggalZoneId));
+        }
+
         if relative_depth > self.max_relative_depth()? {
             return Err(DggrsError::RelativeDepthLimitReached {
                 grid_name: self.grid_name().to_string(),
