@@ -6,7 +6,7 @@
 // <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use api::{
   adapters::{
@@ -14,11 +14,10 @@ use api::{
     dggrid::{igeo7::Igeo7Impl, isea3h::Isea3hImpl},
   },
   api::{DggrsApi, DggrsApiConfig},
-  error::DggrsError,
   factory,
-  models::common::{DggrsUid, HexString, RefinementLevel, RelativeDepth, ZoneId, Zones},
+  models::common::{DggrsUid, HexString, RefinementLevel, RelativeDepth},
 };
-use geo::{Coord, Point, Rect};
+use geo::{Coord, Rect};
 use napi::{Either, Error};
 
 use crate::models::common::{JsZones, ZonesWrapper};
@@ -28,13 +27,6 @@ use napi_derive::napi;
 #[napi]
 pub struct Dggrs {
   inner: Arc<dyn DggrsApi>,
-}
-
-pub enum DggrsApiEnum {
-  Isea3h(Isea3hImpl),
-  Igeo7(Igeo7Impl),
-  Dggal(DggalImpl),
-  // ... future implementors
 }
 
 #[napi(object)]
@@ -76,96 +68,12 @@ pub fn default_config() -> Config {
   }
 }
 
-// impl DggrsApi for DggrsApiEnum {
-//   fn zones_from_bbox(
-//     &self,
-//     refinement_level: RefinementLevel,
-//     bbox: Option<Rect<f64>>,
-//     config: Option<DggrsApiConfig>,
-//   ) -> Result<Zones, DggrsError> {
-//     match self {
-//       DggrsApiEnum::Isea3h(port) => port.zones_from_bbox(refinement_level, bbox, config),
-//       DggrsApiEnum::Igeo7(port) => port.zones_from_bbox(refinement_level, bbox, config),
-//       DggrsApiEnum::Dggal(port) => port.zones_from_bbox(refinement_level, bbox, config),
-//     }
-//   }
-
-//   fn zone_from_point(
-//     &self,
-//     refinement_level: RefinementLevel,
-//     point: Point, // NOTE:Consider accepting a vector of Points.
-//     config: Option<DggrsApiConfig>,
-//   ) -> Result<Zones, DggrsError> {
-//     match self {
-//       DggrsApiEnum::Isea3h(port) => port.zone_from_point(refinement_level, point, config),
-//       DggrsApiEnum::Igeo7(port) => port.zone_from_point(refinement_level, point, config),
-//       DggrsApiEnum::Dggal(port) => port.zone_from_point(refinement_level, point, config),
-//     }
-//   }
-
-//   fn zones_from_parent(
-//     &self,
-//     relative_depth: RelativeDepth,
-//     parent_zone_id: ZoneId,
-//     config: Option<DggrsApiConfig>,
-//   ) -> Result<Zones, DggrsError> {
-//     match self {
-//       DggrsApiEnum::Isea3h(port) => port.zones_from_parent(relative_depth, parent_zone_id, config),
-//       DggrsApiEnum::Igeo7(port) => port.zones_from_parent(relative_depth, parent_zone_id, config),
-//       DggrsApiEnum::Dggal(port) => port.zones_from_parent(relative_depth, parent_zone_id, config),
-//     }
-//   }
-
-//   fn zone_from_id(
-//     &self,
-//     zone_id: ZoneId,
-//     config: Option<DggrsApiConfig>,
-//   ) -> Result<Zones, DggrsError> {
-//     match self {
-//       DggrsApiEnum::Isea3h(port) => port.zone_from_id(zone_id, config),
-//       DggrsApiEnum::Igeo7(port) => port.zone_from_id(zone_id, config),
-//       DggrsApiEnum::Dggal(port) => port.zone_from_id(zone_id, config),
-//     }
-//   }
-
-//   fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
-//     todo!()
-//   }
-
-//   fn max_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
-//     todo!()
-//   }
-
-//   fn default_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
-//     todo!()
-//   }
-
-//   fn max_relative_depth(&self) -> Result<api::models::common::RelativeDepth, DggrsError> {
-//     todo!()
-//   }
-
-//   fn default_relative_depth(&self) -> Result<api::models::common::RelativeDepth, DggrsError> {
-//     todo!()
-//   }
-//   // forward the rest...
-// }
-
 #[napi]
 impl Dggrs {
   #[napi(constructor)]
   pub fn new(dggrs: String) -> Dggrs {
     let dggrs_uid = DggrsUid::from_str(&dggrs).expect("Invalid DGGRS UID");
 
-    // Dggrs {
-    //   inner: match dggrs.as_str() {
-    //     "isea3h" => {
-    //       DggrsApiEnum::Isea3h(Isea3hImpl::new(PathBuf::from("dggrid"), PathBuf::from("")))
-    //     }
-    //     "igeo7" => DggrsApiEnum::Igeo7(Igeo7Impl::new(PathBuf::from("dggrid"), PathBuf::from(""))),
-    //     "dggal" => DggrsApiEnum::Dggal(DggalImpl::new(dggrs_uid)),
-    //     _ => panic!("Type a valid DGGRS"),
-    //   },
-    // }
     Dggrs {
       inner: factory::get(dggrs_uid).expect("msg"),
     }
@@ -336,7 +244,19 @@ mod tests {
 
   #[test]
   fn test_zone() {
-
-   assert_eq!(is_zone_hex_id("B4-8-B"), true)
+    let generator = Dggrs::new("ISEA3HDGGAL".to_owned());
+    let rl = RefinementLevel::new(1).unwrap();
+    let bbox = Rect::new([-77.0, 39.0], [-76.0, 40.0]);
+    let result = generator
+      .inner
+      .zones_from_bbox(rl, Some(bbox), None)
+      .unwrap();
+    
+    assert_eq!(
+      result.zones.len(),
+      1,
+      "{:?}: zones_from_bbox returned wrong result",
+      result.zones
+    );
   }
 }
