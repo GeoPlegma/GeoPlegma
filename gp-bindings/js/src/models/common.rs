@@ -253,6 +253,9 @@ impl ZonesWrapper {
       }
     }
 
+    children_id_offsets.push(children_utf8_ids.len() as u32);
+    neighbors_id_offsets.push(neighbors_utf8_ids.len() as u32);
+
     JsZones {
       id_offsets,
       utf8_ids,
