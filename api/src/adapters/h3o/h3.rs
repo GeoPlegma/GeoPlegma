@@ -51,10 +51,9 @@ impl DggrsApi for H3Impl {
         let cfg = config.unwrap_or_default();
         let h3o_zones: Vec<CellIndex>;
 
-        let mut tiler =
-            TilerBuilder::new(refinement_level_to_h3_resolution(RefinementLevel::new(2)?)?)
-                .containment_mode(ContainmentMode::Covers)
-                .build();
+        let mut tiler = TilerBuilder::new(refinement_level_to_h3_resolution(refinement_level)?)
+            .containment_mode(ContainmentMode::Covers)
+            .build();
 
         if let Some(b) = bbox {
             // NOTE: adapt resolution dynamically based on bbox size & depth

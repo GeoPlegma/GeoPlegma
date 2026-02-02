@@ -12,6 +12,7 @@
 //! vectors, and other geometric primitives used throughout the DGGRS system.
 
 pub mod geo;
+pub mod shape;
 
 // Re-export commonly used utilities
 pub use geo::*;

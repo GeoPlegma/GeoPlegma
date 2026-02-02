@@ -14,3 +14,7 @@ thiserror = "2.0.12"
 name = "basic"
 path = "example/basic.rs"
 
+[[example]]
+name = "polygon"
+path = "example/polygon.rs"
+
