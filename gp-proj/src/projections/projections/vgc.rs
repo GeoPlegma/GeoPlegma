@@ -7,17 +7,17 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use std::f64::consts::{E, PI};
+use std::{f64::consts::{E, PI}, os::linux::raw};
 
 use crate::{
-    constants::KarneyCoefficients,
+    constants::{KarneyCoefficients, PolyhedronConstants},
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Polyhedron},
+        polyhedron::{ArcLengths, Polyhedron, spherical_geometry::barycentric_coordinates},
         projections::traits::{DistortionMetrics, Forward, Projection},
     },
-    utils::shape::{triangle, triangle3d_to_2d},
+    utils::shape::{map_subtriangle_to_face_2d, triangle, triangle3d_to_2d},
 };
 use geo::{Coord, Point};
 
@@ -26,7 +26,19 @@ use geo::{Coord, Point};
 /// Based on the slice and dice approach from this article:
 /// http://dx.doi.org/10.1559/152304006779500687
 pub struct Vgc;
+// Hardcoded face 2D template (same for all faces)
+const FACE_2D_VERTICES: [(f64, f64); 3] = [
+    (0.0, 0.0),
+    (1.1071487177940906, 0.0),
+    (0.5535743588970453, 0.9585853315146595),
+];
 
+// Hardcoded face 2D template (same for all faces)
+const FACE_2D_VERTICES_DOWN: [(f64, f64); 3] = [
+    (0.0, 0.0),
+    (0.5535743588970453, 0.9585853315146595),
+    (1.1071487177940906, 0.0),
+];
 impl Projection for Vgc {
     fn geo_to_face(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward> {
         let mut out: Vec<Forward> = vec![];
@@ -53,6 +65,9 @@ impl Projection for Vgc {
                 let face = usize::from(index);
 
                 if polyhedron.is_point_in_face(point_p, index) {
+                    // Create face-level 2D coordinate system
+                    let face_vertices_2d = polyhedron.face_to_2d_system(face);
+
                     // the icosahedron triangle gets divided into six rectangle triangles,
                     // and we find the one where the point is
                     let triangle_3d = triangle(
@@ -60,14 +75,15 @@ impl Projection for Vgc {
                         face,
                     )
                     .unwrap();
-
-                    // need to find in which triangle the point is in
+                    let face_vertices_3d = polyhedron.face_vertices(face).unwrap();
+                    // calculating the arc lenghts from one of the vertices of the sub-triangle to point P
                     let ArcLengths {
                         ab, bp, ap, bc, ac, ..
                     } = polyhedron.arc_lengths(triangle_3d.0, point_p);
 
-                    // Map the 3D triangle to 2D
-                    let triangle_2d = triangle3d_to_2d(ab, bc, ac);
+                    // Map the 3D sub-triangle to the face's 2D coordinate system
+                    // Map the 3D sub-triangle to 2D
+                    // let triangle_2d = triangle3d_to_2d(ab, bc, ac);
 
                     // Spherical angles for point B and point C
                     let beta = ((ac.cos() - ab.cos() * bc.cos()) / (ab.sin() * bc.sin()))
@@ -96,19 +112,103 @@ impl Projection for Vgc {
                     // 4. Calculate the ratio of the spherical areas x and y
                     let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_x_y));
 
-                    // =================================
-                    // ==== Interpolation ====
-                    // Between A and C it gives point D
-                    let pd_x = triangle_2d[2].0 + (triangle_2d[0].0 - triangle_2d[2].0) * uv;
-                    let pd_y = triangle_2d[2].1 + (triangle_2d[0].1 - triangle_2d[2].1) * uv;
+                    // // ================================================================
+                    // // JUST TESTING THE 2D LOCAL FACE SYSTEM
+                    // let face_2d_vertices = if face % 2 == 0 {
+                    //     FACE_2D_VERTICES_UP
+                    // } else {
+                    //     FACE_2D_VERTICES_DOWN
+                    // };
 
-                    // Between D and B it gives point P
-                    let p_x = triangle_2d[1].0 + (pd_x - triangle_2d[1].0) * xy;
-                    let p_y = triangle_2d[1].1 + (pd_y - triangle_2d[1].1) * xy;
-                    // ======================
+                    // // // Map the sub-triangle to the face's 2D coordinate system
+                    // let triangle_2d = map_subtriangle_to_face_2d(
+                    //     triangle_3d.0,
+                    //     face_vertices_3d.clone(),
+                    //     face_2d_vertices,
+                    // );
+
+                    // // =================================
+                    // // ==== Interpolation ====
+                    // // Between A and C it gives point D
+                    // let pd_x = triangle_2d[2].0 + (triangle_2d[0].0 - triangle_2d[2].0) * uv;
+                    // let pd_y = triangle_2d[2].1 + (triangle_2d[0].1 - triangle_2d[2].1) * uv;
+
+                    // // Between D and B it gives point P
+                    // let p_x = triangle_2d[1].0 + (pd_x - triangle_2d[1].0) * xy;
+                    // let p_y = triangle_2d[1].1 + (pd_y - triangle_2d[1].1) * xy;
+                    // // ======================
+                    // // ================================================================
+
+                    let face_vertices = [
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    ];
+                    //     face_vertices_2d,
+                    // );
+
+                    // Calculate barycentric coordinates within sub-triangle
+                    let sub_bary_u = xy * uv; // weight for v_mid (A)
+                    let sub_bary_v = 1.0 - xy; // weight for corner (B)
+                    let sub_bary_w = xy * (1.0 - uv); // weight for center (C)
+
+                    // Get barycentric coordinates of sub-triangle vertices with respect to face
+                    let sub_vertex_0_bary = barycentric_coordinates(
+                        triangle_3d.0[0], // v_mid
+                        face_vertices,
+                    )
+                    .unwrap();
+
+                    let sub_vertex_1_bary = barycentric_coordinates(
+                        triangle_3d.0[1], // corner
+                        face_vertices,
+                    )
+                    .unwrap();
+
+                    let sub_vertex_2_bary = barycentric_coordinates(
+                        triangle_3d.0[2], // center
+                        face_vertices,
+                    )
+                    .unwrap();
+                    // println!(
+                    //     "face vertices {:?} \n subtriangle vertices {:?} \n",
+                    //     sub_bary_w, sub_vertex_0_bary
+                    // );
+
+                    // transform to 2D face coordinate system
+
+                    // Compose: barycentric of P in face = weighted sum of sub-triangle vertices' barycentrics
+                    let face_bary_u = sub_vertex_0_bary.0 * sub_bary_u
+                        + sub_vertex_1_bary.0 * sub_bary_v
+                        + sub_vertex_2_bary.0 * sub_bary_w;
+
+                    let face_bary_v = sub_vertex_0_bary.1 * sub_bary_u
+                        + sub_vertex_1_bary.1 * sub_bary_v
+                        + sub_vertex_2_bary.1 * sub_bary_w;
+
+                    let face_bary_w = sub_vertex_0_bary.2 * sub_bary_u
+                        + sub_vertex_1_bary.2 * sub_bary_v
+                        + sub_vertex_2_bary.2 * sub_bary_w;
+
+                    println!(
+                        "barycentric coordinates {:?} \n 
+                        weighted sum {}",
+                        // projected point in 2D {:?} \n
+                        Vector3D {
+                            x: face_bary_u,
+                            y: face_bary_v,
+                            z: face_bary_w,
+                        },
+                        // [p_x, p_y],
+                        face_bary_u + face_bary_v + face_bary_w
+                    );
 
                     out.push(Forward {
-                        coords: Coord { x: p_x, y: p_y },
+                        coords: Vector3D {
+                            x: face_bary_u,
+                            y: face_bary_v,
+                            z: face_bary_w,
+                        },
                         face: index,
                         sub_triangle: triangle_3d.1,
                     });
@@ -142,24 +242,52 @@ impl Projection for Vgc {
     fn compute_distortion(&self, lat: f64, lon: f64, polyhedron: &Polyhedron) -> DistortionMetrics {
         let epsilon = 1e-7; // Small perturbation for numerical derivatives
 
+    // Use authalic radius
+    let radius = 6371007.181; // authalic radius for WGS84
+
+
+// Hardcoded face 2D template (same for all faces)
+let face_2d_vertices: [(f64, f64); 3] = [
+    (0.0, 0.0),
+    (2.0 * (1.0 / PolyhedronConstants::golden_ratio()).asin(), 0.0),
+    (0.5535743588970453, 0.9585853315146595),
+];
+
         // Project the original point
-        let center = &self.geo_to_face(vec![Point::new(lon, lat)], Some(polyhedron))[0];
+        let center_bary = &self.geo_to_face(vec![Point::new(lon, lat)], Some(polyhedron))[0];
 
         // Perturb latitude (north-south)
-        let north = &self.geo_to_face(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
+        let north_bary = &self.geo_to_face(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
 
         // Perturb longitude (east-west)
-        let east = &self.geo_to_face(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
+        let east_bary = &self.geo_to_face(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
+
+        // Convert to Cartesian
+        let to_cartesian = |bary: &Forward| -> (f64, f64) {
+            let u = bary.coords.x;
+            let v = bary.coords.y;
+            let w = 1.0 - u - v;
+
+            let x =
+                face_2d_vertices[0].0 * u + face_2d_vertices[1].0 * v + face_2d_vertices[2].0 * w;
+            let y =
+                face_2d_vertices[0].1 * u + face_2d_vertices[1].1 * v + face_2d_vertices[2].1 * w;
+
+            (x * radius, y * radius)
+        };
+
+        let center_xy = to_cartesian(&center_bary);
+        let north_xy = to_cartesian(&north_bary);
+        let east_xy = to_cartesian(&east_bary);
 
         // Calculate partial derivatives
         // dx/dφ, dy/dφ
-        let dx_dphi = (north.coords.x - center.coords.x) / epsilon.to_radians();
-        let dy_dphi = (north.coords.y - center.coords.y) / epsilon.to_radians();
+        let dx_dphi = (north_xy.0 -center_xy.0) / epsilon.to_radians();
+        let dy_dphi = (north_xy.1 -center_xy.1) / epsilon.to_radians();
 
         // dx/dλ, dy/dλ
-        let dx_dlambda = (east.coords.x - center.coords.x) / epsilon.to_radians();
-        let dy_dlambda = (east.coords.y - center.coords.y) / epsilon.to_radians();
-
+        let dx_dlambda = (east_xy.0 -center_xy.0) / epsilon.to_radians();
+        let dy_dlambda = (east_xy.1 -center_xy.1) / epsilon.to_radians();
         // Radius of curvature for WGS84
         let a = 6378137.0; // semi-major axis
         let e2 = 0.00669437999014; // first eccentricity squared

@@ -9,6 +9,7 @@
 use super::geometry::{ArcLengths, Face};
 use super::spherical_geometry;
 use crate::models::vector_3d::Vector3D;
+use crate::utils::shape::triangle3d_to_2d;
 
 /// A concrete polyhedron with pre-computed geometric data.
 /// This design separates data from operations for better performance
@@ -182,5 +183,14 @@ impl Polyhedron {
 
         // Adjacent faces share exactly 2 vertices (an edge)
         shared_vertices == 2
+    }
+
+    pub fn face_to_2d_system(&self, face_id: usize) -> [(f64, f64); 3]  {
+        let face_vertices = self.face_vertices(face_id).unwrap();
+        let ab= spherical_geometry::stable_angle_between(face_vertices[0], face_vertices[1]);
+        let bc= spherical_geometry::stable_angle_between(face_vertices[1], face_vertices[2]);
+        let ca= spherical_geometry::stable_angle_between(face_vertices[2], face_vertices[0]);
+
+        triangle3d_to_2d(ab, bc, ca)
     }
 }

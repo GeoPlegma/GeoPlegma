@@ -8,14 +8,13 @@
 // except according to those terms
 
 use crate::{
-    constants::WGS84,
-    projections::{layout::traits::Layout, polyhedron::Polyhedron},
+    Vector3D, constants::WGS84, projections::{layout::traits::Layout, polyhedron::Polyhedron}
 };
 use geo::{Coord, Point};
 
 #[derive(Debug)]
 pub struct Forward {
-    pub coords: Coord,
+    pub coords: Vector3D,
     pub face: usize,
     pub sub_triangle: u8,
 }

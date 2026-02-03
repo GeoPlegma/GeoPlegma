@@ -9,7 +9,7 @@
 
 use crate::{
     Vector3D,
-    projections::polyhedron::{Polyhedron, spherical_geometry},
+    projections::polyhedron::{Polyhedron, spherical_geometry::{self, barycentric_coordinates}},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -144,4 +144,37 @@ pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
     let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
 
     [a_2d, b_2d, c_2d]
+}
+
+/// Maps sub-triangle vertices to the face's 2D coordinate system
+pub fn map_subtriangle_to_face_2d(
+    sub_triangle_3d: [Vector3D; 3],      // [v_mid, corner, center]
+    face_vertices_3d: Vec<Vector3D>,       // The original face's 3 vertices
+    face_vertices_2d: [(f64, f64); 3],   // The face's 2D positions
+) -> [(f64, f64); 3] {
+    let mut sub_tri_2d = [(0.0, 0.0); 3];
+    
+    for i in 0..3 {
+        let point_3d = sub_triangle_3d[i];
+        
+        // Compute spherical barycentric coordinates of this point 
+        // with respect to the face triangle
+        let bary = barycentric_coordinates(
+            point_3d,
+            [face_vertices_3d[0], face_vertices_3d[1], face_vertices_3d[2]]
+        ).unwrap();
+        
+        // Apply these barycentric coordinates in the face's 2D system
+        sub_tri_2d[i] = (
+            face_vertices_2d[0].0 * bary.0 + 
+            face_vertices_2d[1].0 * bary.1 + 
+            face_vertices_2d[2].0 * bary.2,
+            
+            face_vertices_2d[0].1 * bary.0 + 
+            face_vertices_2d[1].1 * bary.1 + 
+            face_vertices_2d[2].1 * bary.2,
+        );
+    }
+    
+    sub_tri_2d
 }
