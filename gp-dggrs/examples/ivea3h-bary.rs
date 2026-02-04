@@ -26,7 +26,6 @@ fn unbundle_index(zone_id:u64) -> (u64, u64, u64, u64) {
 }
 
 /// This is just an example and basic testing function if there is output or not
-//pub fn main() -> Result<(), std::io::Error> {
 pub fn main() {
 
     let p1 = Point::new(0.45, 0.22);
@@ -83,8 +82,6 @@ pub fn main() {
     assert_eq!(unbundled.1, 6);   
     assert_eq!(unbundled.2, 10);
     assert_eq!(unbundled.3, 5);   
-    //assert_eq!(zone3.0, 12);
-    //assert_eq!(zone3.1, 6);   
 
     println!("Point 2 {} {}", p2.x(), p2.y());
     let zone4 = system.zone_from_point(level, p2);
@@ -93,8 +90,6 @@ pub fn main() {
     assert_eq!(unbundled.1, 17);   
     assert_eq!(unbundled.2, 10);
     assert_eq!(unbundled.3, 5);   
-//    assert_eq!(zone4.0, 5);
-//    assert_eq!(zone4.1, 17);   
     
     let level = RefinementLevel::new(6).unwrap();
 
@@ -106,8 +101,6 @@ pub fn main() {
     assert_eq!(unbundled.1, 6);   
     assert_eq!(unbundled.2, 10);
     assert_eq!(unbundled.3, 6);   
-//    assert_eq!(zone3.0, 12);
-//    assert_eq!(zone3.1, 6);   
 
     println!("Point 2 {} {}", p2.x(), p2.y());
     let zone4 = system.zone_from_point(level, p2);
@@ -116,8 +109,6 @@ pub fn main() {
     assert_eq!(unbundled.1, 17);   
     assert_eq!(unbundled.2, 10);
     assert_eq!(unbundled.3, 6);   
-//    assert_eq!(zone4.0, 6);
-//    assert_eq!(zone4.1, 17);   
 
     println!("Point 3 {} {}", p3.x(), p3.y());
     let zone5 = system.zone_from_point(level, p3);
@@ -126,6 +117,4 @@ pub fn main() {
     assert_eq!(unbundled.1, 3);   
     assert_eq!(unbundled.2, 10);
     assert_eq!(unbundled.3, 6);   
-//    assert_eq!(zone5.0, 20);
-//    assert_eq!(zone5.1, 3);   
 }

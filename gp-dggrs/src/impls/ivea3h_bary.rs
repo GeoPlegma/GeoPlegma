@@ -99,11 +99,110 @@ impl DggrsSysApi for IVEA3HBary {
         // bundle_index(zone_centre.0, zone_centre.1, refinement_level, bary.3);
         // return zone_centre;
         let face:i32 = 10;
-        return zone_centre.0 as u64 +
-               zone_centre.1 as u64 * 2_u64.pow(26) as u64 +
-               face as u64 * 2_u64.pow(52) as u64 + 
+        let unique = edge_cases(zone_centre.0, zone_centre.1, face);
+        return unique.0 as u64 +                        // i
+               unique.1 as u64 * 2_u64.pow(26) as u64 + // j
+               unique.2 as u64 * 2_u64.pow(52) as u64 + // face
                refinement_level.get() as u64 * 2_u64.pow(57) as u64;
     }
+
+    // Determines face to be enconded in index for edge cases, i.e. cells/zones spaning two or more
+    // icosahedron faces. Guarantees each cell/zone has only one index.
+    fn edge_cases(i:u32, j:u32, face:i32, refinement_level: RefinementLevel) -> u64
+    {
+        let to_zero = false;
+        let to_swap = false;
+        let k = refinement_level - i - j;
+                           
+        // top-most row of faces
+        if (face < 10 && (face % 2) > 0) 
+        {
+            if (j == 1) face = 1; // top-most pentagon
+            else if (k == 0) // shared cell on the right-edge: moves to right 
+            {
+               face = face + 2;
+               if (face > 9) face = 1; // wrap around
+               i = 0;
+            }
+        }
+        // middle row of faces pointing "downwards"
+        else if (face < 11 && (face % 2) == 0) 
+        {
+            if (j == 1) // bottom pentagon
+            { 
+                face = face + 10;
+                zero = true;
+            }
+            else if (k == 1) // left-most pentagon
+            {
+                face = face - 1;
+                zero = true;
+            }
+            else if (i == 1) // right-most pentagon
+            {
+                face = face + 1;
+                if (face > 10) face = 1;
+                zero = true;
+            }
+            else if (j == 0) face = face - 1; // top edge
+            else if (k == 0)                  // right edge
+            {
+                face = face + 9;
+                swap = true;
+            }
+        }
+        // middle row of faces pointing "upwards"
+        else if (face < 20 && (face % 2) > 0) 
+        {
+            if (j == 1) // top-most pentagon
+            { 
+                face = face - 8;
+                if (face > 9) face = 1; // wrap around
+                zero = true;
+            }
+            else if (k == 1) // left-most pentagon
+            {
+                face = face + 1;
+                zero = true;
+            }
+            else if (i == 1) // right-most pentagon
+            {
+                face = face + 3;
+                if (face > 20) face = 12; // wrap around
+                zero = true;
+            }
+            else if (j == 0) face = face + 1; // bottom edge
+            else if (k == 0)                  // right edge
+            {
+                face = face - 7;
+                swap = true;
+            }
+        }
+        else // botom row of faces
+        {
+            if (j == 1) face = 12; // bottom pentagon
+            else if (k == 0) // right edge
+            {
+                face = face + 2;
+                if (face > 20) face = 12; // wrap around
+                i = 0;
+            }
+        }
+
+        if zero 
+        {
+           i = 0;
+           j = 0; 
+        }
+        if swap
+        {
+            let temp = j;
+            j = i;
+            i = temp;
+        }
+        return (i, j, face);
+    }
+
 }
 
 #[cfg(test)]
