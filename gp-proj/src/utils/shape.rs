@@ -9,7 +9,7 @@
 
 use crate::{
     Vector3D,
-    projections::polyhedron::{Polyhedron, spherical_geometry::{self, barycentric_coordinates}},
+    projections::polyhedron::{Polyhedron, spherical_geometry::{self, barycentric_coordinates, spherical_triangle_area}},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -178,3 +178,35 @@ pub fn map_subtriangle_to_face_2d(
     
     sub_tri_2d
 }
+
+
+pub fn compute_spherical_barycentric(
+    point: Vector3D,
+    v0: Vector3D,
+    v1: Vector3D,
+    v2: Vector3D,
+) -> (f64, f64, f64) {
+    let total_area = spherical_triangle_area([v0, v1, v2]).unwrap();
+    let area0 = spherical_triangle_area([point, v1, v2]).unwrap();
+    let area1 = spherical_triangle_area([v0, point, v2]).unwrap();
+    let area2 = spherical_triangle_area([v0, v1, point]).unwrap();
+    
+    (area0 / total_area, area1 / total_area, area2 / total_area)
+}
+
+// pub fn spherical_triangle_area(v0: Vector3D, v1: Vector3D, v2: Vector3D) -> f64 {
+//     let a = spherical_geometry::stable_angle_between(v1, v2);
+//     let b = spherical_geometry::stable_angle_between(v2, v0);
+//     let c = spherical_geometry::stable_angle_between(v0, v1);
+    
+//     let s = (a + b + c) / 2.0;
+    
+//     let tan_e_over_4 = (
+//         (s / 2.0).tan() *
+//         ((s - a) / 2.0).tan() *
+//         ((s - b) / 2.0).tan() *
+//         ((s - c) / 2.0).tan()
+//     ).sqrt();
+    
+//     4.0 * tan_e_over_4.atan()
+// }

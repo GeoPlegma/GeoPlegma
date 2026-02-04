@@ -7,7 +7,10 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms
 
-use std::{f64::consts::{E, PI}, os::linux::raw};
+use std::{
+    f64::consts::{E, PI},
+    os::linux::raw,
+};
 
 use crate::{
     constants::{KarneyCoefficients, PolyhedronConstants},
@@ -17,7 +20,9 @@ use crate::{
         polyhedron::{ArcLengths, Polyhedron, spherical_geometry::barycentric_coordinates},
         projections::traits::{DistortionMetrics, Forward, Projection},
     },
-    utils::shape::{map_subtriangle_to_face_2d, triangle, triangle3d_to_2d},
+    utils::shape::{
+        compute_spherical_barycentric, map_subtriangle_to_face_2d, triangle, triangle3d_to_2d,
+    },
 };
 use geo::{Coord, Point};
 
@@ -153,23 +158,26 @@ impl Projection for Vgc {
                     let sub_bary_w = xy * (1.0 - uv); // weight for center (C)
 
                     // Get barycentric coordinates of sub-triangle vertices with respect to face
-                    let sub_vertex_0_bary = barycentric_coordinates(
+                    let sub_vertex_0_bary = compute_spherical_barycentric(
                         triangle_3d.0[0], // v_mid
-                        face_vertices,
-                    )
-                    .unwrap();
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    );
 
-                    let sub_vertex_1_bary = barycentric_coordinates(
+                    let sub_vertex_1_bary = compute_spherical_barycentric(
                         triangle_3d.0[1], // corner
-                        face_vertices,
-                    )
-                    .unwrap();
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    );
 
-                    let sub_vertex_2_bary = barycentric_coordinates(
+                    let sub_vertex_2_bary = compute_spherical_barycentric(
                         triangle_3d.0[2], // center
-                        face_vertices,
-                    )
-                    .unwrap();
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    );
                     // println!(
                     //     "face vertices {:?} \n subtriangle vertices {:?} \n",
                     //     sub_bary_w, sub_vertex_0_bary
@@ -240,29 +248,46 @@ impl Projection for Vgc {
 
     // Calculate distortion and compare with Geocart values
     fn compute_distortion(&self, lat: f64, lon: f64, polyhedron: &Polyhedron) -> DistortionMetrics {
-        let epsilon = 1e-7; // Small perturbation for numerical derivatives
-
-    // Use authalic radius
-    let radius = 6371007.181; // authalic radius for WGS84
-
-
-// Hardcoded face 2D template (same for all faces)
 let face_2d_vertices: [(f64, f64); 3] = [
     (0.0, 0.0),
     (2.0 * (1.0 / PolyhedronConstants::golden_ratio()).asin(), 0.0),
     (0.5535743588970453, 0.9585853315146595),
 ];
 
-        // Project the original point
+        let r_authalic = 6371007.181;
+        let epsilon = 1e-7;
+
+
+
+         let coef_fourier_geod_to_auth =
+            Self::fourier_coefficients(KarneyCoefficients::AUTHALIC_TO_GEODETIC);
+
+            let lat_geodetic = Self::lat_authalic_to_geodetic(
+                lat.to_radians(),
+                &coef_fourier_geod_to_auth,
+            );// Project the original point
         let center_bary = &self.geo_to_face(vec![Point::new(lon, lat)], Some(polyhedron))[0];
 
         // Perturb latitude (north-south)
-        let north_bary = &self.geo_to_face(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
+        let north_bary =
+            &self.geo_to_face(vec![Point::new(lon, lat + epsilon)], Some(polyhedron))[0];
 
         // Perturb longitude (east-west)
-        let east_bary = &self.geo_to_face(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
+        let east_bary =
+            &self.geo_to_face(vec![Point::new(lon + epsilon, lat)], Some(polyhedron))[0];
 
-        // Convert to Cartesian
+        // Handle face discontinuities
+        if center_bary.face != north_bary.face || center_bary.face != east_bary.face {
+            // Point is near face boundary, derivatives unreliable
+            return DistortionMetrics {
+                h: f64::NAN,
+                k: f64::NAN,
+                angular_deformation: f64::NAN,
+                areal_scale: f64::NAN,
+            };
+        }
+
+        // Convert barycentric to Cartesian in radians
         let to_cartesian = |bary: &Forward| -> (f64, f64) {
             let u = bary.coords.x;
             let v = bary.coords.y;
@@ -273,50 +298,54 @@ let face_2d_vertices: [(f64, f64); 3] = [
             let y =
                 face_2d_vertices[0].1 * u + face_2d_vertices[1].1 * v + face_2d_vertices[2].1 * w;
 
-            (x * radius, y * radius)
+            (x, y)
         };
 
         let center_xy = to_cartesian(&center_bary);
         let north_xy = to_cartesian(&north_bary);
         let east_xy = to_cartesian(&east_bary);
 
-        // Calculate partial derivatives
-        // dx/dφ, dy/dφ
-        let dx_dphi = (north_xy.0 -center_xy.0) / epsilon.to_radians();
-        let dy_dphi = (north_xy.1 -center_xy.1) / epsilon.to_radians();
+        // Derivatives in radians per radian
+        let dx_dphi_rad = (north_xy.0 - center_xy.0) / epsilon.to_radians();
+        let dy_dphi_rad = (north_xy.1 - center_xy.1) / epsilon.to_radians();
 
-        // dx/dλ, dy/dλ
-        let dx_dlambda = (east_xy.0 -center_xy.0) / epsilon.to_radians();
-        let dy_dlambda = (east_xy.1 -center_xy.1) / epsilon.to_radians();
-        // Radius of curvature for WGS84
-        let a = 6378137.0; // semi-major axis
-        let e2 = 0.00669437999014; // first eccentricity squared
-        let lat_rad = lat.to_radians();
+        let dx_dlambda_rad = (east_xy.0 - center_xy.0) / epsilon.to_radians();
+        let dy_dlambda_rad = (east_xy.1 - center_xy.1) / epsilon.to_radians();
+
+        // Convert to meters
+        let dx_dphi = dx_dphi_rad * r_authalic;
+        let dy_dphi = dy_dphi_rad * r_authalic;
+        let dx_dlambda = dx_dlambda_rad * r_authalic;
+        let dy_dlambda = dy_dlambda_rad * r_authalic;
+
+        // WGS84 ellipsoid parameters for GEODETIC coordinates
+        let a = 6378137.0;
+        let e2 = 0.00669437999014;
+        let lat_rad = lat_geodetic.to_radians();
 
         let sin_lat = lat_rad.sin();
         let cos_lat = lat_rad.cos();
 
-        // Meridional radius of curvature
-        let m = a * (1.0 - e2) / (1.0 - e2 * sin_lat * sin_lat).powf(1.5);
-
-        // Prime vertical radius of curvature
-        let n = a / (1.0 - e2 * sin_lat * sin_lat).sqrt();
+        // Radii of curvature on the ellipsoid
+        let m = a * (1.0 - e2) / (1.0 - e2 * sin_lat.powi(2)).powf(1.5);
+        let n = a / (1.0 - e2 * sin_lat.powi(2)).sqrt();
 
         // Scale factors
         let h = (dx_dphi.powi(2) + dy_dphi.powi(2)).sqrt() / m;
         let k = (dx_dlambda.powi(2) + dy_dlambda.powi(2)).sqrt() / (n * cos_lat);
 
         // Angular deformation
-        // sin(ω/2) = |h - k| / (h + k) where ω is the maximum angular distortion
-        let sin_half_omega = (h - k).abs() / (h + k);
+        let a_tissot = ((h.powi(2) + k.powi(2)) / 2.0).sqrt();
+        let b_tissot = (h * k).sqrt();
+
+        let sin_half_omega = (a_tissot - b_tissot) / (a_tissot + b_tissot);
         let omega = 2.0 * sin_half_omega.asin();
-        let angular_deformation_degrees = omega.to_degrees();
 
         DistortionMetrics {
             h,
             k,
-            angular_deformation: angular_deformation_degrees,
-            areal_scale: h * k, // For equal-area projections, this should be ~1.0
+            angular_deformation: omega.to_degrees(),
+            areal_scale: h * k,
         }
     }
 }
