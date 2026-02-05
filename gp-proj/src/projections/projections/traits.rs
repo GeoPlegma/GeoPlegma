@@ -35,7 +35,7 @@ pub trait Projection {
         &self,
         positions: Vec<Point>,
         polyhedron: Option<&Polyhedron>,
-        layout: &dyn Layout,
+        layout: Option<&dyn Layout>,
     ) -> Vec<Forward>;
     fn cartesian_to_geo(&self, coords: Vec<Coord>) -> Point;
 
