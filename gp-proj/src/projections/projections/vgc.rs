@@ -75,7 +75,7 @@ impl Projection for Vgc {
 
                     // the icosahedron triangle gets divided into six rectangle triangles,
                     // and we find the one where the point is
-                    let triangle_3d = triangle(
+                    let sub_triangle_3d = triangle(
                         polyhedron, point_p, // polyhedron.face_vertices(face).unwrap(),
                         face,
                     )
@@ -84,141 +84,131 @@ impl Projection for Vgc {
                     // calculating the arc lenghts from one of the vertices of the sub-triangle to point P
                     let ArcLengths {
                         ab, bp, ap, bc, ac, ..
-                    } = polyhedron.arc_lengths(triangle_3d.0, point_p);
+                    } = polyhedron.arc_lengths(sub_triangle_3d.0, point_p);
 
                     // Map the 3D sub-triangle to the face's 2D coordinate system
                     // Map the 3D sub-triangle to 2D
-                    // let triangle_2d = triangle3d_to_2d(ab, bc, ac);
+                    let triangle_2d = triangle3d_to_2d(ab, bc, ac);
+                    let [xy, uv] = slice_and_dice(ac, ab, bc, ap, bp);
+                    // // // ================================================================
+                    // // // JUST TESTING THE 2D LOCAL FACE SYSTEM
+                    // // let face_2d_vertices = if face % 2 == 0 {
+                    // //     FACE_2D_VERTICES_UP
+                    // // } else {
+                    // //     FACE_2D_VERTICES_DOWN
+                    // // };
 
-                    // Spherical angles for point B and point C
-                    let beta = ((ac.cos() - ab.cos() * bc.cos()) / (ab.sin() * bc.sin()))
-                        .clamp(-1.0, 1.0)
-                        .acos();
-                    let gamma = ((ab.cos() - bc.cos() * ac.cos()) / (bc.sin() * ac.sin()))
-                        .clamp(-1.0, 1.0)
-                        .acos();
-
-                    // ==== Slice and Dice formulas ====
-                    // angle ρ
-                    let rho: f64 = f64::acos(
-                        ((ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin())).clamp(-1.0, 1.0),
-                    );
-
-                    // 1. Calculate delta (δ)
-                    let delta = f64::acos(rho.sin() * ab.cos());
-
-                    // 2. Calculate the ratio of the spherical areas u and v
-                    let uv = (beta + gamma - rho - delta) / (beta + gamma - PI / 2.0);
-
-                    // 3. Calculate cos(x + y) by applying the spherical law of cosines
-                    // being that the x and y are the spherical lenghts from B to P and P to D, respectively.
-                    let cos_x_y = 1.0 / (rho.tan() * delta.tan());
-
-                    // 4. Calculate the ratio of the spherical areas x and y
-                    let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_x_y));
-
-                    // // ================================================================
-                    // // JUST TESTING THE 2D LOCAL FACE SYSTEM
-                    // let face_2d_vertices = if face % 2 == 0 {
-                    //     FACE_2D_VERTICES_UP
-                    // } else {
-                    //     FACE_2D_VERTICES_DOWN
-                    // };
-
-                    // // // Map the sub-triangle to the face's 2D coordinate system
+                    // // // // Map the sub-triangle to the face's 2D coordinate system
                     // let triangle_2d = map_subtriangle_to_face_2d(
-                    //     triangle_3d.0,
+                    //     sub_triangle_3d.0,
                     //     face_vertices_3d.clone(),
-                    //     face_2d_vertices,
-                    // );
-
-                    // // =================================
-                    // // ==== Interpolation ====
-                    // // Between A and C it gives point D
-                    // let pd_x = triangle_2d[2].0 + (triangle_2d[0].0 - triangle_2d[2].0) * uv;
-                    // let pd_y = triangle_2d[2].1 + (triangle_2d[0].1 - triangle_2d[2].1) * uv;
-
-                    // // Between D and B it gives point P
-                    // let p_x = triangle_2d[1].0 + (pd_x - triangle_2d[1].0) * xy;
-                    // let p_y = triangle_2d[1].1 + (pd_y - triangle_2d[1].1) * xy;
-                    // // ======================
-                    // // ================================================================
-
-                    let face_vertices = [
-                        face_vertices_3d[0].clone(),
-                        face_vertices_3d[1].clone(),
-                        face_vertices_3d[2].clone(),
-                    ];
                     //     face_vertices_2d,
                     // );
 
-                    // Calculate barycentric coordinates within sub-triangle
-                    let sub_bary_u = xy * uv; // weight for v_mid (A)
-                    let sub_bary_v = 1.0 - xy; // weight for corner (B)
-                    let sub_bary_w = xy * (1.0 - uv); // weight for center (C)
+                    // =================================
+                    // ==== Interpolation ====
+                    // Between A and C it gives point D
+                    let pd_x = triangle_2d[2].0 + (triangle_2d[0].0 - triangle_2d[2].0) * uv;
+                    let pd_y = triangle_2d[2].1 + (triangle_2d[0].1 - triangle_2d[2].1) * uv;
+
+                    // Between D and B it gives point P
+                    let p_x = triangle_2d[1].0 + (pd_x - triangle_2d[1].0) * xy;
+                    let p_y = triangle_2d[1].1 + (pd_y - triangle_2d[1].1) * xy;
+                    // ======================
+                    // ================================================================
+
+                    // let face_vertices = [
+                    //     face_vertices_3d[0].clone(),
+                    //     face_vertices_3d[1].clone(),
+                    //     face_vertices_3d[2].clone(),
+                    // ];
+                    // //     face_vertices_2d,
+                    // // );
+
+                    // Calculate barycentric coordinates within sub-triangle for P for a the subtriangle ABC
+                    // Deduction
+                    // P = B + (D - B) * xy => P = B * (1 - xy) + D * xy
+                    // So (1 - xy) and xy are the barycentric coordinates (the weights) of B and D respectively
+                    // Being that D = C + (A - C) * uv => D = A * uv + C * (1 - uv) then if you replace D in the previous equation
+                    // P = B * (1 - xy) + (A * uv + C * (1 - uv)) * xy => A × (xy × uv) + B × (1 - xy) + C × (xy × (1 - uv))
+                    // Therefore, the barycentric coordinates are:
+                    // - Weight for A (v_mid)**: `xy × uv`
+                    // - Weight for B (corner)**: `1 - xy`
+                    // - Weight for C (center)**: `xy × (1 - uv)`
+                    let subtriangle_bary_u = xy * uv; // weight for v_mid (A)
+                    let subtriangle_bary_v = 1.0 - xy; // weight for corner (B)
+                    let subtriangle_bary_w = xy * (1.0 - uv); // weight for center (C)
 
                     // Get barycentric coordinates of sub-triangle vertices with respect to face
-                    let sub_vertex_0_bary = compute_spherical_barycentric(
-                        triangle_3d.0[0], // v_mid
-                        face_vertices_3d[0].clone(),
+                    let subtriangle_a_bary_face = barycentric_coordinates(
+                        sub_triangle_3d.0[0], // v_mid
+                        [face_vertices_3d[0].clone(),
                         face_vertices_3d[1].clone(),
-                        face_vertices_3d[2].clone(),
-                    );
+                        face_vertices_3d[2].clone()],
+                    ).unwrap();
+                    // Result: A = F0 × a0 + F1 × a1 + F2 × a2
 
-                    let sub_vertex_1_bary = compute_spherical_barycentric(
-                        triangle_3d.0[1], // corner
-                        face_vertices_3d[0].clone(),
+                    let subtriangle_b_bary_face = barycentric_coordinates(
+                        sub_triangle_3d.0[1], // corner
+                        [face_vertices_3d[0].clone(),
                         face_vertices_3d[1].clone(),
-                        face_vertices_3d[2].clone(),
-                    );
+                        face_vertices_3d[2].clone()],
+                    ).unwrap();
+                    // Result: B = F0 × b0 + F1 × b1 + F2 × b2
 
-                    let sub_vertex_2_bary = compute_spherical_barycentric(
-                        triangle_3d.0[2], // center
-                        face_vertices_3d[0].clone(),
+                    let subtriangle_c_bary_face = barycentric_coordinates(
+                        sub_triangle_3d.0[2], // center
+                        [face_vertices_3d[0].clone(),
                         face_vertices_3d[1].clone(),
-                        face_vertices_3d[2].clone(),
-                    );
-                    // println!(
-                    //     "face vertices {:?} \n subtriangle vertices {:?} \n",
-                    //     sub_bary_w, sub_vertex_0_bary
-                    // );
-
-                    // transform to 2D face coordinate system
+                        face_vertices_3d[2].clone()],
+                    ).unwrap();
+                    // Result: C = F0 × c0 + F1 × c1 + F2 × c2
 
                     // Compose: barycentric of P in face = weighted sum of sub-triangle vertices' barycentrics
-                    let face_bary_u = sub_vertex_0_bary.0 * sub_bary_u
-                        + sub_vertex_1_bary.0 * sub_bary_v
-                        + sub_vertex_2_bary.0 * sub_bary_w;
+                    // Because barycentric coordinates are linear. When you have:
+                    // - P as a barycentric combination of A, B, C
+                    // - And A, B, C are themselves barycentric combinations of F0, F1, F2
+                    // You can "distribute" and get P directly as a barycentric combination of F0, F1, F2.
+                    // So then if we substitute the face-barycentric expressions for A, B, C back into the equation for P:
+                    // P = A × subtriangle_bary_u + B × subtriangle_bary_v + C × subtriangle_bary_w
+                    // Becomes (brind that F(0,1,2) are the corner of the face):
+                    // P = (F0×a0 + F1×a1 + F2×a2) × subtriangle_bary_u + (F0×b0 + F1×b1 + F2×b2) × subtriangle_bary_v + (F0×c0 + F1×c1 + F2×c2) × subtriangle_bary_w
+                    // Rearranging by grouping F0, F1, F2:
+                    // P = F0 × (a0×subtriangle_bary_u  + b0×subtriangle_bary_v  + c0×subtriangle_bary_w ) + F1 × (a1×subtriangle_bary_u  + b1×subtriangle_bary_v  + c1×subtriangle_bary_w ) + F2 × (a2×subtriangle_bary_u  + b2×subtriangle_bary_v  + c2×subtriangle_bary_w )
+                    let p_bary_u = subtriangle_a_bary_face.0 * subtriangle_bary_u
+                        + subtriangle_b_bary_face.0 * subtriangle_bary_v
+                        + subtriangle_c_bary_face.0 * subtriangle_bary_w;
 
-                    let face_bary_v = sub_vertex_0_bary.1 * sub_bary_u
-                        + sub_vertex_1_bary.1 * sub_bary_v
-                        + sub_vertex_2_bary.1 * sub_bary_w;
+                    let p_bary_v = subtriangle_a_bary_face.1 * subtriangle_bary_u
+                        + subtriangle_b_bary_face.1 * subtriangle_bary_v
+                        + subtriangle_c_bary_face.1 * subtriangle_bary_w;
 
-                    let face_bary_w = sub_vertex_0_bary.2 * sub_bary_u
-                        + sub_vertex_1_bary.2 * sub_bary_v
-                        + sub_vertex_2_bary.2 * sub_bary_w;
+                    let p_bary_w = subtriangle_a_bary_face.2 * subtriangle_bary_u
+                        + subtriangle_b_bary_face.2 * subtriangle_bary_v
+                        + subtriangle_c_bary_face.2 * subtriangle_bary_w;
 
                     println!(
                         "barycentric coordinates {:?} \n 
-                        weighted sum {}",
-                        // projected point in 2D {:?} \n
+                        weighted sum {}
+                        projected point in 2D {:?} \n",
                         Vector3D {
-                            x: face_bary_u,
-                            y: face_bary_v,
-                            z: face_bary_w,
+                            x: p_bary_u,
+                            y: p_bary_v,
+                            z: p_bary_w,
                         },
                         // [p_x, p_y],
-                        face_bary_u + face_bary_v + face_bary_w
+                        p_bary_u + p_bary_v + p_bary_w,
+                        p_x,
                     );
 
                     out.push(Forward {
                         coords: Vector3D {
-                            x: face_bary_u,
-                            y: face_bary_v,
-                            z: face_bary_w,
+                            x: p_bary_u,
+                            y: p_bary_v,
+                            z: p_bary_w,
                         },
                         face: index,
-                        sub_triangle: triangle_3d.1,
+                        sub_triangle: sub_triangle_3d.1,
                     });
 
                     // in case the point is on the edge of two faces, we return the first face.
@@ -248,24 +238,23 @@ impl Projection for Vgc {
 
     // Calculate distortion and compare with Geocart values
     fn compute_distortion(&self, lat: f64, lon: f64, polyhedron: &Polyhedron) -> DistortionMetrics {
-let face_2d_vertices: [(f64, f64); 3] = [
-    (0.0, 0.0),
-    (2.0 * (1.0 / PolyhedronConstants::golden_ratio()).asin(), 0.0),
-    (0.5535743588970453, 0.9585853315146595),
-];
+        let face_2d_vertices: [(f64, f64); 3] = [
+            (0.0, 0.0),
+            (
+                2.0 * (1.0 / PolyhedronConstants::golden_ratio()).asin(),
+                0.0,
+            ),
+            (0.5535743588970453, 0.9585853315146595),
+        ];
 
         let r_authalic = 6371007.181;
         let epsilon = 1e-7;
 
-
-
-         let coef_fourier_geod_to_auth =
+        let coef_fourier_geod_to_auth =
             Self::fourier_coefficients(KarneyCoefficients::AUTHALIC_TO_GEODETIC);
 
-            let lat_geodetic = Self::lat_authalic_to_geodetic(
-                lat.to_radians(),
-                &coef_fourier_geod_to_auth,
-            );// Project the original point
+        let lat_geodetic =
+            Self::lat_authalic_to_geodetic(lat.to_radians(), &coef_fourier_geod_to_auth); // Project the original point
         let center_bary = &self.geo_to_face(vec![Point::new(lon, lat)], Some(polyhedron))[0];
 
         // Perturb latitude (north-south)
@@ -348,6 +337,36 @@ let face_2d_vertices: [(f64, f64); 3] = [
             areal_scale: h * k,
         }
     }
+}
+
+fn slice_and_dice(ac: f64, ab: f64, bc: f64, ap: f64, bp: f64) -> [f64; 2] {
+    // Spherical angles for point B and point C
+    let beta = ((ac.cos() - ab.cos() * bc.cos()) / (ab.sin() * bc.sin()))
+        .clamp(-1.0, 1.0)
+        .acos();
+    let gamma = ((ab.cos() - bc.cos() * ac.cos()) / (bc.sin() * ac.sin()))
+        .clamp(-1.0, 1.0)
+        .acos();
+
+    // ==== Slice and Dice formulas ====
+    // angle ρ
+    let rho: f64 =
+        f64::acos(((ap.cos() - ab.cos() * bp.cos()) / (ab.sin() * bp.sin())).clamp(-1.0, 1.0));
+
+    // 1. Calculate delta (δ)
+    let delta = f64::acos(rho.sin() * ab.cos());
+
+    // 2. Calculate the ratio of the spherical areas u and v
+    let uv = (beta + gamma - rho - delta) / (beta + gamma - PI / 2.0);
+
+    // 3. Calculate cos(x + y) by applying the spherical law of cosines
+    // being that the x and y are the spherical lenghts from B to P and P to D, respectively.
+    let cos_x_y = 1.0 / (rho.tan() * delta.tan());
+
+    // 4. Calculate the ratio of the spherical areas x and y
+    let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_x_y));
+
+    [xy, uv]
 }
 
 #[cfg(test)]
