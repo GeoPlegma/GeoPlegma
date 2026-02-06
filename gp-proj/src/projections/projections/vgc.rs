@@ -17,7 +17,7 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Polyhedron, spherical_geometry::barycentric_coordinates},
+        polyhedron::{ArcLengths, Polyhedron, spherical_geometry::{self, barycentric_coordinates}},
         projections::traits::{DistortionMetrics, Forward, Projection},
     },
     utils::shape::{
@@ -251,8 +251,9 @@ impl Projection for Vgc {
         // Hardcoded face 2D template (same for all faces)
         const FACE_2D_VERTICES_DOWN: [(f64, f64); 3] = [
             (0.0, 0.0),                               // v1 at origin
-            (1.1071487177940906, 0.0),                // v0
-            (0.5535743588970453, 0.9585853315146595), // v2
+            (-0.5535743588970453, 0.9585853315146595), // v2
+
+            (-1.1071487177940906, 0.0),                // v0
         ];
         // Need the coeficcients to convert from geodetic to authalic
         let coef_fourier_geod_to_auth =
@@ -289,7 +290,7 @@ impl Projection for Vgc {
                         ab, bp, ap, bc, ac, ..
                     } = polyhedron.arc_lengths(sub_triangle_3d.0, point_p);
 
-                    let triangle_2d = triangle3d_to_2d(ab, bc, ac);
+                    // let triangle_2d = triangle3d_to_2d(ab, bc, ac);
 
                     // Parameterization values of the slice and dice projection.
                     let [xy, uv] = slice_and_dice(ac, ab, bc, ap, bp);
@@ -322,14 +323,14 @@ impl Projection for Vgc {
                     //     FACE_2D_VERTICES_DOWN, // Using right-origin template
                     // );
 
-                    // Interpolate to get 2D Cartesian coordinates
-                    let p_x_ = (triangle_2d[0].0 * subtriangle_bary_u
-                        + triangle_2d[1].0 * subtriangle_bary_v
-                        + triangle_2d[2].0 * subtriangle_bary_w);
+                    // // Interpolate to get 2D Cartesian coordinates
+                    // let p_x_ = (triangle_2d[0].0 * subtriangle_bary_u
+                    //     + triangle_2d[1].0 * subtriangle_bary_v
+                    //     + triangle_2d[2].0 * subtriangle_bary_w);
 
-                    let p_y_ = (triangle_2d[0].1 * subtriangle_bary_u
-                        + triangle_2d[1].1 * subtriangle_bary_v
-                        + triangle_2d[2].1 * subtriangle_bary_w);
+                    // let p_y_ = (triangle_2d[0].1 * subtriangle_bary_u
+                    //     + triangle_2d[1].1 * subtriangle_bary_v
+                    //     + triangle_2d[2].1 * subtriangle_bary_w);
 
                     // Interpolate to get 2D Cartesian coordinates
                     let p_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_bary_u
@@ -345,29 +346,29 @@ impl Projection for Vgc {
                     let x_final = p_x - offset_x;
                     let y_final = p_y - offset_y;
 
-                    println!("Point: lat={}, lon={}", x_final, y_final);
-                    println!("Face: {}", face);
-                    println!("Sub-triangle: {}", sub_triangle_3d.1);
+     println!("3D vectors:");
+println!("  A: {:?}", sub_triangle_3d.0[0]);
+println!("  B: {:?}", sub_triangle_3d.0[1]);
+println!("  P: {:?}", point_p);
 
-                    // Print sub-triangle vertices in lat/lon
-                    for (i, vertex) in sub_triangle_3d.0.iter().enumerate() {
-                        let lat = vertex.z.asin().to_degrees();
-                        let lon = vertex.y.atan2(vertex.x).to_degrees();
-                        println!("  Sub-tri vertex {}: lat={:.2}°, lon={:.2}°", i, lat, lon);
-                    }
+let manual_ap = spherical_geometry::stable_angle_between(sub_triangle_3d.0[0], point_p) ;
+let manual_ab =spherical_geometry::stable_angle_between(sub_triangle_3d.0[0], sub_triangle_3d.0[1]);
+let manual_bp =spherical_geometry::stable_angle_between(sub_triangle_3d.0[1], point_p);
 
-                    // println!(
-                    //     "
-                    //     2D coordinates {:?} \n
-                    //     triangle 2D {:?} \n
-                    //     // subtriangle 3D {:?} \n
-                    //     point 3D {:?} \n",
-                    //     (p_x, p_y),
-                    //     // [p_x, p_y],
-                    //     triangle_2d,
-                    //     (sub_triangle_3d.0[0],sub_triangle_3d.0[1],sub_triangle_3d.0[2]),
-                    // (point_p.x,point_p.y,point_p.z)
-                    // );
+println!("Manual arc lengths:");
+println!("  ap: {:.4} (reported: {:.4})", manual_ap, ap);
+println!("  ab: {:.4} (reported: {:.4})", manual_ab, ab);
+println!("  bp: {:.4} (reported: {:.4})", manual_bp, bp);
+                    println!(
+                        "
+                        2D coordinates {:?} \n
+                        triangle 2D {:?} \n
+                        point 3D {:?} \n",
+                        (p_x, p_y),
+                        // [p_x, p_y],
+                        (sub_triangle_3d.0[0],sub_triangle_3d.0[1],sub_triangle_3d.0[2]),
+                    (point_p.x,point_p.y,point_p.z)
+                    );
 
                     out.push(Forward {
                         coords: Vector3D {
@@ -526,23 +527,23 @@ fn slice_and_dice(ac: f64, ab: f64, bc: f64, ap: f64, bp: f64) -> [f64; 2] {
 
     // 4. Calculate the ratio of the spherical areas x and y
     let xy = f64::sqrt((1.0 - bp.cos()) / (1.0 - cos_xp_y));
-    // After computing arc lengths
-    println!("Arc lengths:");
-    println!("  ab (mid to corner): {:.4}", ab);
-    println!("  bc (corner to center): {:.4}", bc);
-    println!("  ac (mid to center): {:.4}", ac);
-    println!("  ap (mid to point): {:.4}", ap);
-    println!("  bp (corner to point): {:.4}", bp);
+    // // After computing arc lengths
+    // println!("Arc lengths:");
+    // println!("  ab (mid to corner): {:.4}", ab);
+    // println!("  bc (corner to center): {:.4}", bc);
+    // println!("  ac (mid to center): {:.4}", ac);
+    // println!("  ap (mid to point): {:.4}", ap);
+    // println!("  bp (corner to point): {:.4}", bp);
 
-    // After computing slice-and-dice parameters
-    println!("Slice-and-dice params:");
-    println!("  beta: {:.4}°", beta.to_degrees());
-    println!("  gamma: {:.4}°", gamma.to_degrees());
-    println!("  rho: {:.4}°", rho.to_degrees());
-    println!("  delta: {:.4}°", delta.to_degrees());
-    println!("  uv: {:.6}", uv);
-    println!("  xy: {:.6}", xy);
-    println!("  cos_x_y: {:.6}", cos_xp_y);
+    // // After computing slice-and-dice parameters
+    // println!("Slice-and-dice params:");
+    // println!("  beta: {:.4}°", beta.to_degrees());
+    // println!("  gamma: {:.4}°", gamma.to_degrees());
+    // println!("  rho: {:.4}°", rho.to_degrees());
+    // println!("  delta: {:.4}°", delta.to_degrees());
+    // println!("  uv: {:.6}", uv);
+    // println!("  xy: {:.6}", xy);
+    // println!("  cos_x_y: {:.6}", cos_xp_y);
 
     [xy, uv]
 }

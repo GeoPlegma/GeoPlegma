@@ -138,11 +138,11 @@ impl Polyhedron {
     pub fn arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
         let [mid, corner, center] = triangle;
         ArcLengths {
-            ab: spherical_geometry::stable_angle_between(corner, mid),
-            bc: spherical_geometry::stable_angle_between(mid, center),
-            ac: spherical_geometry::stable_angle_between(corner, center),
-            ap: spherical_geometry::stable_angle_between(corner, point),
-            bp: spherical_geometry::stable_angle_between(mid, point),
+            ab: spherical_geometry::stable_angle_between(mid, corner),
+            bc: spherical_geometry::stable_angle_between(corner, center),
+            ac: spherical_geometry::stable_angle_between(mid, center),
+            ap: spherical_geometry::stable_angle_between(mid, point),
+            bp: spherical_geometry::stable_angle_between(corner, point),
             cp: spherical_geometry::stable_angle_between(center, point),
         }
     }
