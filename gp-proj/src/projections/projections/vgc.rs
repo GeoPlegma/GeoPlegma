@@ -17,7 +17,10 @@ use crate::{
     models::vector_3d::Vector3D,
     projections::{
         layout::traits::Layout,
-        polyhedron::{ArcLengths, Polyhedron, spherical_geometry::{self, barycentric_coordinates}},
+        polyhedron::{
+            ArcLengths, Polyhedron,
+            spherical_geometry::{self, barycentric_coordinates},
+        },
         projections::traits::{DistortionMetrics, Forward, Projection},
     },
     utils::shape::{
@@ -177,7 +180,7 @@ impl Projection for Vgc {
                     // You can "distribute" and get P directly as a barycentric combination of F0, F1, F2.
                     // So then if we substitute the face-barycentric expressions for A, B, C back into the equation for P:
                     // P = A × subtriangle_bary_u + B × subtriangle_bary_v + C × subtriangle_bary_w
-                    // Becomes (brind that F(0,1,2) are the corner of the face):
+                    // Becomes (being that F(0,1,2) are the corners of the face):
                     // P = (F0×a0 + F1×a1 + F2×a2) × subtriangle_bary_u + (F0×b0 + F1×b1 + F2×b2) × subtriangle_bary_v + (F0×c0 + F1×c1 + F2×c2) × subtriangle_bary_w
                     // Rearranging by grouping F0, F1, F2:
                     // P = F0 × (a0×subtriangle_bary_u  + b0×subtriangle_bary_v  + c0×subtriangle_bary_w ) + F1 × (a1×subtriangle_bary_u  + b1×subtriangle_bary_v  + c1×subtriangle_bary_w ) + F2 × (a2×subtriangle_bary_u  + b2×subtriangle_bary_v  + c2×subtriangle_bary_w )
@@ -250,10 +253,9 @@ impl Projection for Vgc {
         let polyhedron = polyhedron.unwrap();
         // Hardcoded face 2D template (same for all faces)
         const FACE_2D_VERTICES_DOWN: [(f64, f64); 3] = [
-            (0.0, 0.0),                               // v1 at origin
-            (-0.5535743588970453, 0.9585853315146595), // v2
-
+            (0.0, 0.0),                                // v1 at origin
             (-1.1071487177940906, 0.0),                // v0
+            (-0.5535743588970453, 0.9585853315146595), // v2
         ];
         // Need the coeficcients to convert from geodetic to authalic
         let coef_fourier_geod_to_auth =
@@ -316,12 +318,68 @@ impl Projection for Vgc {
                         "Sum: {}",
                         subtriangle_bary_u + subtriangle_bary_v + subtriangle_bary_w
                     );
-                    // // Map sub-triangle to face 2D (with rightmost origin)
-                    // let subtriangle_face_2d = map_subtriangle_to_face_2d(
-                    //     sub_triangle_3d.0,
-                    //     face_vertices_3d,
-                    //     FACE_2D_VERTICES_DOWN, // Using right-origin template
-                    // );
+                    // Get barycentric coordinates of sub-triangle vertices with respect to face
+                    let subtriangle_a_bary_face = compute_spherical_barycentric(
+                        sub_triangle_3d.0[0], // v_mid
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    );
+                    // Result: A = F0 × a0 + F1 × a1 + F2 × a2
+
+                    let subtriangle_b_bary_face = compute_spherical_barycentric(
+                        sub_triangle_3d.0[1], // corner
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    );
+                    // Result: B = F0 × b0 + F1 × b1 + F2 × b2
+
+                    let subtriangle_c_bary_face = compute_spherical_barycentric(
+                        sub_triangle_3d.0[2], // center
+                        face_vertices_3d[0].clone(),
+                        face_vertices_3d[1].clone(),
+                        face_vertices_3d[2].clone(),
+                    );
+
+                    let p_bary_u = subtriangle_a_bary_face.0 * subtriangle_bary_u
+                        + subtriangle_b_bary_face.0 * subtriangle_bary_v
+                        + subtriangle_c_bary_face.0 * subtriangle_bary_w;
+
+                    let p_bary_v = subtriangle_a_bary_face.1 * subtriangle_bary_u
+                        + subtriangle_b_bary_face.1 * subtriangle_bary_v
+                        + subtriangle_c_bary_face.1 * subtriangle_bary_w;
+
+                    let p_bary_w = subtriangle_a_bary_face.2 * subtriangle_bary_u
+                        + subtriangle_b_bary_face.2 * subtriangle_bary_v
+                        + subtriangle_c_bary_face.2 * subtriangle_bary_w;
+
+                    let subtriangle_a_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_a_bary_face.0
+                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_a_bary_face.1
+                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_a_bary_face.2;
+
+                    let subtriangle_a_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_a_bary_face.0
+                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_a_bary_face.1
+                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_a_bary_face.2;
+
+                    let subtriangle_b_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_b_bary_face.0
+                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_b_bary_face.1
+                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_b_bary_face.2;
+
+                    let subtriangle_b_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_b_bary_face.0
+                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_b_bary_face.1
+                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_b_bary_face.2;
+
+                    let subtriangle_c_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_c_bary_face.0
+                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_c_bary_face.1
+                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_c_bary_face.2;
+
+                    let subtriangle_c_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_c_bary_face.0
+                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_c_bary_face.1
+                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_c_bary_face.2;
+                    println!("{:?}", (subtriangle_a_x, subtriangle_a_y));
+                    println!("{:?}", (subtriangle_b_x, subtriangle_b_y));
+                    println!("{:?}", (subtriangle_c_x, subtriangle_c_y));
 
                     // // Interpolate to get 2D Cartesian coordinates
                     // let p_x_ = (triangle_2d[0].0 * subtriangle_bary_u
@@ -333,32 +391,33 @@ impl Projection for Vgc {
                     //     + triangle_2d[2].1 * subtriangle_bary_w);
 
                     // Interpolate to get 2D Cartesian coordinates
-                    let p_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_bary_u
-                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_bary_v
-                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_bary_w;
+                    let p_x = FACE_2D_VERTICES_DOWN[0].0 * p_bary_u
+                        + FACE_2D_VERTICES_DOWN[1].0 * p_bary_v
+                        + FACE_2D_VERTICES_DOWN[2].0 * p_bary_w;
 
-                    let p_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_bary_u
-                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_bary_v
-                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_bary_w;
+                    let p_y = FACE_2D_VERTICES_DOWN[0].1 * p_bary_u
+                        + FACE_2D_VERTICES_DOWN[1].1 * p_bary_v
+                        + FACE_2D_VERTICES_DOWN[2].1 * p_bary_w;
 
                     let offset_x = FACE_2D_VERTICES_DOWN[1].0;
                     let offset_y = FACE_2D_VERTICES_DOWN[1].1;
                     let x_final = p_x - offset_x;
                     let y_final = p_y - offset_y;
 
-     println!("3D vectors:");
-println!("  A: {:?}", sub_triangle_3d.0[0]);
-println!("  B: {:?}", sub_triangle_3d.0[1]);
-println!("  P: {:?}", point_p);
-
-let manual_ap = spherical_geometry::stable_angle_between(sub_triangle_3d.0[0], point_p) ;
-let manual_ab =spherical_geometry::stable_angle_between(sub_triangle_3d.0[0], sub_triangle_3d.0[1]);
-let manual_bp =spherical_geometry::stable_angle_between(sub_triangle_3d.0[1], point_p);
-
-println!("Manual arc lengths:");
-println!("  ap: {:.4} (reported: {:.4})", manual_ap, ap);
-println!("  ab: {:.4} (reported: {:.4})", manual_ab, ab);
-println!("  bp: {:.4} (reported: {:.4})", manual_bp, bp);
+                    println!("3D vectors:");
+                    println!(
+                        "  Bary Triangle A: {:?} Bary P: {:?}",
+                        subtriangle_a_bary_face, p_bary_u
+                    );
+                    println!(
+                        "  Bary Triangle B: {:?} Bary P: {:?}",
+                        subtriangle_b_bary_face, p_bary_v
+                    );
+                    println!(
+                        "  Bary Triangle C: {:?} Bary P: {:?}",
+                        subtriangle_c_bary_face, p_bary_w
+                    );
+                    println!("  P: {:?}", face_vertices_3d);
                     println!(
                         "
                         2D coordinates {:?} \n
@@ -366,8 +425,12 @@ println!("  bp: {:.4} (reported: {:.4})", manual_bp, bp);
                         point 3D {:?} \n",
                         (p_x, p_y),
                         // [p_x, p_y],
-                        (sub_triangle_3d.0[0],sub_triangle_3d.0[1],sub_triangle_3d.0[2]),
-                    (point_p.x,point_p.y,point_p.z)
+                        (
+                            sub_triangle_3d.0[0],
+                            sub_triangle_3d.0[1],
+                            sub_triangle_3d.0[2]
+                        ),
+                        (point_p.x, point_p.y, point_p.z)
                     );
 
                     out.push(Forward {

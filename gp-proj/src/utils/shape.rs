@@ -103,7 +103,7 @@ pub fn triangle(
 
     // Left sub-triangle = (C, mid, V0)
     let left = [c, mid, v0];
-
+println!("{:?}",[mid, v0, c]);
     if spherical_geometry::point_in_spherical_triangle(point_p, left) {
         return Some(([mid, v0, c], i0 as u8));
     }
