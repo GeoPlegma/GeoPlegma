@@ -11,7 +11,7 @@ use crate::{
     Vector3D,
     projections::polyhedron::{
         Polyhedron,
-        spherical_geometry::{self, barycentric_coordinates},
+        spherical_geometry::{self, barycentric_coordinates, spherical_triangle_area},
     },
 };
 
@@ -103,7 +103,7 @@ pub fn triangle(
 
     // Left sub-triangle = (C, mid, V0)
     let left = [c, mid, v0];
-println!("{:?}",[mid, v0, c]);
+
     if spherical_geometry::point_in_spherical_triangle(point_p, left) {
         return Some(([mid, v0, c], i0 as u8));
     }
@@ -131,59 +131,31 @@ println!("{:?}",[mid, v0, c]);
 }
 
 // Map spherical triangle into a planar triangle.
-pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
-    // Place vertex B (triangle_3d[1] / corner) at origin
-    let b_2d = (0.0, 0.0);
+pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64, is_upward: bool) -> [(f64, f64); 3] {
+    let a01 = ab; // edge 0-1
+    let a12 = bc; // edge 1-2
+    let a20 = ac; // edge 2-0
+    // Build triangle with v1 at origin
+    // v1 at origin
+    let v1 = (0.0, 0.0);
 
-    // Place vertex A (triangle_3d[0] / v_mid) on the positive x-axis at distance ab
-    let a_2d = (ab, 0.0);
+    // v0 on negative x-axis at distance a01
+    let v0 = (-a01, 0.0);
 
-    // Use law of cosines to find angle at B
-    // cos(angle_B) = (ab² + bc² - ac²) / (2·ab·bc)
-    let cos_angle_b = (bc.powi(2) + ac.powi(2) - ac.powi(2)) / (2.0 * bc * ac);
-    let angle_b = cos_angle_b.clamp(-1.0, 1.0).acos();
+    // v2 positioned using law of cosines
+    // We know: a01 (v0 to v1), a12 (v1 to v2), a20 (v2 to v0)
+    // Find angle at v1
+    let cos_angle_v1 = (a01.powi(2) + a12.powi(2) - a20.powi(2)) / (2.0 * a01 * a12);
+    let angle_v1 = cos_angle_v1.clamp(-1.0, 1.0).acos();
 
-    // Place vertex C (triangle_3d[2] / vector_center) using angle and distance bc
-    let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
+    let y_sign = if is_upward { 1.0 } else { -1.0 };
 
-    [a_2d, b_2d, c_2d]
-}
+    // v2 at distance a12 from v1, at angle from negative x-axis
+    let v2_x = -a12 * angle_v1.cos();
+    let v2_y = y_sign * a12 * angle_v1.sin();
+    let v2 = (v2_x, v2_y);
 
-/// Maps sub-triangle vertices to the face's 2D coordinate system
-pub fn map_subtriangle_to_face_2d(
-    sub_triangle_3d: [Vector3D; 3],    // [v_mid, corner, center]
-    face_vertices_3d: Vec<Vector3D>,   // The original face's 3 vertices
-    face_vertices_2d: [(f64, f64); 3], // The face's 2D positions
-) -> [(f64, f64); 3] {
-    let mut sub_tri_2d = [(0.0, 0.0); 3];
-
-    for i in 0..3 {
-        let point_3d = sub_triangle_3d[i];
-
-        // Compute spherical barycentric coordinates of this point
-        // with respect to the face triangle
-        let bary = barycentric_coordinates(
-            point_3d,
-            [
-                face_vertices_3d[0],
-                face_vertices_3d[1],
-                face_vertices_3d[2],
-            ],
-        )
-        .unwrap();
-
-        // Apply these barycentric coordinates in the face's 2D system
-        sub_tri_2d[i] = (
-            face_vertices_2d[0].0 * bary.0
-                + face_vertices_2d[1].0 * bary.1
-                + face_vertices_2d[2].0 * bary.2,
-            face_vertices_2d[0].1 * bary.0
-                + face_vertices_2d[1].1 * bary.1
-                + face_vertices_2d[2].1 * bary.2,
-        );
-    }
-
-    sub_tri_2d
+    [v1, v0, v2]
 }
 
 pub fn compute_spherical_barycentric(
@@ -192,27 +164,27 @@ pub fn compute_spherical_barycentric(
     v1: Vector3D,
     v2: Vector3D,
 ) -> (f64, f64, f64) {
-    let total_area = spherical_triangle_area(v0, v1, v2);
-    let area0 = spherical_triangle_area(point, v1, v2);
-    let area1 = spherical_triangle_area(v0, point, v2);
-    let area2 = spherical_triangle_area(v0, v1, point);
+    let total_area = spherical_triangle_area([v0, v1, v2]).unwrap();
+    let area0 = spherical_triangle_area([point, v1, v2]).unwrap();
+    let area1 = spherical_triangle_area([v0, point, v2]).unwrap();
+    let area2 = spherical_triangle_area([v0, v1, point]).unwrap();
 
     (area0 / total_area, area1 / total_area, area2 / total_area)
 }
 
-pub fn spherical_triangle_area(v0: Vector3D, v1: Vector3D, v2: Vector3D) -> f64 {
-    let a = spherical_geometry::stable_angle_between(v1, v2);
-    let b = spherical_geometry::stable_angle_between(v2, v0);
-    let c = spherical_geometry::stable_angle_between(v0, v1);
+// pub fn spherical_triangle_area(v0: Vector3D, v1: Vector3D, v2: Vector3D) -> f64 {
+//     let a = spherical_geometry::stable_angle_between(v1, v2);
+//     let b = spherical_geometry::stable_angle_between(v2, v0);
+//     let c = spherical_geometry::stable_angle_between(v0, v1);
 
-    let s = (a + b + c) / 2.0;
+//     let s = (a + b + c) / 2.0;
 
-    let tan_e_over_4 =
-        ((s / 2.0).tan() * ((s - a) / 2.0).tan() * ((s - b) / 2.0).tan() * ((s - c) / 2.0).tan())
-            .sqrt();
+//     let tan_e_over_4 =
+//         ((s / 2.0).tan() * ((s - a) / 2.0).tan() * ((s - b) / 2.0).tan() * ((s - c) / 2.0).tan())
+//             .sqrt();
 
-    4.0 * tan_e_over_4.atan()
-}
+//     4.0 * tan_e_over_4.atan()
+// }
 
 pub fn bary_to_cartesian(
     barycentric: Vector3D,

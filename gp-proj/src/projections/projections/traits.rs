@@ -13,10 +13,15 @@ use crate::{
 use geo::{Coord, Point};
 
 #[derive(Debug)]
-pub struct Forward {
+pub struct ForwardBary {
     pub coords: Vector3D,
     pub face: usize,
-    pub sub_triangle: u8,
+}
+
+#[derive(Debug)]
+pub struct ForwardCartesian {
+    pub coords: Coord,
+    pub face: usize,
 }
 
 #[derive(Debug)]
@@ -28,7 +33,7 @@ pub struct DistortionMetrics {
 }
 
 pub trait Projection {
-    fn geo_to_face(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<Forward>;
+    fn geo_to_face(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>) -> Vec<ForwardBary>;
     fn face_to_geo(&self, coords: Vec<Coord>) -> Point;
 
     fn geo_to_cartesian(
@@ -36,7 +41,7 @@ pub trait Projection {
         positions: Vec<Point>,
         polyhedron: Option<&Polyhedron>,
         layout: Option<&dyn Layout>,
-    ) -> Vec<Forward>;
+    ) -> Vec<ForwardCartesian>;
     fn cartesian_to_geo(&self, coords: Vec<Coord>) -> Point;
 
     fn compute_distortion(

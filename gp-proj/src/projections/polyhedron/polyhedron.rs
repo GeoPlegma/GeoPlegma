@@ -120,7 +120,7 @@ impl Polyhedron {
         if let Some(face) = self.face_vertices(face_id) {
             let mut arc_lengths: Vec<f64> = [].to_vec();
             for i in 0..face.len() {
-                if i == face.len() {
+                if i == face.len() - 1 {
                     arc_lengths.push(spherical_geometry::stable_angle_between(face[i], face[0]));
                 } else {
                     arc_lengths.push(spherical_geometry::stable_angle_between(
@@ -185,12 +185,12 @@ impl Polyhedron {
         shared_vertices == 2
     }
 
-    pub fn face_to_2d_system(&self, face_id: usize) -> [(f64, f64); 3]  {
-        let face_vertices = self.face_vertices(face_id).unwrap();
-        let ab= spherical_geometry::stable_angle_between(face_vertices[0], face_vertices[1]);
-        let bc= spherical_geometry::stable_angle_between(face_vertices[1], face_vertices[2]);
-        let ca= spherical_geometry::stable_angle_between(face_vertices[2], face_vertices[0]);
+    // pub fn face_to_2d_system(&self, face_id: usize) -> [(f64, f64); 3]  {
+    //     let face_vertices = self.face_vertices(face_id).unwrap();
+    //     let ab= spherical_geometry::stable_angle_between(face_vertices[0], face_vertices[1]);
+    //     let bc= spherical_geometry::stable_angle_between(face_vertices[1], face_vertices[2]);
+    //     let ca= spherical_geometry::stable_angle_between(face_vertices[2], face_vertices[0]);
 
-        triangle3d_to_2d(ab, bc, ca)
-    }
+    //     triangle3d_to_2d(ab, bc, ca)
+    // }
 }
