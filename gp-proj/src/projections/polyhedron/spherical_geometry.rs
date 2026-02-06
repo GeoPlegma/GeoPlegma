@@ -256,11 +256,11 @@ pub fn barycentric_coordinates(
     let v0v2 = v2 - v0;
     let v0p = point - v0;
 
-    let dot00 = v0v1.dot(v0v1);
-    let dot01 = v0v1.dot(v0v2);
-    let dot11 = v0v1.dot(v0v1);
+    let dot00 = v0v2.dot(v0v2);
+    let dot01 = v0v2.dot(v0v1);
     let dot02 = v0v2.dot(v0p);
-    let dot12 = v0v2.dot(v0v1);
+    let dot11 = v0v1.dot(v0v1);
+    let dot12 = v0v1.dot(v0p);
 
     let denom = dot00 * dot11 - dot01 * dot01;
     if denom.abs() < DEGENERATE_TRIANGLE_THRESHOLD {

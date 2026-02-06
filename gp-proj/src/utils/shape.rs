@@ -9,10 +9,7 @@
 
 use crate::{
     Vector3D,
-    projections::polyhedron::{
-        Polyhedron,
-        spherical_geometry::{self, barycentric_coordinates, spherical_triangle_area},
-    },
+    projections::polyhedron::{Polyhedron, spherical_geometry::{self, spherical_triangle_area}},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -158,6 +155,7 @@ pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64, is_upward: bool) -> [(f64, f6
     [v1, v0, v2]
 }
 
+// @TODO - needs to be added to spherical geometry, the other function there is not behaving correctly
 pub fn compute_spherical_barycentric(
     point: Vector3D,
     v0: Vector3D,
@@ -171,59 +169,3 @@ pub fn compute_spherical_barycentric(
 
     (area0 / total_area, area1 / total_area, area2 / total_area)
 }
-
-// pub fn spherical_triangle_area(v0: Vector3D, v1: Vector3D, v2: Vector3D) -> f64 {
-//     let a = spherical_geometry::stable_angle_between(v1, v2);
-//     let b = spherical_geometry::stable_angle_between(v2, v0);
-//     let c = spherical_geometry::stable_angle_between(v0, v1);
-
-//     let s = (a + b + c) / 2.0;
-
-//     let tan_e_over_4 =
-//         ((s / 2.0).tan() * ((s - a) / 2.0).tan() * ((s - b) / 2.0).tan() * ((s - c) / 2.0).tan())
-//             .sqrt();
-
-//     4.0 * tan_e_over_4.atan()
-// }
-
-pub fn bary_to_cartesian(
-    barycentric: Vector3D,
-    origin_vertex: usize, // 0, 1, or 2
-) -> (f64, f64) {
-    const FACE_2D_TEMPLATE: [(f64, f64); 3] = [
-        (0.0, 0.0),
-        (1.1071487177940906, 0.0),
-        (0.5535743588970453, 0.9585853315146595),
-    ];
-
-    let r_authalic = 1.0; // 6371007.181;
-
-    // First compute with default origin (vertex 0)
-    let u = barycentric.x;
-    let v = barycentric.y;
-    let w = 1.0 - u - v;
-
-    let x = (FACE_2D_TEMPLATE[0].0 * u + FACE_2D_TEMPLATE[1].0 * v + FACE_2D_TEMPLATE[2].0 * w)
-        * r_authalic;
-    let y = (FACE_2D_TEMPLATE[0].1 * u + FACE_2D_TEMPLATE[1].1 * v + FACE_2D_TEMPLATE[2].1 * w)
-        * r_authalic;
-
-    // Translate to new origin
-    let origin_offset = (
-        FACE_2D_TEMPLATE[origin_vertex].0 * r_authalic * 0.0,
-        FACE_2D_TEMPLATE[origin_vertex].1 * r_authalic * 0.0,
-    );
-
-    (x - origin_offset.0, y - origin_offset.1)
-}
-
-// face vertices [(1.0172219678978514, 0.0), (0.0, 0.0), (0.49405221144358774, 0.8891866757558156)]
-//  subtriangle vertices [(0.49791064281623476, 0.5922059885716121), (1.0172219678978514, 0.0), (0.5017690741888817, 0.29522530138740866)]
-
-// face vertices [(1.2566370614359172, 0.0), (0.0, 0.0), (0.7539822368615504, 1.0053096491487337)]
-//  subtriangle vertices [(0.9722147547976886, 0.17194811203986515), (1.2566370614359172, 0.0), (0.6877924481594601, 0.3438962240797299)]
-
-// face vertices [(1.0172219678978514, 0.0), (0.0, 0.0), (0.49405221144358746, 0.8891866757558157)]
-//  subtriangle vertices [(0.7594955210433665, 0.14761265069370458), (0.49405221144358746, 0.8891866757558157), (0.5017690741888816, 0.2952253013874087)]
-
-// [Forward { coords: COORD(0.8187121991892949 0.22255139041969554), face: 0, sub_triangle: 0 }, Forward { coords: COORD(1.1244248219039588 0.07992919136612857), face: 1, sub_triangle: 0 }, Forward { coords: COORD(0.6020272585050668 0.5857847703220402), face: 8, sub_triangle: 2 }]
