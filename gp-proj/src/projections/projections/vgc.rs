@@ -257,6 +257,12 @@ impl Projection for Vgc {
             (-1.1071487177940906, 0.0),                // v0
             (-0.5535743588970453, 0.9585853315146595), // v2
         ];
+
+        const FACE_2D_VERTICES_UP: [(f64, f64); 3] = [
+            (0.0, 0.0),                                 // v1 at origin
+            (-1.1071487177940906, 0.0),                 // v0
+            (-0.5535743588970453, -0.9585853315146595), // v2
+        ];
         // Need the coeficcients to convert from geodetic to authalic
         let coef_fourier_geod_to_auth =
             Self::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
@@ -354,69 +360,62 @@ impl Projection for Vgc {
                         + subtriangle_b_bary_face.2 * subtriangle_bary_v
                         + subtriangle_c_bary_face.2 * subtriangle_bary_w;
 
-                    let subtriangle_a_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_a_bary_face.0
-                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_a_bary_face.1
-                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_a_bary_face.2;
+                    let face_2d_vertices = if face % 2 == 0 {
+                        FACE_2D_VERTICES_DOWN
+                    } else {
+                        FACE_2D_VERTICES_UP
+                    };
 
-                    let subtriangle_a_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_a_bary_face.0
-                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_a_bary_face.1
-                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_a_bary_face.2;
+                    let subtriangle_a_x = face_2d_vertices[0].0 * subtriangle_a_bary_face.0
+                        + face_2d_vertices[1].0 * subtriangle_a_bary_face.1
+                        + face_2d_vertices[2].0 * subtriangle_a_bary_face.2;
 
-                    let subtriangle_b_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_b_bary_face.0
-                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_b_bary_face.1
-                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_b_bary_face.2;
+                    let subtriangle_a_y = face_2d_vertices[0].1 * subtriangle_a_bary_face.0
+                        + face_2d_vertices[1].1 * subtriangle_a_bary_face.1
+                        + face_2d_vertices[2].1 * subtriangle_a_bary_face.2;
 
-                    let subtriangle_b_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_b_bary_face.0
-                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_b_bary_face.1
-                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_b_bary_face.2;
+                    let subtriangle_b_x = face_2d_vertices[0].0 * subtriangle_b_bary_face.0
+                        + face_2d_vertices[1].0 * subtriangle_b_bary_face.1
+                        + face_2d_vertices[2].0 * subtriangle_b_bary_face.2;
 
-                    let subtriangle_c_x = FACE_2D_VERTICES_DOWN[0].0 * subtriangle_c_bary_face.0
-                        + FACE_2D_VERTICES_DOWN[1].0 * subtriangle_c_bary_face.1
-                        + FACE_2D_VERTICES_DOWN[2].0 * subtriangle_c_bary_face.2;
+                    let subtriangle_b_y = face_2d_vertices[0].1 * subtriangle_b_bary_face.0
+                        + face_2d_vertices[1].1 * subtriangle_b_bary_face.1
+                        + face_2d_vertices[2].1 * subtriangle_b_bary_face.2;
 
-                    let subtriangle_c_y = FACE_2D_VERTICES_DOWN[0].1 * subtriangle_c_bary_face.0
-                        + FACE_2D_VERTICES_DOWN[1].1 * subtriangle_c_bary_face.1
-                        + FACE_2D_VERTICES_DOWN[2].1 * subtriangle_c_bary_face.2;
+                    let subtriangle_c_x = face_2d_vertices[0].0 * subtriangle_c_bary_face.0
+                        + face_2d_vertices[1].0 * subtriangle_c_bary_face.1
+                        + face_2d_vertices[2].0 * subtriangle_c_bary_face.2;
+
+                    let subtriangle_c_y = face_2d_vertices[0].1 * subtriangle_c_bary_face.0
+                        + face_2d_vertices[1].1 * subtriangle_c_bary_face.1
+                        + face_2d_vertices[2].1 * subtriangle_c_bary_face.2;
                     println!("{:?}", (subtriangle_a_x, subtriangle_a_y));
                     println!("{:?}", (subtriangle_b_x, subtriangle_b_y));
                     println!("{:?}", (subtriangle_c_x, subtriangle_c_y));
 
-                    // // Interpolate to get 2D Cartesian coordinates
-                    // let p_x_ = (triangle_2d[0].0 * subtriangle_bary_u
-                    //     + triangle_2d[1].0 * subtriangle_bary_v
-                    //     + triangle_2d[2].0 * subtriangle_bary_w);
+                    // ==== Interpolation ====
+                    // Between A and C it gives point D
+                    let pd_x = subtriangle_c_x + (subtriangle_a_x - subtriangle_c_x) * uv;
+                    let pd_y = subtriangle_c_y + (subtriangle_a_y - subtriangle_c_y) * uv;
 
-                    // let p_y_ = (triangle_2d[0].1 * subtriangle_bary_u
-                    //     + triangle_2d[1].1 * subtriangle_bary_v
-                    //     + triangle_2d[2].1 * subtriangle_bary_w);
-
+                    // Between D and B it gives point P
+                    let p_x = subtriangle_b_x + (pd_x - subtriangle_b_x) * xy;
+                    let p_y = subtriangle_b_y + (pd_y - subtriangle_b_y) * xy;
+                    // ======================
                     // Interpolate to get 2D Cartesian coordinates
-                    let p_x = FACE_2D_VERTICES_DOWN[0].0 * p_bary_u
-                        + FACE_2D_VERTICES_DOWN[1].0 * p_bary_v
-                        + FACE_2D_VERTICES_DOWN[2].0 * p_bary_w;
+                    // let p_x = FACE_2D_VERTICES_DOWN[0].0 * p_bary_u
+                    //     + FACE_2D_VERTICES_DOWN[1].0 * p_bary_v
+                    //     + FACE_2D_VERTICES_DOWN[2].0 * p_bary_w;
 
-                    let p_y = FACE_2D_VERTICES_DOWN[0].1 * p_bary_u
-                        + FACE_2D_VERTICES_DOWN[1].1 * p_bary_v
-                        + FACE_2D_VERTICES_DOWN[2].1 * p_bary_w;
+                    // let p_y = FACE_2D_VERTICES_DOWN[0].1 * p_bary_u
+                    //     + FACE_2D_VERTICES_DOWN[1].1 * p_bary_v
+                    //     + FACE_2D_VERTICES_DOWN[2].1 * p_bary_w;
 
                     let offset_x = FACE_2D_VERTICES_DOWN[1].0;
                     let offset_y = FACE_2D_VERTICES_DOWN[1].1;
                     let x_final = p_x - offset_x;
                     let y_final = p_y - offset_y;
 
-                    println!("3D vectors:");
-                    println!(
-                        "  Bary Triangle A: {:?} Bary P: {:?}",
-                        subtriangle_a_bary_face, p_bary_u
-                    );
-                    println!(
-                        "  Bary Triangle B: {:?} Bary P: {:?}",
-                        subtriangle_b_bary_face, p_bary_v
-                    );
-                    println!(
-                        "  Bary Triangle C: {:?} Bary P: {:?}",
-                        subtriangle_c_bary_face, p_bary_w
-                    );
                     println!("  P: {:?}", face_vertices_3d);
                     println!(
                         "
