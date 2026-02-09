@@ -70,8 +70,9 @@ impl Projection for Vgc {
                     // Parameterization values of the slice and dice projection.
                     let [xy, uv] = slice_and_dice(ac, ab, bc, ap, bp);
 
-                    // Calculate barycentric coordinates within sub-triangle for P for a the subtriangle ABC
-                    // Deduction
+                    // Calculate barycentric coordinates within sub-triangle for P for the subtriangle ABC
+                    // Deduction using interpolation for the slice and dice, point D and then point P
+                    // Check the image here: https://raw.githubusercontent.com/GeoPlegma/GeoPlegma/refs/heads/master/gp-proj/src/assets/sub-triangles.png
                     // P = B + (D - B) * xy => P = B * (1 - xy) + D * xy
                     // So (1 - xy) and xy are the barycentric coordinates (the weights) of B and D respectively
                     // Being that D = C + (A - C) * uv => D = A * uv + C * (1 - uv) then if you replace D in the previous equation
@@ -286,6 +287,7 @@ impl Projection for Vgc {
         todo!()
     }
 
+    // @TODO - Needs to be reviewed
     // Calculate distortion and compare with Geocart values
     fn compute_distortion(&self, lat: f64, lon: f64, polyhedron: &Polyhedron) -> DistortionMetrics {
         let r_authalic = 6371007.181;
@@ -400,6 +402,7 @@ fn slice_and_dice(ac: f64, ab: f64, bc: f64, ap: f64, bp: f64) -> [f64; 2] {
     [xy, uv]
 }
 
+// @TODO - new tests need to be added.
 #[cfg(test)]
 mod tests {
     use geo::Point;
