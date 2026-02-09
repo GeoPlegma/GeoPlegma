@@ -42,10 +42,10 @@ It also provides helper routines for ellipsoidal latitude conversions and 3D coo
 This trait allows multiple projection strategies to coexist behind a common API.
 ---
 
-### 📦 Related Types
+### Related Types
 
 #### `ForwardBary`
-Represents the forward-projection result:
+Represents the forward-projection result for barycentric coordinates:
 
 ```rust
 pub struct ForwardBary {
@@ -54,7 +54,17 @@ pub struct ForwardBary {
 }
 ```
 
-### 📦 Methods
+#### `ForwardBary`
+Represents the forward-projection result for local-face 2D cartesian coordinates:
+
+```rust
+pub struct ForwardCartesian {
+    pub coords: Coord,
+    pub face: usize,
+}
+```
+
+### Methods
 #### `geo_to_face(...) -> Vec<ForwardBary>`
 **Description:**  
 Projects geographic coordinates (latitude/longitude) onto a specific face of a polyhedron.
@@ -208,7 +218,7 @@ This design separates **data storage** from **geometric operations** for perform
 
 ---
 
-## 🏗️ `new(vertices, faces, num_edges) -> Self`
+## `new(vertices, faces, num_edges) -> Self`
 
 **Description:**  
 Constructs a polyhedron while **precomputing**:
@@ -258,7 +268,7 @@ A fully constructed `Polyhedron` with precomputed fields.
 
 ---
 
-# 🧮 Geometry and Topology Operations
+# Geometry and Topology Operations
 ## `face_center(&self, face_id: usize) -> Vector3D`
 **Description:**  
 Returns the precomputed center of a face in **O(1)**.
@@ -381,10 +391,10 @@ This projection comes from this [article](https://www.tandfonline.com/doi/abs/10
         ![alt text](src/assets/sub-triangles.png)
         - Get spherichal angles for point B and C
         - Apply slice and dice formulas and gets the `uv` and `xy` parameterization.
-        - Interpolate for point D
-        - interpolate for point P
+        - If we want the barycentric coordinates we deduct them by using `uv` and `xy`
+        - If we want cartesian coordinates, we interpolate for point D and then the final point P
 
-3. Return array with 2D local coordinates (origin on the right most corner of the face) and face of the polyhedron.
+3. Return array with local coordinates (origin on the right most corner of the face) and face of the polyhedron.
 
 NOTE: The compute_distortion method will be used eventually so we can assess if the distortion parameters (The Tissot Indicatrix parameters) match the ones with the author values.
 
