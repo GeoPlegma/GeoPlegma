@@ -45,12 +45,22 @@ This trait allows multiple projection strategies to coexist behind a common API.
 ### Related Types
 
 #### `ForwardBary`
-Represents the forward-projection result:
+Represents the forward-projection result for barycentric coordinates:
 
 ```rust
 pub struct ForwardBary {
     pub coords: Vector3D,
     pub face: usize
+}
+```
+
+#### `ForwardBary`
+Represents the forward-projection result for local-face 2D cartesian coordinates:
+
+```rust
+pub struct ForwardCartesian {
+    pub coords: Coord,
+    pub face: usize,
 }
 ```
 
