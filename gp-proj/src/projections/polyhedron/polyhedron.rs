@@ -119,7 +119,7 @@ impl Polyhedron {
         if let Some(face) = self.face_vertices(face_id) {
             let mut arc_lengths: Vec<f64> = [].to_vec();
             for i in 0..face.len() {
-                if i == face.len() {
+                if i == face.len() - 1 {
                     arc_lengths.push(spherical_geometry::stable_angle_between(face[i], face[0]));
                 } else {
                     arc_lengths.push(spherical_geometry::stable_angle_between(
@@ -137,11 +137,11 @@ impl Polyhedron {
     pub fn arc_lengths(&self, triangle: [Vector3D; 3], point: Vector3D) -> ArcLengths {
         let [mid, corner, center] = triangle;
         ArcLengths {
-            ab: spherical_geometry::stable_angle_between(corner, mid),
-            bc: spherical_geometry::stable_angle_between(mid, center),
-            ac: spherical_geometry::stable_angle_between(corner, center),
-            ap: spherical_geometry::stable_angle_between(corner, point),
-            bp: spherical_geometry::stable_angle_between(mid, point),
+            ab: spherical_geometry::stable_angle_between(mid, corner),
+            bc: spherical_geometry::stable_angle_between(corner, center),
+            ac: spherical_geometry::stable_angle_between(mid, center),
+            ap: spherical_geometry::stable_angle_between(mid, point),
+            bp: spherical_geometry::stable_angle_between(corner, point),
             cp: spherical_geometry::stable_angle_between(center, point),
         }
     }

@@ -74,35 +74,34 @@ fn create_vertices() -> Vec<Vector3D> {
         z: -1.0,
     });
 
-
     vertices
 }
 
 /// Create the 20 triangular faces of the icosahedron
 fn create_faces() -> Vec<Face> {
-    // A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, 
-    // G => 6, H => 7, I => 8, J => 9, K => 10, L => 11 
+    // A => 0, B => 1, C => 2, D => 3, E => 4, F => 5,
+    // G => 6, H => 7, I => 8, J => 9, K => 10, L => 11
     vec![
-        Face::Triangle([1, 0, 2]), // B, A, C
-        Face::Triangle([1, 6, 2]), // B, G, C
-        Face::Triangle([2, 0, 3]), // C, A, D
-        Face::Triangle([2, 7, 3]), // C, H, D
-        Face::Triangle([3, 0, 4]), // D, A, E
-        Face::Triangle([3, 8, 4]), // D, I, E
-        Face::Triangle([4, 0, 5]), // E, A, F
-        Face::Triangle([4, 9, 5]), // E, J, F
-        Face::Triangle([5, 0, 1]), // F, A, B
-        Face::Triangle([5, 10, 1]), // F, K, B
-        Face::Triangle([6, 2, 7]), // G, C, H
-        Face::Triangle([6, 11, 7]), // G, L, H
-        Face::Triangle([7, 3, 8]), // H, D, I
-        Face::Triangle([7, 11, 8]), // H, L, I
-        Face::Triangle([8, 4, 9]), // I, E, J
-        Face::Triangle([8, 11, 9]), // I, L, J
-        Face::Triangle([9, 5, 10]), // J, F, K
-        Face::Triangle([9, 11, 10]), // J, L, K
-        Face::Triangle([10, 1, 6]), // K, B, G
-        Face::Triangle([10, 11, 6]), // K, L, G
+        Face::Triangle([2, 1, 0]),   // C, B, A
+        Face::Triangle([2, 1, 6]),   // C, B, G
+        Face::Triangle([3, 2, 0]),   // D, C, A
+        Face::Triangle([3, 2, 7]),   // D, C, H
+        Face::Triangle([4, 3, 0]),   // E, D, A
+        Face::Triangle([4, 3, 8]),   // E, D, I
+        Face::Triangle([5, 4, 0]),   // F, E, A
+        Face::Triangle([5, 4, 9]),   // F, E, J
+        Face::Triangle([1, 5, 0]),   // B, F, A
+        Face::Triangle([1, 5, 10]),  // B, F, K
+        Face::Triangle([7, 6, 2]),   // H, G, C
+        Face::Triangle([7, 6, 11]),  // H, G, L
+        Face::Triangle([8, 7, 3]),   // I, H, D
+        Face::Triangle([8, 7, 11]),  // I, H, L
+        Face::Triangle([9, 8, 4]),   // J, I, E
+        Face::Triangle([9, 8, 11]),  // J, I, L
+        Face::Triangle([10, 9, 5]),  // K, J, F
+        Face::Triangle([10, 9, 11]), // K, J, L
+        Face::Triangle([6, 10, 1]),  // G, K, B
+        Face::Triangle([6, 10, 11]), // G, K, L
     ]
 }
 

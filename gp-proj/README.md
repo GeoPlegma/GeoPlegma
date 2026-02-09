@@ -44,19 +44,18 @@ This trait allows multiple projection strategies to coexist behind a common API.
 
 ### 📦 Related Types
 
-#### `Forward`
+#### `ForwardBary`
 Represents the forward-projection result:
 
 ```rust
-pub struct Forward {
-    pub coords: Coord,
-    pub face: usize,
-    pub sub_triangle: u8,
+pub struct ForwardBary {
+    pub coords: Vector3D,
+    pub face: usize
 }
 ```
 
 ### 📦 Methods
-#### `geo_to_face(...) -> Vec<Forward>`
+#### `geo_to_face(...) -> Vec<ForwardBary>`
 **Description:**  
 Projects geographic coordinates (latitude/longitude) onto a specific face of a polyhedron.
 
@@ -65,7 +64,7 @@ Projects geographic coordinates (latitude/longitude) onto a specific face of a p
 - `polyhedron`: Polyhedron definition to be used.
 
 **Returns:**  
-A vector of `Forward` structures, each containing the projected coordinates, face index, and the sub-triangle identifier.
+A vector of `ForwardBary` structures, each containing the barycentric coordinates and face index.
 
 ---
 
@@ -81,7 +80,7 @@ A single `geo::Point` representing latitude and longitude.
 
 ---
 
-#### `geo_to_cartesian(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>, layout: &dyn Layout) -> Vec<Forward>`
+#### `geo_to_cartesian(&self, positions: Vec<Point>, polyhedron: Option<&Polyhedron>, layout: &dyn Layout) -> Vec<ForwardCartesian>`
 **Description:**  
 Projects geographic coordinates into a final cartesian output using a 2D layout derived from the polyhedron.
 
@@ -91,7 +90,7 @@ Projects geographic coordinates into a final cartesian output using a 2D layout 
 - `layout`: A layout strategy implementing the `Layout` trait, used to arrange faces in 2D space.
 
 **Returns:**  
-A list of `Forward` items corresponding to cartesian output coordinates.
+A list of `Forward` items corresponding to cartesian output coordinates and its face.
 
 ---
 
@@ -375,15 +374,17 @@ This projection comes from this [article](https://www.tandfonline.com/doi/abs/10
 2. Loop through every position.
     a. Convert to authalic latitudes.
     b. Loops through all faces in the polyhedron
-        * Finds the face where the point lies
-        * Splits the face into equilateral triangles from the center, finds in which the triangle where the point is. Then splits that triangle into two rectangular triangles and finds in which rectangular triangle the point lies 
-        * Calculate arc lengths for the triangle and maps into 2D in a local 2D system. A => (0,0) B => (BA,0) C => (BC*cos(angle_B), BC*sin(angle_B))
+
+        - Finds the face where the point lies
+        - Splits the face into equilateral triangles from the center, finds in which the triangle where the point is. Then splits that triangle into two rectangular triangles and finds in which rectangular triangle the point lies 
+        - Calculate arc lengths for the triangle and maps into 2D in a local 2D system. A => (0,0) B => (BA,0) C => (BC*cos(angle_B), BC*sin(angle_B))
         ![alt text](src/assets/sub-triangles.png)
-        * Get spherichal angles for point B and C
-        * Apply slice and dice formulas and gets the `uv` and `xy` parameterization.
-        * Interpolate for point D
-        * interpolate for point P
-3. Return array with 2D local coordinates (origin on the sub-triangle), face of the polyhedron, and the sub-triangle.
+        - Get spherichal angles for point B and C
+        - Apply slice and dice formulas and gets the `uv` and `xy` parameterization.
+        - Interpolate for point D
+        - interpolate for point P
+
+3. Return array with 2D local coordinates (origin on the right most corner of the face) and face of the polyhedron.
 
 NOTE: The compute_distortion method will be used eventually so we can assess if the distortion parameters (The Tissot Indicatrix parameters) match the ones with the author values.
 

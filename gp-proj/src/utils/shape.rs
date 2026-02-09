@@ -9,7 +9,7 @@
 
 use crate::{
     Vector3D,
-    projections::polyhedron::{Polyhedron, spherical_geometry},
+    projections::polyhedron::{Polyhedron, spherical_geometry::{self, spherical_triangle_area}},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -96,7 +96,7 @@ pub fn triangle(
     let v0 = macro_tri[1];
     let v1 = macro_tri[2];
 
-    let mid = Vector3D::mid(c, v0);
+    let mid = Vector3D::mid(v0, v1);
 
     // Left sub-triangle = (C, mid, V0)
     let left = [c, mid, v0];
@@ -128,20 +128,44 @@ pub fn triangle(
 }
 
 // Map spherical triangle into a planar triangle.
-pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64) -> [(f64, f64); 3] {
-    // Place vertex B (triangle_3d[1] / corner) at origin
-    let b_2d = (0.0, 0.0);
+pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64, is_upward: bool) -> [(f64, f64); 3] {
+    let a01 = ab; // edge 0-1
+    let a12 = bc; // edge 1-2
+    let a20 = ac; // edge 2-0
+    // Build triangle with v1 at origin
+    // v1 at origin
+    let v1 = (0.0, 0.0);
 
-    // Place vertex A (triangle_3d[0] / v_mid) on the positive x-axis at distance ab
-    let a_2d = (ab, 0.0);
+    // v0 on negative x-axis at distance a01
+    let v0 = (-a01, 0.0);
 
-    // Use law of cosines to find angle at B
-    // cos(angle_B) = (ab² + bc² - ac²) / (2·ab·bc)
-    let cos_angle_b = (bc.powi(2) + ac.powi(2) - ac.powi(2)) / (2.0 * bc * ac);
-    let angle_b = cos_angle_b.clamp(-1.0, 1.0).acos();
+    // v2 positioned using law of cosines
+    // We know: a01 (v0 to v1), a12 (v1 to v2), a20 (v2 to v0)
+    // Find angle at v1
+    let cos_angle_v1 = (a01.powi(2) + a12.powi(2) - a20.powi(2)) / (2.0 * a01 * a12);
+    let angle_v1 = cos_angle_v1.clamp(-1.0, 1.0).acos();
 
-    // Place vertex C (triangle_3d[2] / vector_center) using angle and distance bc
-    let c_2d = (bc * angle_b.cos(), bc * angle_b.sin());
+    let y_sign = if is_upward { 1.0 } else { -1.0 };
 
-    [a_2d, b_2d, c_2d]
+    // v2 at distance a12 from v1, at angle from negative x-axis
+    let v2_x = -a12 * angle_v1.cos();
+    let v2_y = y_sign * a12 * angle_v1.sin();
+    let v2 = (v2_x, v2_y);
+
+    [v1, v0, v2]
+}
+
+// @TODO - needs to be added to spherical geometry, the other function there is not behaving correctly
+pub fn compute_spherical_barycentric(
+    point: Vector3D,
+    v0: Vector3D,
+    v1: Vector3D,
+    v2: Vector3D,
+) -> (f64, f64, f64) {
+    let total_area = spherical_triangle_area([v0, v1, v2]).unwrap();
+    let area0 = spherical_triangle_area([point, v1, v2]).unwrap();
+    let area1 = spherical_triangle_area([v0, point, v2]).unwrap();
+    let area2 = spherical_triangle_area([v0, v1, point]).unwrap();
+
+    (area0 / total_area, area1 / total_area, area2 / total_area)
 }
