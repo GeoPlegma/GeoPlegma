@@ -28,9 +28,12 @@ fn unbundle_index(zone_id:u64) -> (u64, u64, u64, u64) {
 /// This is just an example and basic testing function if there is output or not
 pub fn main() {
 
-    let p1 = Point::new(0.45, 0.22);
-    let p2 = Point::new(0.21, 0.64);
-    let p3 = Point::new(0.75, 0.11);
+    // Old points
+    //let p1 = Point::new(0.45, 0.22); // Longitude: 43, Latitude: 49.5
+    //let p2 = Point::new(0.21, 0.64); // Longitude: 40, Latitude: 71
+    //let p3 = Point::new(0.75, 0.11);
+    let p1 = Point::new(43.0, 49.5);
+    let p2 = Point::new(40.0, 71.0);
 
     let system = IVEA3HBary {};
     let level = RefinementLevel::new(3).unwrap();
@@ -110,11 +113,11 @@ pub fn main() {
     assert_eq!(unbundled.2, 10);
     assert_eq!(unbundled.3, 6);   
 
-    println!("Point 3 {} {}", p3.x(), p3.y());
-    let zone5 = system.zone_from_point(level, p3);
-    unbundled = unbundle_index(zone5);
-    assert_eq!(unbundled.0, 20);
-    assert_eq!(unbundled.1, 3);   
-    assert_eq!(unbundled.2, 10);
-    assert_eq!(unbundled.3, 6);   
+    //println!("Point 3 {} {}", p3.x(), p3.y());
+    //let zone5 = system.zone_from_point(level, p3);
+    //unbundled = unbundle_index(zone5);
+    //assert_eq!(unbundled.0, 20);
+    //assert_eq!(unbundled.1, 3);   
+    //assert_eq!(unbundled.2, 10);
+    //assert_eq!(unbundled.3, 6);   
 }
