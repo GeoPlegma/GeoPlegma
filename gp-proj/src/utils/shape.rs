@@ -129,30 +129,68 @@ pub fn triangle(
 
 // Map spherical triangle into a planar triangle.
 pub fn triangle3d_to_2d(ab: f64, bc: f64, ac: f64, is_upward: bool) -> [(f64, f64); 3] {
-    let a01 = ab; // edge 0-1
-    let a12 = bc; // edge 1-2
-    let a20 = ac; // edge 2-0
-    // Build triangle with v1 at origin
-    // v1 at origin
+    // let a01 = ab; // edge 0-1
+    // let a12 = bc; // edge 1-2
+    // let a20 = ac; // edge 2-0
+    // // Build triangle with v1 at origin
+    // // v1 at origin
+    // let v1 = (0.0, 0.0);
+
+    // // v0 on negative x-axis at distance a01
+    // let v0 = (-a01, 0.0);
+
+    // // v2 positioned using law of cosines
+    // // We know: a01 (v0 to v1), a12 (v1 to v2), a20 (v2 to v0)
+    // // Find angle at v1
+    // let cos_angle_v1 = (a01.powi(2) + a12.powi(2) - a20.powi(2)) / (2.0 * a01 * a12);
+    // let angle_v1 = cos_angle_v1.clamp(-1.0, 1.0).acos();
+
+    // let y_sign = if is_upward { 1.0 } else { -1.0 };
+
+    // // v2 at distance a12 from v1, at angle from negative x-axis
+    // let v2_x = -a12 * angle_v1.cos();
+    // let v2_y = y_sign * a12 * angle_v1.sin();
+    // let v2 = (v2_x, v2_y);
+
+    // [v1, v0, v2]
+     let a01 = ab;
+    let a12 = bc;
+    let a20 = ac;
+    
+    // Build triangle with edge lengths (temporarily)
     let v1 = (0.0, 0.0);
-
-    // v0 on negative x-axis at distance a01
     let v0 = (-a01, 0.0);
-
-    // v2 positioned using law of cosines
-    // We know: a01 (v0 to v1), a12 (v1 to v2), a20 (v2 to v0)
-    // Find angle at v1
+    
     let cos_angle_v1 = (a01.powi(2) + a12.powi(2) - a20.powi(2)) / (2.0 * a01 * a12);
     let angle_v1 = cos_angle_v1.clamp(-1.0, 1.0).acos();
-
+    
     let y_sign = if is_upward { 1.0 } else { -1.0 };
-
-    // v2 at distance a12 from v1, at angle from negative x-axis
+    
     let v2_x = -a12 * angle_v1.cos();
     let v2_y = y_sign * a12 * angle_v1.sin();
-    let v2 = (v2_x, v2_y);
-
-    [v1, v0, v2]
+    
+    // Calculate planar area of this triangle
+    let planar_area = 0.5 * (v0.0 * v2_y - v2_x * v0.1).abs();
+    
+    // Calculate spherical area using L'Huilier's theorem
+    let s = (a01 + a12 + a20) / 2.0;
+    let tan_e_over_4 = (
+        (s / 2.0).tan() *
+        ((s - a01) / 2.0).tan() *
+        ((s - a12) / 2.0).tan() *
+        ((s - a20) / 2.0).tan()
+    ).sqrt();
+    let spherical_area = 4.0 * tan_e_over_4.atan();
+    
+    // Scale factor to make planar area equal spherical area
+    let scale = (spherical_area / planar_area).sqrt();
+    
+    // Scale all vertices
+    let v0_scaled = (v0.0 * scale, v0.1 * scale);
+    let v1_scaled = (v1.0 * scale, v1.1 * scale);
+    let v2_scaled = (v2_x * scale, v2_y * scale);
+    
+    [v1_scaled, v0_scaled, v2_scaled]
 }
 
 // @TODO - needs to be added to spherical geometry, the other function there is not behaving correctly

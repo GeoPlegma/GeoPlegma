@@ -52,7 +52,38 @@ pub fn main() -> () {
             c.coords
         );
     }
-
+    // Test a small region
+    let lat0 = 38.0;
+    let lon0 = -10.0;
+    let delta = 1.0; // 1 degree square
+    
+    // Four corners
+    let p1 = Point::new(lon0, lat0);
+    let p2 = Point::new(lon0 + delta, lat0);
+    let p3 = Point::new(lon0 + delta, lat0 + delta);
+    let p4 = Point::new(lon0, lat0 + delta);
+     let proj = projection.geo_to_cartesian(vec![p1, p2, p3, p4], Some(&icosahedron), None);
+    
+    // Spherical area (approximate for small region)
+    let lat_mid = (lat0 + delta / 2.0).to_radians();
+    let spherical_area = lat_mid.cos() * delta.to_radians() * delta.to_radians() * 6371007.181_f64.powi(2);
+    
+    // Projected area using shoelace formula
+    let x1 = proj[0].coords.x;
+    let y1 = proj[0].coords.y;
+    let x2 = proj[1].coords.x;
+    let y2 = proj[1].coords.y;
+    let x3 = proj[2].coords.x;
+    let y3 = proj[2].coords.y;
+    let x4 = proj[3].coords.x;
+    let y4 = proj[3].coords.y;
+    
+    let projected_area = 0.5 * ((x1*y2 - x2*y1) + (x2*y3 - x3*y2) + (x3*y4 - x4*y3) + (x4*y1 - x1*y4)).abs();
+    
+    let ratio = projected_area / spherical_area;
+     println!("Spherical area: {}", spherical_area);
+    println!("Projected area: {}", projected_area);
+    println!("Ratio: {}", ratio);
     // println!("{:?}", coords);
 
     // let distortion = projection.compute_distortion(38.68499, -9.49420, &icosahedron);

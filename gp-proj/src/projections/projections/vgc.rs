@@ -235,7 +235,8 @@ impl Projection for Vgc {
                         face_edge_lengths[2],
                         is_upward,
                     );
-
+println!("Face {} edge lengths: {:?}", face, face_edge_lengths);
+println!("Face 2D vertices: {:?}", face_2d_vertices);
                     let subtriangle_a_x = face_2d_vertices[0].0 * subtriangle_a_bary_face.0
                         + face_2d_vertices[1].0 * subtriangle_a_bary_face.1
                         + face_2d_vertices[2].0 * subtriangle_a_bary_face.2;
@@ -271,7 +272,7 @@ impl Projection for Vgc {
                     // ======================
 
                     out.push(ForwardCartesian {
-                        coords: Coord { x: p_x, y: p_y },
+                        coords: Coord { x: p_x * 6371007.181, y: p_y *6371007.181 },
                         face: index,
                     });
 
@@ -309,7 +310,7 @@ impl Projection for Vgc {
         // Perturb longitude (east-west)
         let east_xy =
             &self.geo_to_cartesian(vec![Point::new(lon + epsilon, lat)], Some(polyhedron), None)[0];
-
+        println!("{:?}", center_xy);
         // Handle face discontinuities
         if center_xy.face != north_xy.face || center_xy.face != east_xy.face {
             // Point is near face boundary, derivatives unreliable
@@ -322,22 +323,22 @@ impl Projection for Vgc {
         }
 
         // Derivatives in radians per radian
-        let dx_dphi_rad = (north_xy.coords.x - center_xy.coords.x) / epsilon.to_radians();
-        let dy_dphi_rad = (north_xy.coords.y - center_xy.coords.y) / epsilon.to_radians();
+        let dx_dphi = (north_xy.coords.x - center_xy.coords.x) / epsilon.to_radians();
+        let dy_dphi = (north_xy.coords.y - center_xy.coords.y) / epsilon.to_radians();
 
-        let dx_dlambda_rad = (east_xy.coords.x - center_xy.coords.x) / epsilon.to_radians();
-        let dy_dlambda_rad = (east_xy.coords.y - center_xy.coords.y) / epsilon.to_radians();
+        let dx_dlambda = (east_xy.coords.x - center_xy.coords.x) / epsilon.to_radians();
+        let dy_dlambda = (east_xy.coords.y - center_xy.coords.y) / epsilon.to_radians();
 
-        // Convert to meters
-        let dx_dphi = dx_dphi_rad * r_authalic;
-        let dy_dphi = dy_dphi_rad * r_authalic;
-        let dx_dlambda = dx_dlambda_rad * r_authalic;
-        let dy_dlambda = dy_dlambda_rad * r_authalic;
+        // // Convert to meters
+        // let dx_dphi = dx_dphi_rad * r_authalic;
+        // let dy_dphi = dy_dphi_rad * r_authalic;
+        // let dx_dlambda = dx_dlambda_rad * r_authalic;
+        // let dy_dlambda = dy_dlambda_rad * r_authalic;
 
         // WGS84 ellipsoid parameters for GEODETIC coordinates
         let a = 6378137.0;
         let e2 = 0.00669437999014;
-        let lat_rad = lat_geodetic.to_radians();
+        let lat_rad = lat.to_radians();
 
         let sin_lat = lat_rad.sin();
         let cos_lat = lat_rad.cos();
@@ -351,12 +352,16 @@ impl Projection for Vgc {
         let k = (dx_dlambda.powi(2) + dy_dlambda.powi(2)).sqrt() / (n * cos_lat);
 
         // Angular deformation
-        let a_tissot = ((h.powi(2) + k.powi(2)) / 2.0).sqrt();
-        let b_tissot = (h * k).sqrt();
 
-        let sin_half_omega = (a_tissot - b_tissot) / (a_tissot + b_tissot);
-        let omega = 2.0 * sin_half_omega.asin();
-
+    // Correct Tissot formulas
+    let a_tissot = ((h.powi(2) + k.powi(2)) / 2.0 + 
+                    ((dx_dphi * dy_dlambda - dy_dphi * dx_dlambda) / (m * n * cos_lat)).powi(2).sqrt()).sqrt();
+    
+    let b_tissot = ((h.powi(2) + k.powi(2)) / 2.0 - 
+                    ((dx_dphi * dy_dlambda - dy_dphi * dx_dlambda) / (m * n * cos_lat)).powi(2).sqrt()).sqrt();
+    
+    // Maximum angular deformation
+    let omega = 2.0 * ((a_tissot - b_tissot) / (a_tissot + b_tissot)).asin();
         DistortionMetrics {
             h,
             k,
