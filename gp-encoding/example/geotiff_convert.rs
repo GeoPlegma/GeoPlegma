@@ -19,6 +19,10 @@ fn main() {
         eprintln!("usage: cargo run -p gp-encoding --example geotiff_convert -- <input.tif>");
         std::process::exit(2);
     });
+    let refinement = std::env::args()
+        .nth(2)
+        .and_then(|s| s.parse::<u8>().ok())
+        .unwrap_or(5);
 
     let input_path = PathBuf::from(input);
     let output_store = PathBuf::from("./tmp/gp_encoding_geotiff_convert");
@@ -36,14 +40,14 @@ fn main() {
             fill_value: Some("0.0".to_string()),
         }],
         chunk_size: 1024,
-        levels: vec![5],
+        levels: vec![u32::from(refinement)],
     };
 
     let backend = convert_geotiff_file_to_backend::<ZarrBackend, _>(
         &input_path,
         &output_store,
         &H3Impl::default(),
-        RefinementLevel::new_const(5),
+        RefinementLevel::from(refinement),
         0,
         metadata,
     )
@@ -52,5 +56,6 @@ fn main() {
     println!("Conversion successful");
     println!("  Input:  {}", input_path.display());
     println!("  Output: {}", output_store.display());
+    println!("  Refinement: {refinement}");
     println!("  Levels: {:?}", backend.levels());
 }
