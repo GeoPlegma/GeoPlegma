@@ -4,6 +4,7 @@ use std::path::Path;
 use api::models::common::RefinementLevel;
 use gdal::{Dataset, GeoTransformEx};
 use geo_types::Point;
+use rayon::prelude::*;
 
 use crate::error::EncodingError;
 use crate::grid::Linearizer;
@@ -35,8 +36,7 @@ where
         ))
     })?;
 
-    let dataset = Dataset::open(geotiff_path)
-        .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+    let dataset = Dataset::open(geotiff_path).map_err(|e| EncodingError::Gdal(e.to_string()))?;
 
     if sample >= dataset.raster_count() {
         return Err(EncodingError::Gdal(format!(
@@ -59,7 +59,7 @@ where
 
     let gt = dataset
         .geo_transform()
-        .map_err(|e| EncodingError::Gdal(format!("missing/invalid geotransform: {e}")) )?;
+        .map_err(|e| EncodingError::Gdal(format!("missing/invalid geotransform: {e}")))?;
 
     let corners = [
         gt.apply(0.0, 0.0),
@@ -97,9 +97,14 @@ where
 
     let mut linear_values: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
 
-    for row in 0..height {
-        for col in 0..width {
-            let idx = row * width + col;
+    let total_pixels = height * width;
+
+    let computed_entries: Result<Vec<_>, EncodingError> = (0..total_pixels)
+        .into_par_iter()
+        .map(|idx| {
+            let row = idx / width;
+            let col = idx % width;
+
             let v = *data
                 .get(idx)
                 .ok_or_else(|| EncodingError::Gdal("raster buffer index out of bounds".into()))?;
@@ -111,14 +116,19 @@ where
                 .zone_from_point(refinement_level, Point::new(x, y), None)
                 .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
-            let zone = zones.zones.first().ok_or_else(|| {
-                EncodingError::Grid("zone_from_point returned no zones".into())
-            })?;
+            let zone = zones
+                .zones
+                .first()
+                .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
 
             let bytes = f64_to_bytes(v, output_type)?;
-            linear_values.insert(grid.zone_to_linear(&zone.id), bytes);
-        }
-    }
+            let key = grid.zone_to_linear(&zone.id);
+
+            Ok((key, bytes))
+        })
+        .collect();
+
+    linear_values.extend(computed_entries?);
 
     let num_cells = grid.num_cells_at_level(refinement_level);
     let chunk_size = metadata.chunk_size;
@@ -183,7 +193,9 @@ where
     T: TryFrom<i64>,
 {
     if value.fract() != 0.0 {
-        return Err(format!("non-integer GeoTIFF value {value} for integer output type"));
+        return Err(format!(
+            "non-integer GeoTIFF value {value} for integer output type"
+        ));
     }
 
     let as_i64 = value as i64;
