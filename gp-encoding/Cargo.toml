@@ -8,6 +8,8 @@ rust-version = "1.88"
 
 [dependencies]
 api = { path = "../api" }
+gdal = "0.19"
+geo = "0.30"
 geo-types = "0.7"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -18,3 +20,7 @@ zarrs_filesystem = "0.3"
 [[example]]
 name = "zarr_roundtrip"
 path = "example/zarr_roundtrip.rs"
+
+[[example]]
+name = "geotiff_convert"
+path = "example/geotiff_convert.rs"

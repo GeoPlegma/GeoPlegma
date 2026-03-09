@@ -5,6 +5,12 @@ pub enum EncodingError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("GDAL error: {0}")]
+    Gdal(String),
+
+    #[error("GeoTIFF error: {0}")]
+    GeoTiff(String),
+
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
