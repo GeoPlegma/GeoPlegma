@@ -60,7 +60,7 @@ impl DggrsApi for H3Impl {
             let _ = tiler.add(b.to_polygon());
             h3o_zones = tiler.into_coverage().collect::<Vec<_>>();
         } else {
-            if refinement_level > self.default_refinement_level()? {
+            if refinement_level > self.max_refinement_level()? {
                 return Err(DggrsError::RefinementLevelTooHigh(refinement_level));
             }
             h3o_zones = CellIndex::base_cells()
