@@ -19,6 +19,23 @@ fn test_adapter_zone_count_equivalence<T: DggrsApi>(adapter: &T) {
 }
 
 #[test]
+fn test_igeo7_ivea7h_zone_count_equivalence() {
+    let igeo7 = Igeo7Impl::default();
+    let ivea7h = DggalImpl::new(api::models::common::DggrsUid::IVEA7H);
+
+    let max_level = igeo7.max_refinement_level().unwrap().get();
+
+    for level_int in 0..=max_level {
+        let level = RefinementLevel::new(level_int).unwrap();
+
+        let igeo7_zone_count = igeo7.zone_count(level).unwrap();
+        let ivea7h_zone_count = ivea7h.zone_count(level).unwrap();
+
+        assert_eq!(igeo7_zone_count, ivea7h_zone_count);
+    }
+}
+
+#[test]
 fn test_isea3h_dggrid_dggal_zone_count_equivalence() {
     let dggal = DggalImpl::new(api::models::common::DggrsUid::ISEA3HDGGAL);
     let dggrid = Isea3hImpl::default();
