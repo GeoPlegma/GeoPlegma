@@ -37,7 +37,8 @@ pub fn new() -> Polyhedron {
 fn create_vertices() -> Vec<Vector3D> {
     let mut vertices = Vec::with_capacity(12);
     let phi = PolyhedronConstants::golden_ratio();
-    let z = 1.0 / (1.0 + phi.powi(2)).sqrt();
+    // let z = 1.0 / (1.0 + phi.powi(2)).sqrt();
+    let z = 1.0 / 5.0_f64.sqrt();
     let r = (1.0 - z.powi(2)).sqrt();
 
     // North Pole (Vertex 0)
@@ -73,7 +74,7 @@ fn create_vertices() -> Vec<Vector3D> {
         y: 0.0,
         z: -1.0,
     });
-
+    println!("{:?}", vertices);
     vertices
 }
 
