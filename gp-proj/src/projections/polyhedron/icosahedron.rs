@@ -74,7 +74,7 @@ fn create_vertices() -> Vec<Vector3D> {
         y: 0.0,
         z: -1.0,
     });
-    println!("{:?}", vertices);
+
     vertices
 }
 
