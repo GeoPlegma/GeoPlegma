@@ -56,11 +56,11 @@ pub fn main() -> () {
 
     for (i, c) in coords.iter().enumerate() {
         println!("----------------------------------");
-        println!("Longitude: {}, Latitude: {}", points[i].x(), points[i].y());
-        println!("Face: {}", c.face);
+        // println!("Longitude: {}, Latitude: {}", points[i].x(), points[i].y());
+        // println!("Face: {}", c.face);
         println!(
-            "Barycentric ({:?},{:?},{:?})",
-            c.coords.x, c.coords.y, c.coords.z
+            "{} Barycentric ({:?},{:?},{:?})",
+            i+1, c.coords.x, c.coords.y, c.coords.z
         );
         //  println!(
         //     "Cartesian coordinates: ({:?},{:?})",
