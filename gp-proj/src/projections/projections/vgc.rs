@@ -203,7 +203,6 @@ impl Projection for Vgc {
                     let p_y_local = subtriangle_2d[0].1 + (pd_y - subtriangle_2d[0].1) * xy;
 
 
-                    // PORQUE RAIOS ESTAMOS A FAZER O MAPPING PARA A FACE COM PONTOS 3D
                     // STEP 4: Find where sub-triangle vertices A, B, C are in face 2D
                     // We need to know which sub-triangle this is to map vertices correctly
                     let (a_face_2d, b_face_2d, c_face_2d) = map_subtriangle_vertices_to_face_2d(
