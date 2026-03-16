@@ -7,8 +7,8 @@
 
 use std::path::PathBuf;
 
-use api::adapters::h3o::h3::H3Impl;
-use api::models::common::{DggrsUid, RefinementLevel};
+use geoplegma::adapters::h3o::h3::H3Impl;
+use geoplegma::models::common::{DggrsUid, RefinementLevel};
 use gp_encoding::{
     AttributeSchema, DataType, DatasetMetadata, GridExtent, StorageBackend, ZarrBackend,
     convert_geotiff_file_to_backend,

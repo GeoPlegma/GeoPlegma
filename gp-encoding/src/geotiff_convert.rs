@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use api::models::common::RefinementLevel;
+use geoplegma::models::common::RefinementLevel;
 use gdal::{Dataset, GeoTransformEx};
 use geo_types::Point;
 use rayon::prelude::*;

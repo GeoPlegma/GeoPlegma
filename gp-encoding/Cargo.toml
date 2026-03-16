@@ -7,7 +7,7 @@ readme = "../README.md"
 rust-version = "1.88"
 
 [dependencies]
-api = { path = "../api" }
+geoplegma = { path = "../geoplegma" }
 gdal = "0.19"
 geo = "0.30"
 rayon = "1.11"

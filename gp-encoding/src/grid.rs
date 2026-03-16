@@ -1,6 +1,6 @@
-use api::api::DggrsApi;
-use api::adapters::h3o::h3::H3Impl;
-use api::models::common::{RefinementLevel, ZoneId};
+use geoplegma::api::DggrsApi;
+use geoplegma::adapters::h3o::h3::H3Impl;
+use geoplegma::models::common::{RefinementLevel, ZoneId};
 
 pub trait Linearizer: DggrsApi {
     fn num_cells_at_level(&self, level: RefinementLevel) -> u64;
