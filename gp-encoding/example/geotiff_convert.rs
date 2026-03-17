@@ -32,7 +32,7 @@ fn main() {
     }
 
     let metadata = DatasetMetadata {
-        dggrs: DggrsUid::H3.to_string(),
+        dggrs: DggrsUid::H3,
         extent: GridExtent::Global,
         attributes: vec![AttributeSchema {
             name: "value_0".to_string(),
@@ -41,6 +41,7 @@ fn main() {
         }],
         chunk_size: 1024,
         levels: vec![u32::from(refinement)],
+        compression: None,
     };
 
     let backend = convert_geotiff_file_to_backend::<ZarrBackend, _>(

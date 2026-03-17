@@ -9,9 +9,9 @@
 
 use std::path::Path;
 
+use geoplegma::models::common::DggrsUid;
 use gp_encoding::{
-    AttributeSchema, DataType, DatasetMetadata, GridExtent, StorageBackend,
-    ZarrBackend,
+    AttributeSchema, DataType, DatasetMetadata, GridExtent, StorageBackend, ZarrBackend,
 };
 
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
     }
 
     let metadata = DatasetMetadata {
-        dggrs: "H3".to_string(),
+        dggrs: DggrsUid::H3,
         extent: GridExtent::BoundingBox {
             min_lon: -9.5,
             min_lat: 38.5,
@@ -37,11 +37,11 @@ fn main() {
         }],
         chunk_size: 1024,
         levels: vec![0, 3, 5],
+        compression: None,
     };
 
     // ── 2. Create the Zarr store ────────────────────────────────────
-    let mut backend =
-        ZarrBackend::create(store_path, metadata).expect("create store");
+    let mut backend = ZarrBackend::create(store_path, metadata).expect("create store");
 
     println!("Created Zarr store at {}", store_path.display());
     println!("  DGGRS:       {}", backend.metadata().dggrs);
@@ -50,7 +50,9 @@ fn main() {
     // ── 3. Create a resolution level ────────────────────────────────
     let num_cells: u64 = 2048;
     let level = 3;
-    let _handle = backend.create_level(level, num_cells).expect("create level");
+    let _handle = backend
+        .create_level(level, num_cells)
+        .expect("create level");
     println!("\nCreated level {level} with {num_cells} cells");
 
     // ── 4. Write some chunks ────────────────────────────────────────
@@ -66,7 +68,9 @@ fn main() {
             let val = (chunk_idx as f32) * 100.0 + (i as f32) * 0.1;
             buf.extend_from_slice(&val.to_ne_bytes());
         }
-        backend.write_chunk(level, chunk_idx, &buf).expect("write chunk");
+        backend
+            .write_chunk(level, chunk_idx, &buf)
+            .expect("write chunk");
     }
 
     println!("Wrote {} chunks", backend.num_chunks(level).unwrap());
@@ -74,7 +78,7 @@ fn main() {
     // ── 5. Re-open and read back ────────────────────────────────────
     let backend2 = ZarrBackend::open(store_path).expect("re-open store");
 
-    assert_eq!(backend2.metadata().dggrs, "H3");
+    assert_eq!(backend2.metadata().dggrs, DggrsUid::H3);
     println!("\nRe-opened store — metadata OK");
 
     let chunk_0 = backend2.read_chunk(level, 0).expect("read chunk 0");

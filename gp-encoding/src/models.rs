@@ -1,9 +1,27 @@
+use geoplegma::models::common::DggrsUid;
 use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "DggrsUid")]
+pub enum DggrsUidDef {
+    ISEA3HDGGRID,
+    IGEO7,
+    H3,
+    IVEA3H,
+    ISEA3HDGGAL,
+    IVEA9R,
+    ISEA9R,
+    RTEA3H,
+    RTEA9R,
+    IVEA7H,
+    IVEA7H_Z7,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatasetMetadata {
-    /// OGC DGGS Reference System identifier (e.g. `"H3"`, `"ISEA3H"`).
-    pub dggrs: String, // (switch to "name")
+    /// DGGS Reference System identifier
+    #[serde(with = "DggrsUidDef")]
+    pub dggrs: DggrsUid,
 
     /// Spatial extent covered by this dataset.
     pub extent: GridExtent,
@@ -12,13 +30,13 @@ pub struct DatasetMetadata {
     pub attributes: Vec<AttributeSchema>,
 
     /// Chunk size: number of cells per chunk along the linearized SFC axis.
-    // pub chunk_size: u64,
+    pub chunk_size: u64,
 
     /// Resolution levels stored in this dataset.
     pub levels: Vec<u32>,
 
     /// Compression method used for the cell attribute data.
-    pub compression: String,
+    pub compression: Option<String>,
 }
 
 /// The spatial bounds or specific cell subset covered by a dataset.
