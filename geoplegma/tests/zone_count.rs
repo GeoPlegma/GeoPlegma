@@ -1,9 +1,9 @@
-use api::adapters::dggal::grids::DggalImpl;
-use api::adapters::dggrid::igeo7::Igeo7Impl;
-use api::adapters::dggrid::isea3h::Isea3hImpl;
-use api::adapters::h3o::h3::H3Impl;
-use api::api::DggrsApi;
-use api::models::common::RefinementLevel;
+use geoplegma::adapters::dggal::grids::DggalImpl;
+use geoplegma::adapters::dggrid::igeo7::Igeo7Impl;
+use geoplegma::adapters::dggrid::isea3h::Isea3hImpl;
+use geoplegma::adapters::h3o::h3::H3Impl;
+use geoplegma::api::DggrsApi;
+use geoplegma::models::common::RefinementLevel;
 
 /// Verify that zone_count matches zones_from_bbox count with an empty bbox (entire globe)
 fn test_adapter_zone_count_equivalence<T: DggrsApi>(adapter: &T) {
@@ -21,7 +21,7 @@ fn test_adapter_zone_count_equivalence<T: DggrsApi>(adapter: &T) {
 #[test]
 fn test_igeo7_ivea7h_zone_count_equivalence() {
     let igeo7 = Igeo7Impl::default();
-    let ivea7h = DggalImpl::new(api::models::common::DggrsUid::IVEA7H);
+    let ivea7h = DggalImpl::new(geoplegma::models::common::DggrsUid::IVEA7H);
 
     let max_level = igeo7.max_refinement_level().unwrap().get();
 
@@ -37,7 +37,7 @@ fn test_igeo7_ivea7h_zone_count_equivalence() {
 
 #[test]
 fn test_isea3h_dggrid_dggal_zone_count_equivalence() {
-    let dggal = DggalImpl::new(api::models::common::DggrsUid::ISEA3HDGGAL);
+    let dggal = DggalImpl::new(geoplegma::models::common::DggrsUid::ISEA3HDGGAL);
     let dggrid = Isea3hImpl::default();
 
     let max_level = dggal.max_refinement_level().unwrap();
@@ -60,7 +60,7 @@ fn test_h3_zone_count_equivalence() {
 
 #[test]
 fn test_dggal_zone_count_equivalence() {
-    let dggal = DggalImpl::new(api::models::common::DggrsUid::ISEA3HDGGAL);
+    let dggal = DggalImpl::new(geoplegma::models::common::DggrsUid::ISEA3HDGGAL);
     test_adapter_zone_count_equivalence(&dggal);
 }
 
