@@ -274,7 +274,8 @@ impl DggrsApi for Isea3hImpl {
 
     fn zone_count(&self, refinement_level: RefinementLevel) -> Result<u64, DggrsError> {
         let r = refinement_level.get();
-        Ok(2 + 10 * (3_u64.pow(r as u32)))
+        let aperture: u64 = self.id.spec().aperture.into();
+        Ok(2 + 10 * (aperture.pow(r as u32)))
     }
 
     fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
