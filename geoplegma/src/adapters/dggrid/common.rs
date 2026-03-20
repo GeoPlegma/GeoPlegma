@@ -9,10 +9,10 @@
 
 pub mod dggrid {
     use rand::distributions::{Alphanumeric, DistString};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
-    pub fn setup(workdir: &PathBuf) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
+    pub fn setup(workdir: &Path) -> (PathBuf, PathBuf, PathBuf, PathBuf, PathBuf, PathBuf) {
         let code = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
         let meta_path = workdir.join(&code).with_extension("meta"); // metafile
         let aigen_path = workdir.join(&code).with_extension("gen"); // AIGEN
@@ -29,7 +29,7 @@ pub mod dggrid {
             input_path,
         )
     }
-    pub fn execute(dggrid_path: &PathBuf, meta_path: &PathBuf) {
+    pub fn execute(dggrid_path: &Path, meta_path: &Path) {
         let _ = Command::new(&dggrid_path).arg(&meta_path).output(); // FIX: Better handling of output and raise DggridError::DggridExecutionFailed
     }
 }
@@ -40,17 +40,17 @@ pub mod write {
     use geo::Rect;
     use std::fs;
     use std::io::{self, Write};
-    use std::path::PathBuf;
+    use std::path::Path;
     use tracing::debug;
 
     pub const DENSIFICATION: u8 = 50; // DGGRID option
 
     pub fn metafile(
-        metafile: &PathBuf,
+        metafile: &Path,
         refinement_level: &RefinementLevel,
-        cell_output_file_name: &PathBuf,
-        children_output_file_name: &PathBuf,
-        neighbor_output_file_name: &PathBuf,
+        cell_output_file_name: &Path,
+        children_output_file_name: &Path,
+        neighbor_output_file_name: &Path,
         conf: &DggrsApiConfig,
     ) -> io::Result<()> {
         debug!("Writing to {:?}", metafile);
@@ -95,7 +95,7 @@ pub mod write {
         Ok(())
     }
 
-    pub fn bbox(bbox: &Rect<f64>, bboxfile: &PathBuf) -> io::Result<()> {
+    pub fn bbox(bbox: &Rect<f64>, bboxfile: &Path) -> io::Result<()> {
         let min = bbox.min();
         let max = bbox.max();
 
@@ -127,7 +127,7 @@ pub mod write {
         Ok(())
     }
 
-    pub fn file(file: PathBuf) {
+    pub fn file(file: &Path) {
         if let Ok(lines) = super::read::lines(file) {
             // Consumes the iterator, returns an (Optional) String
             for line in lines.flatten() {
@@ -279,12 +279,12 @@ pub mod output {
     use geo::GeodesicArea;
     use itertools::Itertools;
     use std::collections::HashMap;
-    use std::path::PathBuf;
+    use std::path::Path;
 
     pub fn ingest(
-        aigen_path: &PathBuf,
-        children_path: &PathBuf,
-        neighbors_path: &PathBuf,
+        aigen_path: &Path,
+        children_path: &Path,
+        neighbors_path: &Path,
         conf: &DggrsApiConfig,
     ) -> Result<Zones, DggrsError> {
         // the default output
@@ -368,14 +368,14 @@ pub mod helper {
 }
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 pub fn cleanup(
-    meta_path: &PathBuf,
-    aigen_path: &PathBuf,
-    children_path: &PathBuf,
-    neighbor_path: &PathBuf,
-    bbox_path: &PathBuf,
-    input_path: &PathBuf,
+    meta_path: &Path,
+    aigen_path: &Path,
+    children_path: &Path,
+    neighbor_path: &Path,
+    bbox_path: &Path,
+    input_path: &Path,
 ) {
     let _ = fs::remove_file(meta_path);
     let _ = fs::remove_file(aigen_path);

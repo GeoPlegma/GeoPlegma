@@ -18,7 +18,7 @@ use geo::{Point, Rect};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::debug;
 pub const CLIP_CELL_DENSIFICATION: u8 = 50; // DGGRID option
 
@@ -86,7 +86,7 @@ impl DggrsApi for Isea3hImpl {
             );
         }
 
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -146,7 +146,7 @@ impl DggrsApi for Isea3hImpl {
         let _ = writeln!(input_file, "{} {}", point.y(), point.x())
             .expect("Cannot create point input file");
 
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -200,7 +200,7 @@ impl DggrsApi for Isea3hImpl {
         );
         let _ = writeln!(meta_file, "clip_cell_addresses \"{}\"", parent_zone_id);
         let _ = writeln!(meta_file, "input_address_type Z3");
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -258,7 +258,7 @@ impl DggrsApi for Isea3hImpl {
 
         let _ = writeln!(meta_file, "dggrid_operation TRANSFORM_POINTS");
         let _ = writeln!(meta_file, "input_address_type Z3");
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -292,7 +292,7 @@ impl DggrsApi for Isea3hImpl {
     }
 }
 
-pub fn isea3h_metafile(meta_path: &PathBuf) -> io::Result<()> {
+pub fn isea3h_metafile(meta_path: &Path) -> io::Result<()> {
     debug!("Writing to {:?}", meta_path);
     // Append to metafile format
     let mut meta_file = OpenOptions::new()

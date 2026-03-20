@@ -18,7 +18,7 @@ use geo::geometry::Point;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::debug;
 pub const CLIP_CELL_DENSIFICATION: u8 = 50; // DGGRID option
 use geo::Rect;
@@ -87,7 +87,7 @@ impl DggrsApi for Igeo7Impl {
             );
         }
 
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -147,7 +147,7 @@ impl DggrsApi for Igeo7Impl {
         let _ = writeln!(input_file, "{} {}", point.y(), point.x())
             .expect("Cannot create point input file");
 
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -201,7 +201,7 @@ impl DggrsApi for Igeo7Impl {
         );
         let _ = writeln!(meta_file, "clip_cell_addresses \"{}\"", parent_zone_id);
         let _ = writeln!(meta_file, "input_address_type Z7");
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
 
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
@@ -261,7 +261,7 @@ impl DggrsApi for Igeo7Impl {
 
         let _ = writeln!(meta_file, "dggrid_operation TRANSFORM_POINTS");
         let _ = writeln!(meta_file, "input_address_type Z7");
-        common::write::file(meta_path.clone());
+        common::write::file(&meta_path);
         common::dggrid::execute(&self.adapter.executable, &meta_path);
         let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
         common::cleanup(
@@ -296,7 +296,7 @@ impl DggrsApi for Igeo7Impl {
     }
 }
 
-pub fn igeo7_metafile(meta_path: &PathBuf) -> io::Result<()> {
+pub fn igeo7_metafile(meta_path: &Path) -> io::Result<()> {
     debug!("Writing to {:?}", meta_path);
     // Append to metafile format
     let mut meta_file = OpenOptions::new()
