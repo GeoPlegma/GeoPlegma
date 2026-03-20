@@ -275,6 +275,12 @@ impl DggrsApi for Igeo7Impl {
         Ok(result)
     }
 
+    fn zone_count(&self, refinement_level: RefinementLevel) -> Result<u64, DggrsError> {
+        let r = refinement_level.get();
+        let aperture: u64 = self.id.spec().aperture.into();
+        Ok(2 + 10 * (aperture.pow(r as u32)))
+    }
+
     fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
         Ok(self.id.spec().min_refinement_level)
     }

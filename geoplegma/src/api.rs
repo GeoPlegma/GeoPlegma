@@ -82,6 +82,9 @@ pub trait DggrsApi: Send + Sync {
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>; // NOTE: Consider accepting a vector of ZoneIDs
 
+    /// Get the total number of zones at a refinement level.
+    fn zone_count(&self, refinement_level: RefinementLevel) -> Result<u64, DggrsError>; // TODO: Consider hard coding zone count statistics instead of calculating them on the fly
+
     /// Get the minimum refinement level of a DGGRS
     fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError>;
 

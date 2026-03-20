@@ -133,6 +133,12 @@ impl DggrsApi for H3Impl {
         Ok(to_zones(vec![h3o_zone], cfg)?)
     }
 
+    fn zone_count(&self, level: RefinementLevel) -> Result<u64, DggrsError> {
+        let r = level.get();
+        let aperture: u64 = self.id.spec().aperture.into();
+        Ok(2 + 120 * (aperture.pow(r as u32)))
+    }
+
     fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
         Ok(self.id.spec().min_refinement_level)
     }

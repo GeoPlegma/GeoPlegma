@@ -140,6 +140,7 @@ pub struct DggrsSpec {
     pub description: &'static str,
     pub uri: &'static str,
     pub crs: &'static str,
+    pub aperture: u32,
     pub min_refinement_level: RefinementLevel,
     pub max_refinement_level: RefinementLevel,
     pub default_refinement_level: RefinementLevel,
