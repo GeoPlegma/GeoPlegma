@@ -1,6 +1,8 @@
+mod common;
 pub mod error;
 pub mod geotiff_convert;
 pub mod models;
+pub mod query;
 pub mod storage;
 pub mod zarr;
 
@@ -9,5 +11,6 @@ pub use geoplegma::models::common::{RefinementLevel, RelativeDepth, Zone, ZoneId
 
 pub use geotiff_convert::convert_geotiff_file_to_backend;
 pub use models::{AttributeSchema, DataType, DatasetMetadata, GridExtent};
+pub use query::{query_value_bytes_by_cell_index, query_value_bytes_for_point};
 pub use storage::StorageBackend;
 pub use zarr::ZarrBackend;

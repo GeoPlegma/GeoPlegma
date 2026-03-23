@@ -4,20 +4,13 @@ use std::path::Path;
 use gdal::{Dataset, GeoTransformEx};
 use geo_types::Point;
 use geoplegma::get;
-use geoplegma::models::common::{RefinementLevel, ZoneId};
+use geoplegma::models::common::RefinementLevel;
 use rayon::prelude::*;
 
+use crate::common::zone_id_to_u64;
 use crate::error::EncodingError;
 use crate::models::{DataType, DatasetMetadata, GridExtent};
 use crate::storage::StorageBackend;
-
-fn zone_id_to_u64(id: &ZoneId) -> u64 {
-    match id {
-        ZoneId::IntId(v) => *v,
-        ZoneId::HexId(h) => u64::from_str_radix(h.as_str(), 16).unwrap(),
-        ZoneId::StrId(s) => s.parse::<u64>().unwrap(),
-    }
-}
 
 pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
@@ -130,7 +123,7 @@ where
                 .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
 
             let bytes = f64_to_bytes(v, output_type)?;
-            let key = zone_id_to_u64(&zone.id);
+            let key = zone_id_to_u64(&zone.id)?;
 
             Ok((key, bytes))
         })
