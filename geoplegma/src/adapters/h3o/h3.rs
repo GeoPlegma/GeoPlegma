@@ -60,7 +60,7 @@ impl DggrsApi for H3Impl {
             let _ = tiler.add(b.to_polygon());
             h3o_zones = tiler.into_coverage().collect::<Vec<_>>();
         } else {
-            if refinement_level > self.default_refinement_level()? {
+            if refinement_level > self.max_refinement_level()? {
                 return Err(DggrsError::RefinementLevelTooHigh(refinement_level));
             }
             h3o_zones = CellIndex::base_cells()
@@ -131,6 +131,12 @@ impl DggrsApi for H3Impl {
         })?;
 
         Ok(to_zones(vec![h3o_zone], cfg)?)
+    }
+
+    fn zone_count(&self, level: RefinementLevel) -> Result<u64, DggrsError> {
+        let r = level.get();
+        let aperture: u64 = self.id.spec().aperture.into();
+        Ok(2 + 120 * (aperture.pow(r as u32)))
     }
 
     fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {

@@ -144,6 +144,13 @@ impl DggrsApi for DggalImpl {
         Ok(to_zones(dggrs, zones, cfg)?)
     }
 
+    fn zone_count(&self, refinement_level: RefinementLevel) -> Result<u64, DggrsError> {
+        let r = refinement_level.get();
+        let dggrs = self.get_dggrs()?;
+
+        Ok(dggrs.countZones(r))
+    }
+
     fn min_refinement_level(&self) -> Result<RefinementLevel, DggrsError> {
         Ok(self.id.spec().min_refinement_level)
     }
