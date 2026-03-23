@@ -34,6 +34,8 @@ pub fn query_value_bytes_for_point<B: StorageBackend>(
         ))
     })?;
 
+    println!("Resolved point ({}, {}) to zone ID {:?} at level {}", point.x(), point.y(), zone.id, level);
+
     query_value_bytes_by_cell_index(backend, level, &zone.id)
 }
 
@@ -47,6 +49,7 @@ pub fn query_value_bytes_by_cell_index<B: StorageBackend>(
     zone_id: &ZoneId,
 ) -> Result<Vec<u8>, EncodingError> {
     let cell_index = zone_id_to_u64(zone_id)?;
+    println!("Querying cell index {} for zone ID {:?} at level {}", cell_index, zone_id, level);
     let value_size = backend
         .metadata()
         .attributes

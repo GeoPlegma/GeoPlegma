@@ -25,3 +25,11 @@ path = "example/zarr_roundtrip.rs"
 [[example]]
 name = "geotiff_convert"
 path = "example/geotiff_convert.rs"
+
+[[example]]
+name = "query_point"
+path = "example/query_point.rs"
+
+[[example]]
+name = "print_all_cells"
+path = "example/print_all_cells.rs"

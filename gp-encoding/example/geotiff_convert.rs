@@ -35,7 +35,7 @@ fn main() {
         extent: GridExtent::Global,
         attributes: vec![AttributeSchema {
             name: "value_0".to_string(),
-            dtype: DataType::Float32,
+            dtype: DataType::UInt16,
             fill_value: Some("0.0".to_string()),
         }],
         chunk_size: 1024,
