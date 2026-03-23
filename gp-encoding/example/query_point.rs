@@ -56,7 +56,7 @@ fn main() {
     println!("  Levels:      {:?}", backend.levels());
     println!("  Attributes:  {:?}", 
         backend.metadata().attributes.iter()
-            .map(|a| format!("{} ({})", a.name, a.dtype as u8))
+            .map(|a| format!("{}", a.dtype as u8))
             .collect::<Vec<_>>()
     );
 

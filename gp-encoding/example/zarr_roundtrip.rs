@@ -31,7 +31,6 @@ fn main() {
             max_lat: 39.0,
         },
         attributes: vec![AttributeSchema {
-            name: "elevation".into(),
             dtype: DataType::Float32,
             fill_value: Some("0.0".into()),
         }],

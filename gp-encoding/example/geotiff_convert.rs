@@ -33,11 +33,7 @@ fn main() {
     let metadata = DatasetMetadata {
         dggrs: DggrsUid::H3,
         extent: GridExtent::Global,
-        attributes: vec![AttributeSchema {
-            name: "value_0".to_string(),
-            dtype: DataType::UInt16,
-            fill_value: Some("0.0".to_string()),
-        }],
+        attributes: vec![],
         chunk_size: 1024,
         levels: vec![u32::from(refinement)],
         compression: None,

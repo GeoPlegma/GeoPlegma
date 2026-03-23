@@ -58,9 +58,6 @@ pub enum GridExtent {
 /// Description of a single data attribute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeSchema {
-    /// Human-readable name (e.g. `"elevation"`, `"population"`).
-    pub name: String,
-
     /// Data type of the attribute values.
     pub dtype: DataType,
 

@@ -1,12 +1,15 @@
+use std::any::Any;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use gdal::{Dataset, GeoTransformEx};
+use gdal::raster::GdalDataType;
+use gdal::{Dataset, GeoTransformEx, Metadata};
 use geo_types::Point;
 use geoplegma::get;
 use geoplegma::models::common::RefinementLevel;
 use rayon::prelude::*;
 
+use crate::AttributeSchema;
 use crate::common::zone_id_to_u64;
 use crate::error::EncodingError;
 use crate::models::{DataType, DatasetMetadata, GridExtent};
@@ -22,12 +25,6 @@ pub fn convert_geotiff_file_to_backend<B>(
 where
     B: StorageBackend,
 {
-    if metadata.attributes.is_empty() {
-        return Err(EncodingError::Storage(
-            "dataset metadata must define at least one attribute".into(),
-        ));
-    }
-
     let grid = get(metadata.dggrs).unwrap(); // TODO: remove unwrap
 
     let level = u32::try_from(refinement_level.get()).map_err(|_| {
@@ -38,6 +35,43 @@ where
     })?;
 
     let dataset = Dataset::open(geotiff_path).map_err(|e| EncodingError::Gdal(e.to_string()))?;
+
+    let bands = dataset
+        .rasterbands()
+        .map(|b| b.unwrap().band_type())
+        .collect::<Vec<_>>();
+    let metadata_bands = bands
+        .iter()
+        .map(|band_type| {
+            let dtype = match band_type {
+                GdalDataType::UInt8 => DataType::UInt8,
+                GdalDataType::Int8 => DataType::Int8,
+                GdalDataType::Int16 => DataType::Int16,
+                GdalDataType::UInt16 => DataType::UInt16,
+                GdalDataType::Int32 => DataType::Int32,
+                GdalDataType::UInt32 => DataType::UInt32,
+                GdalDataType::Float32 => DataType::Float32,
+                GdalDataType::Float64 => DataType::Float64,
+                _ => {
+                    return Err(EncodingError::GeoTiff(format!(
+                        "unsupported GDAL data type: {band_type:?}"
+                    )));
+                }
+            };
+
+            Ok(AttributeSchema {
+                dtype,
+                fill_value: Some("0.0".to_string()),
+            })
+        })
+        .collect::<Result<Vec<_>, EncodingError>>()?;
+    
+    metadata.attributes = metadata_bands;
+    if metadata.attributes.is_empty() {
+        return Err(EncodingError::Storage(
+            "dataset metadata must define at least one attribute".into(),
+        ));
+    }
 
     if sample >= dataset.raster_count() {
         return Err(EncodingError::Gdal(format!(

@@ -25,13 +25,19 @@ fn main() {
     let metadata = backend.metadata();
     println!("=== Zarr Store Contents ===");
     println!("DGGRS:       {}", metadata.dggrs);
-    println!("Attributes:  {:?}", metadata.attributes.iter().map(|a| &a.name).collect::<Vec<_>>());
     println!("Chunk Size:  {}", metadata.chunk_size);
+    println!("Attributes:  {}", metadata.attributes.len());
     println!();
 
     let attributes = &metadata.attributes;
     if attributes.is_empty() {
         eprintln!("No attributes defined in metadata");
+        return;
+    }
+
+    let cell_stride: usize = attributes.iter().map(|a| a.dtype.byte_size()).sum();
+    if cell_stride == 0 {
+        eprintln!("Invalid metadata: computed cell stride is 0");
         return;
     }
 
@@ -46,18 +52,40 @@ fn main() {
                 for chunk_idx in 0..num_chunks {
                     match backend.read_chunk(level, chunk_idx) {
                         Ok(chunk_data) => {
-                            let value_size: usize = attributes[0].dtype.byte_size();
-                            let num_values = chunk_data.len() / value_size;
+                            if chunk_data.len() % cell_stride != 0 {
+                                eprintln!(
+                                    "  Warning: chunk {} byte length {} is not a multiple of cell stride {}",
+                                    chunk_idx,
+                                    chunk_data.len(),
+                                    cell_stride
+                                );
+                            }
+                            let num_values = chunk_data.len() / cell_stride;
 
                             for cell_offset in 0..num_values {
                                 let cell_index = chunk_idx * metadata.chunk_size as u64 + cell_offset as u64;
-                                let start = cell_offset * value_size;
-                                let end = start + value_size;
+                                let start = cell_offset * cell_stride;
+                                let end = start + cell_stride;
 
                                 if end <= chunk_data.len() {
                                     let value_bytes = &chunk_data[start..end];
-                                    let value_str = format_value(&attributes[0].dtype, value_bytes);
-                                    println!("  Cell {}: {} {}", cell_index, attributes[0].name, value_str);
+                                    let mut offset = 0usize;
+                                    let mut values = Vec::with_capacity(attributes.len());
+
+                                    for (band_idx, attribute) in attributes.iter().enumerate() {
+                                        let band_size = attribute.dtype.byte_size();
+                                        let band_end = offset + band_size;
+                                        if band_end <= value_bytes.len() {
+                                            let band_bytes = &value_bytes[offset..band_end];
+                                            let value_str = format_value(&attribute.dtype, band_bytes);
+                                            values.push(format!("band{}={}", band_idx + 1, value_str));
+                                        } else {
+                                            values.push(format!("band{}=INVALID", band_idx + 1));
+                                        }
+                                        offset = band_end;
+                                    }
+
+                                    println!("  Cell {}: {}", cell_index, values.join(", "));
                                     total_cells += 1;
                                 }
                             }

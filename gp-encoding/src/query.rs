@@ -110,7 +110,6 @@ mod tests {
             dggrs: DggrsUid::H3,
             extent: GridExtent::Global,
             attributes: vec![AttributeSchema {
-                name: "value".to_string(),
                 dtype: DataType::UInt16,
                 fill_value: None,
             }],
