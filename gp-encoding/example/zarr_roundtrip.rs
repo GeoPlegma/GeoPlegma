@@ -50,7 +50,7 @@ fn main() {
     let num_cells: u64 = 2048;
     let level = 3;
     let _handle = backend
-        .create_level(level, num_cells)
+        .create_level(level, 0, num_cells)
         .expect("create level");
     println!("\nCreated level {level} with {num_cells} cells");
 
@@ -68,7 +68,7 @@ fn main() {
             buf.extend_from_slice(&val.to_ne_bytes());
         }
         backend
-            .write_chunk(level, chunk_idx, &buf)
+            .write_chunk(level, 0, chunk_idx, &buf)
             .expect("write chunk");
     }
 
@@ -80,12 +80,12 @@ fn main() {
     assert_eq!(backend2.metadata().dggrs, DggrsUid::H3);
     println!("\nRe-opened store — metadata OK");
 
-    let chunk_0 = backend2.read_chunk(level, 0).expect("read chunk 0");
+    let chunk_0 = backend2.read_chunk(level, 0, 0).expect("read chunk 0");
     let first_f32 = f32::from_ne_bytes(chunk_0[..4].try_into().unwrap());
     println!("First value in chunk 0: {first_f32}");
     assert!((first_f32 - 0.0).abs() < 1e-6);
 
-    let chunk_1 = backend2.read_chunk(level, 1).expect("read chunk 1");
+    let chunk_1 = backend2.read_chunk(level, 0, 1).expect("read chunk 1");
     let first_f32_c1 = f32::from_ne_bytes(chunk_1[..4].try_into().unwrap());
     println!("First value in chunk 1: {first_f32_c1}");
     assert!((first_f32_c1 - 100.0).abs() < 1e-6);

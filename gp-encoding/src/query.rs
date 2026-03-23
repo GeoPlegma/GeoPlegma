@@ -13,6 +13,7 @@ use crate::storage::StorageBackend;
 pub fn query_value_bytes_for_point<B: StorageBackend>(
     backend: &B,
     refinement_level: RefinementLevel,
+    band: u32,
     point: Point<f64>,
 ) -> Result<Vec<u8>, EncodingError> {
     let grid = get(backend.metadata().dggrs)
@@ -36,7 +37,7 @@ pub fn query_value_bytes_for_point<B: StorageBackend>(
 
     println!("Resolved point ({}, {}) to zone ID {:?} at level {}", point.x(), point.y(), zone.id, level);
 
-    query_value_bytes_by_cell_index(backend, level, &zone.id)
+    query_value_bytes_by_cell_index(backend, level, band, &zone.id)
 }
 
 /// Query a single cell value by linearized cell index.
@@ -46,6 +47,7 @@ pub fn query_value_bytes_for_point<B: StorageBackend>(
 pub fn query_value_bytes_by_cell_index<B: StorageBackend>(
     backend: &B,
     level: u32,
+    band: u32,
     zone_id: &ZoneId,
 ) -> Result<Vec<u8>, EncodingError> {
     let cell_index = zone_id_to_u64(zone_id)?;
@@ -69,7 +71,7 @@ pub fn query_value_bytes_by_cell_index<B: StorageBackend>(
     let chunk_index = cell_index / chunk_size;
     let in_chunk_index = (cell_index % chunk_size) as usize;
 
-    let chunk = backend.read_chunk(level, chunk_index)?;
+    let chunk = backend.read_chunk(level, band, chunk_index)?;
 
     let start = in_chunk_index * value_size;
     let end = start + value_size;
@@ -119,7 +121,7 @@ mod tests {
         };
 
         let mut backend = ZarrBackend::create(&store_path, metadata).expect("create zarr");
-        backend.create_level(1, 8).expect("create level");
+        backend.create_level(1,  0, 8).expect("create level");
 
         let chunk0: Vec<u8> = [10_u16, 20, 30, 40]
             .into_iter()
@@ -130,19 +132,19 @@ mod tests {
             .flat_map(u16::to_ne_bytes)
             .collect();
 
-        backend.write_chunk(1, 0, &chunk0).expect("write chunk0");
-        backend.write_chunk(1, 1, &chunk1).expect("write chunk1");
+        backend.write_chunk(1, 0, 0, &chunk0).expect("write chunk0");
+        backend.write_chunk(1, 0, 1, &chunk1).expect("write chunk1");
 
-        let bytes = query_value_bytes_by_cell_index(&backend, 1, &ZoneId::IntId(0)).expect("query cell");
+        let bytes = query_value_bytes_by_cell_index(&backend, 1, 0, &ZoneId::IntId(0)).expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 10);
 
-        let bytes = query_value_bytes_by_cell_index(&backend, 1, &ZoneId::IntId(1)).expect("query cell");
+        let bytes = query_value_bytes_by_cell_index(&backend, 1, 0, &ZoneId::IntId(1)).expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 20);
 
 
-        let bytes = query_value_bytes_by_cell_index(&backend, 1, &ZoneId::IntId(5)).expect("query cell");
+        let bytes = query_value_bytes_by_cell_index(&backend, 1, 0, &ZoneId::IntId(5)).expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 60);
 

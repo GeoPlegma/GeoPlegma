@@ -1,10 +1,10 @@
-use std::any::Any;
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use gdal::raster::GdalDataType;
-use gdal::{Dataset, GeoTransformEx, Metadata};
+use gdal::{Dataset, GeoTransformEx};
 use geo_types::Point;
+use geoplegma::api::DggrsApi;
 use geoplegma::get;
 use geoplegma::models::common::RefinementLevel;
 use rayon::prelude::*;
@@ -15,11 +15,67 @@ use crate::error::EncodingError;
 use crate::models::{DataType, DatasetMetadata, GridExtent};
 use crate::storage::StorageBackend;
 
+trait NativeBytes {
+    fn to_native_bytes(self) -> Vec<u8>;
+}
+
+macro_rules! impl_native_bytes {
+    ($($t:ty),+ $(,)?) => {
+        $(
+            impl NativeBytes for $t {
+                fn to_native_bytes(self) -> Vec<u8> {
+                    self.to_ne_bytes().to_vec()
+                }
+            }
+        )+
+    };
+}
+
+impl_native_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
+
+fn compute_entries_from_data<T>(
+    data: &[T],
+    total_pixels: usize,
+    width: usize,
+    gt: [f64; 6],
+    grid: &dyn DggrsApi,
+    refinement_level: RefinementLevel,
+) -> Result<Vec<(u64, Vec<u8>)>, EncodingError>
+where
+    T: NativeBytes + Copy + Send + Sync,
+{
+    (0..total_pixels)
+        .into_par_iter()
+        .map(|idx| {
+            let row = idx / width;
+            let col = idx % width;
+
+            let v = *data
+                .get(idx)
+                .ok_or_else(|| EncodingError::Gdal("raster buffer index out of bounds".into()))?;
+
+            // pixel center
+            let (x, y) = gt.apply(col as f64 + 0.5, row as f64 + 0.5);
+
+            let zones = grid
+                .zone_from_point(refinement_level, Point::new(x, y), None)
+                .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+            let zone = zones
+                .zones
+                .first()
+                .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
+
+            let key = zone_id_to_u64(&zone.id)?;
+            Ok((key, v.to_native_bytes()))
+        })
+        .collect()
+}
+
 pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
     output_path: &Path,
     refinement_level: RefinementLevel,
-    sample: usize,
     mut metadata: DatasetMetadata,
 ) -> Result<B, EncodingError>
 where
@@ -50,6 +106,8 @@ where
                 GdalDataType::UInt16 => DataType::UInt16,
                 GdalDataType::Int32 => DataType::Int32,
                 GdalDataType::UInt32 => DataType::UInt32,
+                GdalDataType::Int64 => DataType::Int64,
+                GdalDataType::UInt64 => DataType::UInt64,
                 GdalDataType::Float32 => DataType::Float32,
                 GdalDataType::Float64 => DataType::Float64,
                 _ => {
@@ -65,7 +123,7 @@ where
             })
         })
         .collect::<Result<Vec<_>, EncodingError>>()?;
-    
+
     metadata.attributes = metadata_bands;
     if metadata.attributes.is_empty() {
         return Err(EncodingError::Storage(
@@ -73,24 +131,19 @@ where
         ));
     }
 
-    if sample >= dataset.raster_count() {
-        return Err(EncodingError::Gdal(format!(
-            "sample index {sample} out of range; dataset has {} raster bands",
-            dataset.raster_count()
-        )));
-    }
-
-    let band = dataset
-        .rasterband(sample + 1)
+    let first_band = dataset
+        .rasterband(1)
         .map_err(|e| EncodingError::Gdal(e.to_string()))?;
 
-    let (width, height) = band.size();
-
+    let (width, height) = first_band.size();
+    
     if width == 0 || height == 0 {
         return Err(EncodingError::GeoTiff(
             "raster has zero width or height".into(),
         ));
     }
+
+    let total_pixels = height * width;
 
     let gt = dataset
         .geo_transform()
@@ -122,131 +175,175 @@ where
         max_lat: max_y,
     };
 
-    let output_type = metadata.attributes[0].dtype;
-    let value_size = output_type.byte_size();
-
-    let raster = band
-        .read_band_as::<f64>()
-        .map_err(|e| EncodingError::Gdal(e.to_string()))?;
-    let data = raster.data();
-
-    let mut linear_values: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
-
-    let total_pixels = height * width;
-
-    let computed_entries: Result<Vec<_>, EncodingError> = (0..total_pixels)
-        .into_par_iter()
-        .map(|idx| {
-            let row = idx / width;
-            let col = idx % width;
-
-            let v = *data
-                .get(idx)
-                .ok_or_else(|| EncodingError::Gdal("raster buffer index out of bounds".into()))?;
-
-            // pixel center
-            let (x, y) = gt.apply(col as f64 + 0.5, row as f64 + 0.5);
-
-            let zones = grid
-                .zone_from_point(refinement_level, Point::new(x, y), None)
-                .map_err(|e| EncodingError::Grid(e.to_string()))?;
-
-            let zone = zones
-                .zones
-                .first()
-                .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
-
-            let bytes = f64_to_bytes(v, output_type)?;
-            let key = zone_id_to_u64(&zone.id)?;
-
-            Ok((key, bytes))
-        })
-        .collect();
-
-    linear_values.extend(computed_entries?);
-
     let zones = grid.zone_count(refinement_level).unwrap();
     let chunk_size = metadata.chunk_size;
-
     let mut backend = B::create(output_path, metadata)?;
-    backend.create_level(level, zones)?;
 
-    let mut chunks: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
-    for (linear_index, value_bytes) in linear_values {
-        let chunk_index = linear_index / chunk_size;
-        let in_chunk_index = (linear_index % chunk_size) as usize;
+    for (band_index, band_type) in bands.into_iter().enumerate() {
+        let band = dataset
+            .rasterband(band_index + 1)
+            .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+        let value_size = band_type.bytes() as usize;
 
-        let chunk_buf = chunks
-            .entry(chunk_index)
-            .or_insert_with(|| vec![0_u8; chunk_size as usize * value_size]);
+        let computed_entries = match band_type {
+            GdalDataType::UInt8 => {
+                let raster = band
+                    .read_band_as::<u8>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::Int8 => {
+                let raster = band
+                    .read_band_as::<i8>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::UInt16 => {
+                let raster = band
+                    .read_band_as::<u16>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::Int16 => {
+                let raster = band
+                    .read_band_as::<i16>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::UInt32 => {
+                let raster = band
+                    .read_band_as::<u32>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::Int32 => {
+                let raster = band
+                    .read_band_as::<i32>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::UInt64 => {
+                let raster = band
+                    .read_band_as::<u64>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::Int64 => {
+                let raster = band
+                    .read_band_as::<i64>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::Float32 => {
+                let raster = band
+                    .read_band_as::<f32>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            GdalDataType::Float64 => {
+                let raster = band
+                    .read_band_as::<f64>()
+                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                compute_entries_from_data(
+                    raster.data(),
+                    total_pixels,
+                    width,
+                    gt,
+                    grid.as_ref(),
+                    refinement_level,
+                )
+            }
+            _ => Err(EncodingError::GeoTiff(format!(
+                "unsupported GDAL data type: {band_type:?}"
+            ))),
+        }?;
 
-        let start = in_chunk_index * value_size;
-        let end = start + value_size;
-        chunk_buf[start..end].copy_from_slice(&value_bytes);
-    }
+        let linear_values: BTreeMap<u64, Vec<u8>> = computed_entries.into_iter().collect();
 
-    for (chunk_index, bytes) in chunks {
-        backend.write_chunk(level, chunk_index, &bytes)?;
+
+        backend.create_level(level, band_index as u32, zones)?;
+
+        let mut chunks: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
+        for (linear_index, value_bytes) in linear_values {
+            let chunk_index = linear_index / chunk_size;
+            let in_chunk_index = (linear_index % chunk_size) as usize;
+
+            let chunk_buf = chunks
+                .entry(chunk_index)
+                .or_insert_with(|| vec![0_u8; chunk_size as usize * value_size]);
+
+            let start = in_chunk_index * value_size;
+            let end = start + value_size;
+            chunk_buf[start..end].copy_from_slice(&value_bytes);
+        }
+
+        for (chunk_index, bytes) in chunks {
+            backend.write_chunk(level, band_index as u32, chunk_index, &bytes)?;
+        }
     }
 
     Ok(backend)
-}
-
-fn f64_to_bytes(value: f64, data_type: DataType) -> Result<Vec<u8>, EncodingError> {
-    match data_type {
-        DataType::Float32 => Ok((value as f32).to_ne_bytes().to_vec()),
-        DataType::Float64 => Ok(value.to_ne_bytes().to_vec()),
-        DataType::Int8 => cast_int::<i8>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::Int16 => cast_int::<i16>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::Int32 => cast_int::<i32>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::Int64 => cast_int::<i64>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::UInt8 => cast_uint::<u8>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::UInt16 => cast_uint::<u16>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::UInt32 => cast_uint::<u32>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-        DataType::UInt64 => cast_uint::<u64>(value)
-            .map(|v| v.to_ne_bytes().to_vec())
-            .map_err(EncodingError::GeoTiff),
-    }
-}
-
-fn cast_int<T>(value: f64) -> Result<T, String>
-where
-    T: TryFrom<i64>,
-{
-    if value.fract() != 0.0 {
-        return Err(format!(
-            "non-integer GeoTIFF value {value} for integer output type"
-        ));
-    }
-
-    let as_i64 = value as i64;
-    T::try_from(as_i64).map_err(|_| format!("GeoTIFF value {value} out of range"))
-}
-
-fn cast_uint<T>(value: f64) -> Result<T, String>
-where
-    T: TryFrom<u64>,
-{
-    if value < 0.0 || value.fract() != 0.0 {
-        return Err(format!(
-            "GeoTIFF value {value} is invalid for unsigned integer output type"
-        ));
-    }
-
-    let as_u64 = value as u64;
-    T::try_from(as_u64).map_err(|_| format!("GeoTIFF value {value} out of range"))
 }

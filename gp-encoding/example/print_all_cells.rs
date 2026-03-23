@@ -9,14 +9,17 @@
 //! cargo run -p gp-encoding --example print_all_cells
 //! ```
 
-use gp_encoding::{ZarrBackend, StorageBackend};
+use gp_encoding::{StorageBackend, ZarrBackend};
 use std::path::Path;
 
 fn main() {
     let store_path = Path::new("./tmp/gp_encoding_geotiff_convert");
 
     if !store_path.exists() {
-        eprintln!("Zarr store not found at {}. Please run the zarr_roundtrip example first.", store_path.display());
+        eprintln!(
+            "Zarr store not found at {}. Please run the zarr_roundtrip example first.",
+            store_path.display()
+        );
         std::process::exit(1);
     }
 
@@ -26,7 +29,7 @@ fn main() {
     println!("=== Zarr Store Contents ===");
     println!("DGGRS:       {}", metadata.dggrs);
     println!("Chunk Size:  {}", metadata.chunk_size);
-    println!("Attributes:  {}", metadata.attributes.len());
+    println!("Attributes:  {:?}", metadata.attributes);
     println!();
 
     let attributes = &metadata.attributes;
@@ -43,6 +46,8 @@ fn main() {
 
     // Iterate through all resolution levels
     let levels = backend.levels();
+    let band_count = backend.band_count();
+    println!("Found levels: {:?} with {} bands each", levels, band_count);
     for level in levels {
         println!("─── Level {} ───", level);
 
@@ -50,48 +55,58 @@ fn main() {
             Ok(num_chunks) => {
                 let mut total_cells = 0;
                 for chunk_idx in 0..num_chunks {
-                    match backend.read_chunk(level, chunk_idx) {
-                        Ok(chunk_data) => {
-                            if chunk_data.len() % cell_stride != 0 {
-                                eprintln!(
-                                    "  Warning: chunk {} byte length {} is not a multiple of cell stride {}",
-                                    chunk_idx,
-                                    chunk_data.len(),
-                                    cell_stride
-                                );
-                            }
-                            let num_values = chunk_data.len() / cell_stride;
+                    for band in 0..band_count {
+                        println!("Reading chunk {} for band {}...", chunk_idx, band);
+                        match backend.read_chunk(level, band, chunk_idx) {
+                            Ok(chunk_data) => {
+                                if chunk_data.len() % cell_stride != 0 {
+                                    eprintln!(
+                                        "  Warning: chunk {} byte length {} is not a multiple of cell stride {}",
+                                        chunk_idx,
+                                        chunk_data.len(),
+                                        cell_stride
+                                    );
+                                }
+                                let num_values = chunk_data.len() / cell_stride;
 
-                            for cell_offset in 0..num_values {
-                                let cell_index = chunk_idx * metadata.chunk_size as u64 + cell_offset as u64;
-                                let start = cell_offset * cell_stride;
-                                let end = start + cell_stride;
+                                for cell_offset in 0..num_values {
+                                    let cell_index =
+                                        chunk_idx * metadata.chunk_size as u64 + cell_offset as u64;
+                                    let start = cell_offset * cell_stride;
+                                    let end = start + cell_stride;
 
-                                if end <= chunk_data.len() {
-                                    let value_bytes = &chunk_data[start..end];
-                                    let mut offset = 0usize;
-                                    let mut values = Vec::with_capacity(attributes.len());
+                                    if end <= chunk_data.len() {
+                                        let value_bytes = &chunk_data[start..end];
+                                        let mut offset = 0usize;
+                                        let mut values = Vec::with_capacity(attributes.len());
 
-                                    for (band_idx, attribute) in attributes.iter().enumerate() {
-                                        let band_size = attribute.dtype.byte_size();
-                                        let band_end = offset + band_size;
-                                        if band_end <= value_bytes.len() {
-                                            let band_bytes = &value_bytes[offset..band_end];
-                                            let value_str = format_value(&attribute.dtype, band_bytes);
-                                            values.push(format!("band{}={}", band_idx + 1, value_str));
-                                        } else {
-                                            values.push(format!("band{}=INVALID", band_idx + 1));
+                                        for (band_idx, attribute) in attributes.iter().enumerate() {
+                                            let band_size = attribute.dtype.byte_size();
+                                            let band_end = offset + band_size;
+                                            if band_end <= value_bytes.len() {
+                                                let band_bytes = &value_bytes[offset..band_end];
+                                                let value_str =
+                                                    format_value(&attribute.dtype, band_bytes);
+                                                values.push(format!(
+                                                    "band{}={}",
+                                                    band_idx + 1,
+                                                    value_str
+                                                ));
+                                            } else {
+                                                values
+                                                    .push(format!("band{}=INVALID", band_idx + 1));
+                                            }
+                                            offset = band_end;
                                         }
-                                        offset = band_end;
-                                    }
 
-                                    println!("  Cell {}: {}", cell_index, values.join(", "));
-                                    total_cells += 1;
+                                        println!("  Cell {}: {}", cell_index, values.join(", "));
+                                        total_cells += 1;
+                                    }
                                 }
                             }
-                        }
-                        Err(e) => {
-                            eprintln!("  Error reading chunk {}: {}", chunk_idx, e);
+                            Err(e) => {
+                                eprintln!("  Error reading chunk {}: {}", chunk_idx, e);
+                            }
                         }
                     }
                 }

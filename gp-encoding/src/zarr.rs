@@ -1,34 +1,3 @@
-// Copyright 2025-2026 contributors to the GeoPlegma project.
-//
-// Licensed under the Apache Licence, Version 2.0 <LICENCE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT licence
-// <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
-// discretion. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-//! Zarr v3 Storage Backend (§4.2.1)
-//!
-//! Reference implementation of [`StorageBackend`] backed by the
-//! [zarrs](https://docs.rs/zarrs) crate.
-//!
-//! # On-disk layout
-//!
-//! ```text
-//! <root>/                        ← Zarr group
-//!   zarr.json                    ← group metadata + dataset attrs (.zattrs)
-//!   level_0/                     ← Zarr array (resolution 0)
-//!     zarr.json
-//!     c/0  c/1  …               ← compressed chunks
-//!   level_5/                     ← Zarr array (resolution 5)
-//!     zarr.json
-//!     c/0  c/1  …
-//! ```
-//!
-//! Each resolution level maps to a **Zarr array** whose single dimension is
-//! the linearized Space-Filling Curve index.  Chunks correspond to
-//! contiguous segments of that curve so that spatial queries hit a minimal
-//! number of I/O operations.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -97,13 +66,13 @@ impl ZarrBackend {
     }
 
     /// Build the Zarr array path for a level (e.g. `"/level_3"`).
-    fn level_path(level: u32) -> String {
-        format!("/level_{level}")
+    fn level_path(level: u32, band: u32) -> String {
+        format!("/level_{level}/band_{band}")
     }
 
     /// Open a Zarr array for a given resolution level.
-    fn open_array(&self, level: u32) -> Result<Array<FilesystemStore>, EncodingError> {
-        let path = Self::level_path(level);
+    fn open_array(&self, level: u32, band: u32) -> Result<Array<FilesystemStore>, EncodingError> {
+        let path = Self::level_path(level, band);
         let array = Array::open(self.store.clone(), &path)
             .map_err(|e| EncodingError::Zarr(e.to_string()))?;
         Ok(array)
@@ -132,16 +101,14 @@ impl ZarrBackend {
 
     /// Read [`DatasetMetadata`] from the root group attributes.
     fn read_metadata(store: &Arc<FilesystemStore>) -> Result<DatasetMetadata, EncodingError> {
-        let group = Group::open(store.clone(), "/")
-            .map_err(|e| EncodingError::Zarr(e.to_string()))?;
+        let group =
+            Group::open(store.clone(), "/").map_err(|e| EncodingError::Zarr(e.to_string()))?;
 
         let attrs = group.attributes();
 
-        let meta_value = attrs
-            .get("gp_encoding")
-            .ok_or_else(|| {
-                EncodingError::Zarr("missing 'gp_encoding' attribute in root group".into())
-            })?;
+        let meta_value = attrs.get("gp_encoding").ok_or_else(|| {
+            EncodingError::Zarr("missing 'gp_encoding' attribute in root group".into())
+        })?;
 
         let metadata: DatasetMetadata = serde_json::from_value(meta_value.clone())?;
         Ok(metadata)
@@ -155,10 +122,8 @@ impl StorageBackend for ZarrBackend {
         // Ensure the directory exists.
         std::fs::create_dir_all(path)?;
 
-        let store = Arc::new(
-            FilesystemStore::new(path)
-                .map_err(|e| EncodingError::Zarr(e.to_string()))?,
-        );
+        let store =
+            Arc::new(FilesystemStore::new(path).map_err(|e| EncodingError::Zarr(e.to_string()))?);
 
         // Write root group + metadata.
         Self::write_metadata(&store, &metadata)?;
@@ -172,21 +137,21 @@ impl StorageBackend for ZarrBackend {
     }
 
     fn open(path: &Path) -> Result<Self, EncodingError> {
-        let store = Arc::new(
-            FilesystemStore::new(path)
-                .map_err(|e| EncodingError::Zarr(e.to_string()))?,
-        );
+        let store =
+            Arc::new(FilesystemStore::new(path).map_err(|e| EncodingError::Zarr(e.to_string()))?);
 
         let metadata = Self::read_metadata(&store)?;
 
         // Discover existing level arrays.
         let mut level_map = BTreeMap::new();
         for &lvl in &metadata.levels {
-            let array_path = Self::level_path(lvl);
-            if let Ok(array) = Array::open(store.clone(), &array_path) {
-                let shape = array.shape();
-                let num_cells = shape.first().copied().unwrap_or(0);
-                level_map.insert(lvl, num_cells);
+            for band in 0..metadata.attributes.len() as u32 {
+                let array_path = Self::level_path(lvl, band);
+                if let Ok(array) = Array::open(store.clone(), &array_path) {
+                    let shape = array.shape();
+                    let num_cells = shape.first().copied().unwrap_or(0);
+                    level_map.insert(lvl, num_cells);
+                }
             }
         }
 
@@ -202,16 +167,21 @@ impl StorageBackend for ZarrBackend {
         &self.metadata
     }
 
-    fn create_level(&mut self, level: u32, num_cells: u64) -> Result<ZarrLevel, EncodingError> {
-        let path = Self::level_path(level);
+    fn create_level(
+        &mut self,
+        level: u32,
+        band: u32,
+        num_cells: u64,
+    ) -> Result<ZarrLevel, EncodingError> {
+        let path = Self::level_path(level, band);
         let dtype_str = self.primary_dtype_str();
         let chunk_size = self.metadata.chunk_size;
 
         let array = ArrayBuilder::new(
-            vec![num_cells],          // array shape
-            vec![chunk_size],         // regular chunk shape
-            dtype_str,                // data type as string
-            0u64,                     // fill value
+            vec![num_cells],  // array shape
+            vec![chunk_size], // regular chunk shape
+            dtype_str,        // data type as string
+            0u64,             // fill value
         )
         .build(self.store.clone(), &path)
         .map_err(|e| EncodingError::Zarr(e.to_string()))?;
@@ -229,13 +199,18 @@ impl StorageBackend for ZarrBackend {
         self.level_map.keys().copied().collect()
     }
 
+    fn band_count(&self) -> u32 {
+        self.metadata.attributes.len() as u32
+    }
+
     fn write_chunk(
         &self,
         level: u32,
+        band: u32,
         chunk_index: u64,
         data: &[u8],
     ) -> Result<(), EncodingError> {
-        let array = self.open_array(level)?;
+        let array = self.open_array(level, band)?;
 
         let array_bytes = ArrayBytes::new_flen(data.to_vec());
         array
@@ -248,9 +223,10 @@ impl StorageBackend for ZarrBackend {
     fn read_chunk(
         &self,
         level: u32,
+        band: u32,
         chunk_index: u64,
     ) -> Result<Vec<u8>, EncodingError> {
-        let array = self.open_array(level)?;
+        let array = self.open_array(level, band)?;
 
         let bytes: ArrayBytes<'static> = array
             .retrieve_chunk(&[chunk_index])

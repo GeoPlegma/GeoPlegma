@@ -44,7 +44,6 @@ fn main() {
         &input_path,
         &output_store,
         RefinementLevel::from(refinement),
-        0,
         metadata,
     )
     .expect("convert GeoTIFF to encoded dataset");
