@@ -7,7 +7,6 @@
 
 use std::path::PathBuf;
 
-use geoplegma::adapters::h3o::h3::H3Impl;
 use geoplegma::models::common::{DggrsUid, RefinementLevel};
 use gp_encoding::{
     AttributeSchema, DataType, DatasetMetadata, GridExtent, StorageBackend, ZarrBackend,
@@ -44,10 +43,10 @@ fn main() {
         compression: None,
     };
 
-    let backend = convert_geotiff_file_to_backend::<ZarrBackend, _>(
+
+    let backend = convert_geotiff_file_to_backend::<ZarrBackend>(
         &input_path,
         &output_store,
-        &H3Impl::default(),
         RefinementLevel::from(refinement),
         0,
         metadata,

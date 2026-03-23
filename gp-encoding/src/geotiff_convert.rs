@@ -1,33 +1,41 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use geoplegma::models::common::RefinementLevel;
 use gdal::{Dataset, GeoTransformEx};
 use geo_types::Point;
+use geoplegma::get;
+use geoplegma::models::common::{RefinementLevel, ZoneId};
 use rayon::prelude::*;
 
 use crate::error::EncodingError;
-use crate::grid::Linearizer;
 use crate::models::{DataType, DatasetMetadata, GridExtent};
 use crate::storage::StorageBackend;
 
-pub fn convert_geotiff_file_to_backend<B, G>(
+fn zone_id_to_u64(id: &ZoneId) -> u64 {
+    match id {
+        ZoneId::IntId(v) => *v,
+        ZoneId::HexId(h) => u64::from_str_radix(h.as_str(), 16).unwrap(),
+        ZoneId::StrId(s) => s.parse::<u64>().unwrap(),
+    }
+}
+
+pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
     output_path: &Path,
-    grid: &G,
     refinement_level: RefinementLevel,
     sample: usize,
     mut metadata: DatasetMetadata,
 ) -> Result<B, EncodingError>
 where
     B: StorageBackend,
-    G: Linearizer,
 {
     if metadata.attributes.is_empty() {
         return Err(EncodingError::Storage(
             "dataset metadata must define at least one attribute".into(),
         ));
     }
+
+    let grid = get(metadata.dggrs).unwrap(); // TODO: remove unwrap
 
     let level = u32::try_from(refinement_level.get()).map_err(|_| {
         EncodingError::Grid(format!(
@@ -122,7 +130,7 @@ where
                 .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
 
             let bytes = f64_to_bytes(v, output_type)?;
-            let key = grid.zone_to_linear(&zone.id);
+            let key = zone_id_to_u64(&zone.id);
 
             Ok((key, bytes))
         })
@@ -130,11 +138,11 @@ where
 
     linear_values.extend(computed_entries?);
 
-    let num_cells = grid.num_cells_at_level(refinement_level);
+    let zones = grid.zone_count(refinement_level).unwrap();
     let chunk_size = metadata.chunk_size;
 
     let mut backend = B::create(output_path, metadata)?;
-    backend.create_level(level, num_cells)?;
+    backend.create_level(level, zones)?;
 
     let mut chunks: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
     for (linear_index, value_bytes) in linear_values {
