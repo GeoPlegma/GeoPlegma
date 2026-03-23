@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use geo_types::Point;
 use geoplegma::models::common::RefinementLevel;
-use gp_encoding::{query_value_bytes_for_point, StorageBackend, ZarrBackend};
+use gp_encoding::{StorageBackend, ZarrBackend, query_value_bytes_for_point};
 
 fn main() {
     let store_path = std::env::args().nth(1).unwrap_or_else(|| {
@@ -54,9 +54,13 @@ fn main() {
     println!("  DGGRS:       {}", backend.metadata().dggrs);
     println!("  Chunk size:  {}", backend.metadata().chunk_size);
     println!("  Levels:      {:?}", backend.levels());
-    println!("  Attributes:  {:?}", 
-        backend.metadata().attributes.iter()
-            .map(|a| format!("{}", a.dtype as u8))
+    println!(
+        "  Attributes:  {:?}",
+        backend
+            .metadata()
+            .attributes
+            .iter()
+            .map(|a| format!("{:?}", a.dtype))
             .collect::<Vec<_>>()
     );
 
@@ -65,52 +69,54 @@ fn main() {
 
     println!("\nQuerying point ({}, {}) at level {}", lon, lat, level);
 
-    let value_bytes = query_value_bytes_for_point(&backend, refinement, point)
-        .expect("query point");
-
-    println!("Retrieved {} bytes", value_bytes.len());
-
-    let dtype = &backend.metadata().attributes[0].dtype;
-    match dtype {
-        gp_encoding::DataType::Float32 => {
-            let value = f32::from_ne_bytes(value_bytes[..4].try_into().unwrap());
-            println!("Value (f32): {}", value);
-        }
-        gp_encoding::DataType::Float64 => {
-            let value = f64::from_ne_bytes(value_bytes[..8].try_into().unwrap());
-            println!("Value (f64): {}", value);
-        }
-        gp_encoding::DataType::Int8 => {
-            let value = i8::from_ne_bytes(value_bytes[..1].try_into().unwrap());
-            println!("Value (i8): {}", value);
-        }
-        gp_encoding::DataType::Int16 => {
-            let value = i16::from_ne_bytes(value_bytes[..2].try_into().unwrap());
-            println!("Value (i16): {}", value);
-        }
-        gp_encoding::DataType::Int32 => {
-            let value = i32::from_ne_bytes(value_bytes[..4].try_into().unwrap());
-            println!("Value (i32): {}", value);
-        }
-        gp_encoding::DataType::Int64 => {
-            let value = i64::from_ne_bytes(value_bytes[..8].try_into().unwrap());
-            println!("Value (i64): {}", value);
-        }
-        gp_encoding::DataType::UInt8 => {
-            let value = u8::from_ne_bytes(value_bytes[..1].try_into().unwrap());
-            println!("Value (u8): {}", value);
-        }
-        gp_encoding::DataType::UInt16 => {
-            let value = u16::from_ne_bytes(value_bytes[..2].try_into().unwrap());
-            println!("Value (u16): {}", value);
-        }
-        gp_encoding::DataType::UInt32 => {
-            let value = u32::from_ne_bytes(value_bytes[..4].try_into().unwrap());
-            println!("Value (u32): {}", value);
-        }
-        gp_encoding::DataType::UInt64 => {
-            let value = u64::from_ne_bytes(value_bytes[..8].try_into().unwrap());
-            println!("Value (u64): {}", value);
+    
+    let band_count = backend.band_count();
+    for band_index in 0..band_count {
+        let value_bytes =
+            query_value_bytes_for_point(&backend, refinement, band_index, point).expect("query point");
+    
+        let dtype = &backend.metadata().attributes[band_index as usize].dtype;
+        match dtype {
+            gp_encoding::DataType::Float32 => {
+                let value = f32::from_ne_bytes(value_bytes[..4].try_into().unwrap());
+                println!("Value (f32): {}", value);
+            }
+            gp_encoding::DataType::Float64 => {
+                let value = f64::from_ne_bytes(value_bytes[..8].try_into().unwrap());
+                println!("Value (f64): {}", value);
+            }
+            gp_encoding::DataType::Int8 => {
+                let value = i8::from_ne_bytes(value_bytes[..1].try_into().unwrap());
+                println!("Value (i8): {}", value);
+            }
+            gp_encoding::DataType::Int16 => {
+                let value = i16::from_ne_bytes(value_bytes[..2].try_into().unwrap());
+                println!("Value (i16): {}", value);
+            }
+            gp_encoding::DataType::Int32 => {
+                let value = i32::from_ne_bytes(value_bytes[..4].try_into().unwrap());
+                println!("Value (i32): {}", value);
+            }
+            gp_encoding::DataType::Int64 => {
+                let value = i64::from_ne_bytes(value_bytes[..8].try_into().unwrap());
+                println!("Value (i64): {}", value);
+            }
+            gp_encoding::DataType::UInt8 => {
+                let value = u8::from_ne_bytes(value_bytes[..1].try_into().unwrap());
+                println!("Value (u8): {}", value);
+            }
+            gp_encoding::DataType::UInt16 => {
+                let value = u16::from_ne_bytes(value_bytes[..2].try_into().unwrap());
+                println!("Value (u16): {}", value);
+            }
+            gp_encoding::DataType::UInt32 => {
+                let value = u32::from_ne_bytes(value_bytes[..4].try_into().unwrap());
+                println!("Value (u32): {}", value);
+            }
+            gp_encoding::DataType::UInt64 => {
+                let value = u64::from_ne_bytes(value_bytes[..8].try_into().unwrap());
+                println!("Value (u64): {}", value);
+            }
         }
     }
 }
