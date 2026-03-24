@@ -40,12 +40,6 @@ struct ConvertGeotiffArgs {
     /// Output Zarr store path.
     #[arg(short, long, default_value = "./tmp/gp_encoding_geotiff_convert")]
     output: PathBuf,
-    /// DGGS refinement level.
-    #[arg(short, long, default_value_t = 5)]
-    refinement: u8,
-    /// Number of cells per chunk.
-    #[arg(long, default_value_t = 1024)]
-    chunk_size: u64,
 }
 
 #[derive(Args, Debug)]
@@ -91,31 +85,21 @@ fn main() {
 
 fn run_convert_geotiff(args: ConvertGeotiffArgs) -> Result<(), String> {
     if args.output.exists() {
-        std::fs::remove_dir_all(&args.output)
-            .map_err(|e| format!("failed to clean output store {}: {e}", args.output.display()))?;
+        std::fs::remove_dir_all(&args.output).map_err(|e| {
+            format!(
+                "failed to clean output store {}: {e}",
+                args.output.display()
+            )
+        })?;
     }
 
-    let metadata = DatasetMetadata {
-        dggrs: args.dggrs,
-        extent: GridExtent::Global,
-        attributes: vec![],
-        chunk_size: args.chunk_size,
-        levels: vec![u32::from(args.refinement)],
-        compression: None,
-    };
-
-    let backend = convert_geotiff_file_to_backend::<ZarrBackend>(
-        &args.input,
-        &args.output,
-        RefinementLevel::from(args.refinement),
-        metadata,
-    )
-    .map_err(|e| e.to_string())?;
+    let backend =
+        convert_geotiff_file_to_backend::<ZarrBackend>(&args.input, &args.output, args.dggrs)
+            .map_err(|e| e.to_string())?;
 
     println!("Conversion successful");
     println!("  Input:      {}", args.input.display());
     println!("  Output:     {}", args.output.display());
-    println!("  Refinement: {}", args.refinement);
     println!("  Levels:     {:?}", backend.levels());
 
     Ok(())
@@ -126,11 +110,6 @@ fn run_query(args: QueryArgs) -> Result<(), String> {
 
     let refinement = RefinementLevel::from(args.level);
     let point = Point::new(args.lon, args.lat);
-
-    println!("Opened Zarr store at {}", args.store.display());
-    println!("  DGGRS:      {}", backend.metadata().dggrs);
-    println!("  Chunk size: {}", backend.metadata().chunk_size);
-    println!("  Levels:     {:?}", backend.levels());
 
     let band_count = backend.band_count();
     let bands: Vec<u32> = if let Some(band) = args.band {

@@ -6,7 +6,7 @@ use gdal::{Dataset, GeoTransformEx};
 use geo_types::Point;
 use geoplegma::api::DggrsApi;
 use geoplegma::get;
-use geoplegma::models::common::RefinementLevel;
+use geoplegma::models::common::{DggrsUid, RefinementLevel};
 use rayon::prelude::*;
 
 use crate::AttributeSchema;
@@ -72,23 +72,59 @@ where
         .collect()
 }
 
+fn get_closest_refinement_level(
+    grid: &std::sync::Arc<dyn geoplegma::api::DggrsApi>,
+    gt: [f64; 6],
+) -> Result<RefinementLevel, EncodingError> {
+    let pixel_width = gt[1].abs();
+    let pixel_height = gt[5].abs();
+
+    if pixel_width == 0.0 || pixel_height == 0.0 {
+        return Err(EncodingError::GeoTiff(
+            "geotransform has zero pixel size".into(),
+        ));
+    }
+
+    let world_pixel_count =
+        ((40_075_016.685 / pixel_width) * (40_075_016.685 / pixel_height)) as u64; // TODO: support different projections?
+
+    println!("world pixel count: {}", world_pixel_count);
+    let mut best_level: Option<RefinementLevel> = None;
+    let mut best_diff = u64::MAX;
+
+    let min_level = grid.min_refinement_level().unwrap();
+    let max_level = grid.max_refinement_level().unwrap();
+
+    for raw_level in min_level.get()..=max_level.get() {
+        let level = RefinementLevel::new_const(raw_level);
+
+        let zone_count = grid.zone_count(level).unwrap();
+
+        let diff = world_pixel_count.abs_diff(zone_count);
+
+        if diff < best_diff {
+            best_diff = diff;
+            best_level = Some(level);
+        }
+    }
+    println!(
+        "best level: {} with diff {}",
+        best_level.unwrap().get(),
+        best_diff
+    );
+
+    best_level.ok_or_else(|| EncodingError::Grid("no valid refinement level found".into()))
+}
+
 pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
     output_path: &Path,
-    refinement_level: RefinementLevel,
-    mut metadata: DatasetMetadata,
+    dggrs: DggrsUid,
 ) -> Result<B, EncodingError>
 where
     B: StorageBackend,
 {
-    let grid = get(metadata.dggrs).unwrap(); // TODO: remove unwrap
-
-    let level = u32::try_from(refinement_level.get()).map_err(|_| {
-        EncodingError::Grid(format!(
-            "refinement level {} cannot be represented as u32",
-            refinement_level.get()
-        ))
-    })?;
+    let grid = get(dggrs).unwrap(); // TODO: remove unwrap
 
     let dataset = Dataset::open(geotiff_path).map_err(|e| EncodingError::Gdal(e.to_string()))?;
 
@@ -110,6 +146,7 @@ where
                 GdalDataType::UInt64 => DataType::UInt64,
                 GdalDataType::Float32 => DataType::Float32,
                 GdalDataType::Float64 => DataType::Float64,
+                // TODO: add every type
                 _ => {
                     return Err(EncodingError::GeoTiff(format!(
                         "unsupported GDAL data type: {band_type:?}"
@@ -124,8 +161,7 @@ where
         })
         .collect::<Result<Vec<_>, EncodingError>>()?;
 
-    metadata.attributes = metadata_bands;
-    if metadata.attributes.is_empty() {
+    if metadata_bands.is_empty() {
         return Err(EncodingError::Storage(
             "dataset metadata must define at least one attribute".into(),
         ));
@@ -136,7 +172,7 @@ where
         .map_err(|e| EncodingError::Gdal(e.to_string()))?;
 
     let (width, height) = first_band.size();
-    
+
     if width == 0 || height == 0 {
         return Err(EncodingError::GeoTiff(
             "raster has zero width or height".into(),
@@ -148,6 +184,8 @@ where
     let gt = dataset
         .geo_transform()
         .map_err(|e| EncodingError::Gdal(format!("missing/invalid geotransform: {e}")))?;
+
+    let refinement_level = get_closest_refinement_level(&grid, gt)?;
 
     let corners = [
         gt.apply(0.0, 0.0),
@@ -168,11 +206,18 @@ where
         max_y = max_y.max(y);
     }
 
-    metadata.extent = GridExtent::BoundingBox {
-        min_lon: min_x,
-        min_lat: min_y,
-        max_lon: max_x,
-        max_lat: max_y,
+    let metadata = DatasetMetadata {
+        dggrs,
+        extent: GridExtent::BoundingBox {
+            min_lon: min_x,
+            min_lat: min_y,
+            max_lon: max_x,
+            max_lat: max_y,
+        },
+        attributes: metadata_bands,
+        chunk_size: 1024,
+        levels: vec![refinement_level.get() as u32],
+        compression: None,
     };
 
     let zones = grid.zone_count(refinement_level).unwrap();
@@ -323,8 +368,7 @@ where
 
         let linear_values: BTreeMap<u64, Vec<u8>> = computed_entries.into_iter().collect();
 
-
-        backend.create_level(level, band_index as u32, zones)?;
+        backend.create_level(refinement_level.get() as u32, band_index as u32, zones)?;
 
         let mut chunks: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
         for (linear_index, value_bytes) in linear_values {
@@ -341,7 +385,12 @@ where
         }
 
         for (chunk_index, bytes) in chunks {
-            backend.write_chunk(level, band_index as u32, chunk_index, &bytes)?;
+            backend.write_chunk(
+                refinement_level.get() as u32,
+                band_index as u32,
+                chunk_index,
+                &bytes,
+            )?;
         }
     }
 
