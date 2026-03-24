@@ -23,36 +23,20 @@ pub struct DatasetMetadata {
     #[serde(with = "DggrsUidDef")]
     pub dggrs: DggrsUid,
 
-    /// Spatial extent covered by this dataset.
-    pub extent: GridExtent,
-
     /// Schema of the stored attributes.
     pub attributes: Vec<AttributeSchema>,
 
     /// Chunk size: number of cells per chunk along the linearized SFC axis.
     pub chunk_size: u64,
 
+    /// IDs of the chunks stored in this dataset.
+    pub chunk_ids: Vec<u64>,
+
     /// Resolution levels stored in this dataset.
     pub levels: Vec<u32>,
 
     /// Compression method used for the cell attribute data.
     pub compression: Option<String>,
-}
-
-/// The spatial bounds or specific cell subset covered by a dataset.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum GridExtent {
-    /// The dataset covers the entire globe.
-    Global,
-
-    /// The dataset covers a geographic bounding box.
-    BoundingBox {
-        min_lon: f64,
-        min_lat: f64,
-        max_lon: f64,
-        max_lat: f64,
-    },
 }
 
 /// Description of a single data attribute.

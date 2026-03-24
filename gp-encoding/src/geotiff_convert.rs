@@ -14,7 +14,7 @@ use rayon::prelude::*;
 use crate::AttributeSchema;
 use crate::common::{CONFIG, zone_id_to_u64};
 use crate::error::EncodingError;
-use crate::models::{DataType, DatasetMetadata, GridExtent};
+use crate::models::{DataType, DatasetMetadata};
 use crate::storage::StorageBackend;
 
 trait NativeBytes {
@@ -35,7 +35,7 @@ macro_rules! impl_native_bytes {
 
 impl_native_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
 
-fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Rect<f64>, f64, f64), EncodingError> {
+fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Option<Rect<f64>>, f64, f64), EncodingError> {
  
     let (width_px, height_px) = dataset.raster_size();
     let w = width_px as f64;
@@ -73,8 +73,13 @@ fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Rect<f64>, f64, f64)
     let pixel_w = f64::hypot(px[1] - px[0], py[1] - py[0]);
     let pixel_h = f64::hypot(px[2] - px[0], py[2] - py[0]);
 
+    let mut bbox: Option<Rect<f64>> = None;
+    if lon_min <= -180.0 && lon_max >= 180.0 && lat_min <= -90.0 && lat_max >= 90.0 {
+        bbox = Some(Rect::new(Point::new(lon_min, lat_min), Point::new(lon_max, lat_max)));
+    }
+
     Ok((
-        Rect::new(Point::new(lon_min, lat_min), Point::new(lon_max, lat_max)),
+        bbox,
         pixel_w,
         pixel_h,
     ))
@@ -244,19 +249,19 @@ where
         chunk_size
     );
 
-    let zones = grid.zones_from_bbox(chunk_level, Some(bbox), Some(CONFIG))?;
-    println!("zones in bbox: {}", zones.zones.len());
+    let chunk_zones = grid.zones_from_bbox(chunk_level, bbox, Some(CONFIG))?;
+    if chunk_zones.zones.is_empty() {
+        return Err(EncodingError::Grid(
+            "no zones found intersecting dataset bounding box".into(),
+        ));
+    }
+    println!("zones in bbox: {}", chunk_zones.zones.len());
 
     let metadata = DatasetMetadata {
         dggrs,
-        extent: GridExtent::BoundingBox {
-            min_lon: bbox.min().x,
-            min_lat: bbox.min().y,
-            max_lon: bbox.max().x,
-            max_lat: bbox.max().y,
-        },
         attributes: metadata_bands,
         chunk_size,
+        chunk_ids: chunk_zones.zones.iter().map(|z| zone_id_to_u64(&z.id)).collect::<Result<_, _>>()?,
         levels: vec![refinement_level.get() as u32],
         compression: None,
     };

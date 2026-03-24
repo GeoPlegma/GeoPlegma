@@ -90,7 +90,7 @@ mod tests {
 
     use geoplegma::models::common::{DggrsUid, ZoneId};
 
-    use crate::models::{AttributeSchema, DataType, DatasetMetadata, GridExtent};
+    use crate::models::{AttributeSchema, DataType, DatasetMetadata};
     use crate::query::query_value_bytes_by_cell_index;
     use crate::storage::StorageBackend;
     use crate::zarr::ZarrBackend;
@@ -109,12 +109,12 @@ mod tests {
 
         let metadata = DatasetMetadata {
             dggrs: DggrsUid::H3,
-            extent: GridExtent::Global,
             attributes: vec![AttributeSchema {
                 dtype: DataType::UInt16,
                 fill_value: None,
             }],
             chunk_size: 4,
+            chunk_ids: vec![0, 1],
             levels: vec![1],
             compression: None,
         };

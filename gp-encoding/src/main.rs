@@ -147,7 +147,7 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
     println!("Store:       {}", args.store.display());
     println!("DGGRS:       {}", metadata.dggrs);
     println!("Chunk size:  {}", metadata.chunk_size);
-    println!("Extent:      {:?}", metadata.extent);
+    println!("Chunks:      {}", metadata.chunk_ids.len());
     println!("Bands:       {}", metadata.attributes.len());
     println!("Levels:      {:?}", backend.levels());
 
