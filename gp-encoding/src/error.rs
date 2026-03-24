@@ -6,7 +6,13 @@ pub enum EncodingError {
     Io(#[from] std::io::Error),
 
     #[error("GDAL error: {0}")]
-    Gdal(String),
+    Gdal(#[from] gdal::errors::GdalError),
+
+    #[error("DGGRS error: {0}")]
+    Dggrs(#[from] geoplegma::error::DggrsError),
+
+    #[error("DGGRS Fabric error: {0}")]
+    DggrsFabric(#[from] geoplegma::error::factory::FactoryError),
 
     #[error("GeoTIFF error: {0}")]
     GeoTiff(String),

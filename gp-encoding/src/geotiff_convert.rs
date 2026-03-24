@@ -50,16 +50,17 @@ where
             let row = idx / width;
             let col = idx % width;
 
-            let v = *data
-                .get(idx)
-                .ok_or_else(|| EncodingError::Gdal("raster buffer index out of bounds".into()))?;
+            let v = *data.get(idx).ok_or_else(|| {
+                EncodingError::GeoTiff(format!(
+                    "index {idx} out of bounds for data length {}",
+                    data.len()
+                ))
+            })?;
 
             // pixel center
             let (x, y) = gt.apply(col as f64 + 0.5, row as f64 + 0.5);
 
-            let zones = grid
-                .zone_from_point(refinement_level, Point::new(x, y), None)
-                .map_err(|e| EncodingError::Grid(e.to_string()))?;
+            let zones = grid.zone_from_point(refinement_level, Point::new(x, y), None)?;
 
             let zone = zones
                 .zones
@@ -92,13 +93,13 @@ fn get_closest_refinement_level(
     let mut best_level: Option<RefinementLevel> = None;
     let mut best_diff = u64::MAX;
 
-    let min_level = grid.min_refinement_level().unwrap();
-    let max_level = grid.max_refinement_level().unwrap();
+    let min_level = grid.min_refinement_level()?;
+    let max_level = grid.max_refinement_level()?;
 
     for raw_level in min_level.get()..=max_level.get() {
         let level = RefinementLevel::new_const(raw_level);
 
-        let zone_count = grid.zone_count(level).unwrap();
+        let zone_count = grid.zone_count(level)?;
 
         let diff = world_pixel_count.abs_diff(zone_count);
 
@@ -124,14 +125,14 @@ pub fn convert_geotiff_file_to_backend<B>(
 where
     B: StorageBackend,
 {
-    let grid = get(dggrs).unwrap(); // TODO: remove unwrap
+    let grid = get(dggrs)?;
 
-    let dataset = Dataset::open(geotiff_path).map_err(|e| EncodingError::Gdal(e.to_string()))?;
+    let dataset = Dataset::open(geotiff_path)?;
 
     let bands = dataset
         .rasterbands()
-        .map(|b| b.unwrap().band_type())
-        .collect::<Vec<_>>();
+        .map(|b| b.map(|band| band.band_type()))
+        .collect::<Result<Vec<_>, _>>()?;
     let metadata_bands = bands
         .iter()
         .map(|band_type| {
@@ -167,9 +168,7 @@ where
         ));
     }
 
-    let first_band = dataset
-        .rasterband(1)
-        .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+    let first_band = dataset.rasterband(1)?;
 
     let (width, height) = first_band.size();
 
@@ -181,9 +180,7 @@ where
 
     let total_pixels = height * width;
 
-    let gt = dataset
-        .geo_transform()
-        .map_err(|e| EncodingError::Gdal(format!("missing/invalid geotransform: {e}")))?;
+    let gt = dataset.geo_transform()?;
 
     let refinement_level = get_closest_refinement_level(&grid, gt)?;
 
@@ -220,21 +217,17 @@ where
         compression: None,
     };
 
-    let zones = grid.zone_count(refinement_level).unwrap();
+    let zones = grid.zone_count(refinement_level)?;
     let chunk_size = metadata.chunk_size;
     let mut backend = B::create(output_path, metadata)?;
 
     for (band_index, band_type) in bands.into_iter().enumerate() {
-        let band = dataset
-            .rasterband(band_index + 1)
-            .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+        let band = dataset.rasterband(band_index + 1)?;
         let value_size = band_type.bytes() as usize;
 
         let computed_entries = match band_type {
             GdalDataType::UInt8 => {
-                let raster = band
-                    .read_band_as::<u8>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<u8>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -245,9 +238,7 @@ where
                 )
             }
             GdalDataType::Int8 => {
-                let raster = band
-                    .read_band_as::<i8>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<i8>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -258,9 +249,7 @@ where
                 )
             }
             GdalDataType::UInt16 => {
-                let raster = band
-                    .read_band_as::<u16>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<u16>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -271,9 +260,7 @@ where
                 )
             }
             GdalDataType::Int16 => {
-                let raster = band
-                    .read_band_as::<i16>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<i16>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -284,9 +271,7 @@ where
                 )
             }
             GdalDataType::UInt32 => {
-                let raster = band
-                    .read_band_as::<u32>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<u32>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -297,9 +282,7 @@ where
                 )
             }
             GdalDataType::Int32 => {
-                let raster = band
-                    .read_band_as::<i32>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<i32>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -310,9 +293,7 @@ where
                 )
             }
             GdalDataType::UInt64 => {
-                let raster = band
-                    .read_band_as::<u64>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<u64>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -323,9 +304,7 @@ where
                 )
             }
             GdalDataType::Int64 => {
-                let raster = band
-                    .read_band_as::<i64>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<i64>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -336,9 +315,7 @@ where
                 )
             }
             GdalDataType::Float32 => {
-                let raster = band
-                    .read_band_as::<f32>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<f32>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
@@ -349,9 +326,7 @@ where
                 )
             }
             GdalDataType::Float64 => {
-                let raster = band
-                    .read_band_as::<f64>()
-                    .map_err(|e| EncodingError::Gdal(e.to_string()))?;
+                let raster = band.read_band_as::<f64>()?;
                 compute_entries_from_data(
                     raster.data(),
                     total_pixels,
