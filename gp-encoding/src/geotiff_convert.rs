@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use gdal::raster::GdalDataType;
+use gdal::spatial_ref::{CoordTransform, SpatialRef};
 use gdal::{Dataset, GeoTransformEx};
+use geo::Rect;
 use geo_types::Point;
 use geoplegma::api::DggrsApi;
 use geoplegma::get;
@@ -32,6 +34,51 @@ macro_rules! impl_native_bytes {
 }
 
 impl_native_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
+
+fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Rect<f64>, f64, f64), EncodingError> {
+ 
+    let (width_px, height_px) = dataset.raster_size();
+    let w = width_px as f64;
+    let h = height_px as f64;
+
+    let gt = dataset.geo_transform()?;
+    let src_srs = dataset.spatial_ref()?;
+
+    let wgs84 = SpatialRef::from_epsg(4326)?;
+    let to_wgs84 = CoordTransform::new(&src_srs, &wgs84)?;
+
+    let mut xs = vec![gt[0], gt[0] + w * gt[1] + h * gt[2]];
+    let mut ys = vec![gt[3], gt[3] + w * gt[4] + h * gt[5]];
+    let mut zs = vec![0.0f64; 2];
+    to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
+
+    let (lon_min, lon_max) = (xs[0].min(xs[1]), xs[0].max(xs[1]));
+    let (lat_min, lat_max) = (ys[0].min(ys[1]), ys[0].max(ys[1]));
+
+    println!("Bounding box (WGS84):");
+    println!("  lon: [{lon_min:.6}, {lon_max:.6}]");
+    println!("  lat: [{lat_min:.6}, {lat_max:.6}]");
+
+    let cx = gt[0] + (w / 2.0) * gt[1] + (h / 2.0) * gt[2];
+    let cy = gt[3] + (w / 2.0) * gt[4] + (h / 2.0) * gt[5];
+
+    let metric = SpatialRef::from_epsg(3857)?;
+    let to_metric = CoordTransform::new(&src_srs, &metric)?;
+
+    let mut px = vec![cx, cx + gt[1], cx + gt[2]];
+    let mut py = vec![cy, cy + gt[4], cy + gt[5]];
+    let mut pz = vec![0.0f64; 3];
+    to_metric.transform_coords(&mut px, &mut py, &mut pz)?;
+
+    let pixel_w = f64::hypot(px[1] - px[0], py[1] - py[0]);
+    let pixel_h = f64::hypot(px[2] - px[0], py[2] - py[0]);
+
+    Ok((
+        Rect::new(Point::new(lon_min, lat_min), Point::new(lon_max, lat_max)),
+        pixel_w,
+        pixel_h,
+    ))
+}
 
 fn compute_entries_from_data<T>(
     data: &[T],
@@ -75,11 +122,9 @@ where
 
 fn get_closest_refinement_level(
     grid: &std::sync::Arc<dyn geoplegma::api::DggrsApi>,
-    gt: [f64; 6],
+    pixel_width: f64,
+    pixel_height: f64,
 ) -> Result<RefinementLevel, EncodingError> {
-    let pixel_width = gt[1].abs();
-    let pixel_height = gt[5].abs();
-
     if pixel_width == 0.0 || pixel_height == 0.0 {
         return Err(EncodingError::GeoTiff(
             "geotransform has zero pixel size".into(),
@@ -108,10 +153,11 @@ fn get_closest_refinement_level(
             best_level = Some(level);
         }
     }
+    let diff_percentage = (best_diff as f64 / world_pixel_count as f64) * 100.0;
     println!(
         "best level: {} with diff {}",
         best_level.unwrap().get(),
-        best_diff
+        diff_percentage
     );
 
     best_level.ok_or_else(|| EncodingError::Grid("no valid refinement level found".into()))
@@ -181,44 +227,41 @@ where
     let total_pixels = height * width;
 
     let gt = dataset.geo_transform()?;
+    let (bbox, pixel_width, pixel_height) = get_corners_and_pixel_size(&dataset)?;
+    let refinement_level = get_closest_refinement_level(&grid, pixel_width, pixel_height)?;
 
-    let refinement_level = get_closest_refinement_level(&grid, gt)?;
+    let chunk_level = RefinementLevel::new_const(
+        (refinement_level.get() - 4).max(grid.min_refinement_level()?.get()),
+    );
+    let chunk_size = dggrs
+        .spec()
+        .aperture
+        .pow((refinement_level.get() - chunk_level.get()) as u32) as u64;
+    println!(
+        "refinement level: {}, chunk level: {}, chunk size: {}",
+        refinement_level.get(),
+        chunk_level.get(),
+        chunk_size
+    );
 
-    let corners = [
-        gt.apply(0.0, 0.0),
-        gt.apply(width as f64, 0.0),
-        gt.apply(0.0, height as f64),
-        gt.apply(width as f64, height as f64),
-    ];
-
-    let mut min_x = f64::INFINITY;
-    let mut min_y = f64::INFINITY;
-    let mut max_x = f64::NEG_INFINITY;
-    let mut max_y = f64::NEG_INFINITY;
-
-    for (x, y) in corners {
-        min_x = min_x.min(x);
-        min_y = min_y.min(y);
-        max_x = max_x.max(x);
-        max_y = max_y.max(y);
-    }
+    let zones = grid.zones_from_bbox(chunk_level, Some(bbox), Some(CONFIG))?;
+    println!("zones in bbox: {}", zones.zones.len());
 
     let metadata = DatasetMetadata {
         dggrs,
         extent: GridExtent::BoundingBox {
-            min_lon: min_x,
-            min_lat: min_y,
-            max_lon: max_x,
-            max_lat: max_y,
+            min_lon: bbox.min().x,
+            min_lat: bbox.min().y,
+            max_lon: bbox.max().x,
+            max_lat: bbox.max().y,
         },
         attributes: metadata_bands,
-        chunk_size: 1024,
+        chunk_size,
         levels: vec![refinement_level.get() as u32],
         compression: None,
     };
 
     let zones = grid.zone_count(refinement_level)?;
-    let chunk_size = metadata.chunk_size;
     let mut backend = B::create(output_path, metadata)?;
 
     for (band_index, band_type) in bands.into_iter().enumerate() {
