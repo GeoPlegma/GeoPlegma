@@ -10,7 +10,7 @@ use geoplegma::models::common::{DggrsUid, RefinementLevel};
 use rayon::prelude::*;
 
 use crate::AttributeSchema;
-use crate::common::zone_id_to_u64;
+use crate::common::{CONFIG, zone_id_to_u64};
 use crate::error::EncodingError;
 use crate::models::{DataType, DatasetMetadata, GridExtent};
 use crate::storage::StorageBackend;
@@ -60,7 +60,7 @@ where
             // pixel center
             let (x, y) = gt.apply(col as f64 + 0.5, row as f64 + 0.5);
 
-            let zones = grid.zone_from_point(refinement_level, Point::new(x, y), None)?;
+            let zones = grid.zone_from_point(refinement_level, Point::new(x, y), Some(CONFIG))?;
 
             let zone = zones
                 .zones

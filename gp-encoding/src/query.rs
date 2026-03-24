@@ -2,7 +2,7 @@ use geo_types::Point;
 use geoplegma::get;
 use geoplegma::models::common::{RefinementLevel, ZoneId};
 
-use crate::common::zone_id_to_u64;
+use crate::common::{CONFIG, zone_id_to_u64};
 use crate::error::EncodingError;
 use crate::storage::StorageBackend;
 
@@ -20,7 +20,7 @@ pub fn query_value_bytes_for_point<B: StorageBackend>(
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
 
     let zones = grid
-        .zone_from_point(refinement_level, point, None)
+        .zone_from_point(refinement_level, point, Some(CONFIG))
         .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
     let zone = zones

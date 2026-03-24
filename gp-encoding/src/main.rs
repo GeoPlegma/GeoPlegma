@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use geo_types::Point;
 use geoplegma::models::common::{DggrsUid, RefinementLevel};
 use gp_encoding::{
-    DatasetMetadata, GridExtent, StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
+    StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
     query_value_bytes_for_point,
 };
 
@@ -158,37 +158,11 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
         let num_chunks = backend.num_chunks(level).map_err(|e| e.to_string())?;
         println!("\nLevel {level}");
         println!("  Logical chunk count: {num_chunks}");
-
+        
         for band in 0..band_count {
-            let mut present_chunks = 0_u64;
-            let mut missing_chunks = 0_u64;
-            let mut stored_bytes = 0_u64;
-
-            for chunk_idx in 0..num_chunks {
-                match backend.read_chunk(level, band, chunk_idx) {
-                    Ok(chunk) => {
-                        present_chunks += 1;
-                        stored_bytes += chunk.len() as u64;
-                    }
-                    Err(_) => {
-                        missing_chunks += 1;
-                    }
-                }
-            }
-
             let dtype = &metadata.attributes[band as usize].dtype;
-            let bytes_per_value = dtype.byte_size();
-            let estimated_values = if bytes_per_value == 0 {
-                0
-            } else {
-                stored_bytes / bytes_per_value as u64
-            };
 
             println!("  Band {band} ({dtype:?})");
-            println!("    Present chunks: {present_chunks}");
-            println!("    Missing chunks: {missing_chunks}");
-            println!("    Stored bytes:   {stored_bytes}");
-            println!("    Stored values:  {estimated_values}");
         }
     }
 
