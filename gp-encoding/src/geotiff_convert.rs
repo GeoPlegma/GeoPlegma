@@ -35,8 +35,9 @@ macro_rules! impl_native_bytes {
 
 impl_native_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
 
-fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Option<Rect<f64>>, f64, f64), EncodingError> {
- 
+fn get_corners_and_pixel_size(
+    dataset: &Dataset,
+) -> Result<(Option<Rect<f64>>, f64, f64), EncodingError> {
     let (width_px, height_px) = dataset.raster_size();
     let w = width_px as f64;
     let h = height_px as f64;
@@ -44,7 +45,8 @@ fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Option<Rect<f64>>, f
     let gt = dataset.geo_transform()?;
     let src_srs = dataset.spatial_ref()?;
 
-    let wgs84 = SpatialRef::from_epsg(4326)?;
+    let mut wgs84 = SpatialRef::from_epsg(4326)?;
+    wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
     let to_wgs84 = CoordTransform::new(&src_srs, &wgs84)?;
 
     let mut xs = vec![gt[0], gt[0] + w * gt[1] + h * gt[2]];
@@ -73,16 +75,22 @@ fn get_corners_and_pixel_size(dataset: &Dataset) -> Result<(Option<Rect<f64>>, f
     let pixel_w = f64::hypot(px[1] - px[0], py[1] - py[0]);
     let pixel_h = f64::hypot(px[2] - px[0], py[2] - py[0]);
 
-    let mut bbox: Option<Rect<f64>> = None;
-    if lon_min <= -180.0 && lon_max >= 180.0 && lat_min <= -90.0 && lat_max >= 90.0 {
-        bbox = Some(Rect::new(Point::new(lon_min, lat_min), Point::new(lon_max, lat_max)));
-    }
+    let tolerance = 1e-4; // 0.0001 degrees
+    let is_global = (lon_min <= -180.0 + tolerance)
+        && (lon_max >= 180.0 - tolerance)
+        && (lat_min <= -90.0 + tolerance)
+        && (lat_max >= 90.0 - tolerance);
 
-    Ok((
-        bbox,
-        pixel_w,
-        pixel_h,
-    ))
+    let bbox = if is_global {
+        None
+    } else {
+        Some(Rect::new(
+            Point::new(lon_min, lat_min),
+            Point::new(lon_max, lat_max),
+        ))
+    };
+
+    Ok((bbox, pixel_w, pixel_h))
 }
 
 fn compute_entries_from_data<T>(
@@ -261,7 +269,11 @@ where
         dggrs,
         attributes: metadata_bands,
         chunk_size,
-        chunk_ids: chunk_zones.zones.iter().map(|z| zone_id_to_u64(&z.id)).collect::<Result<_, _>>()?,
+        chunk_ids: chunk_zones
+            .zones
+            .iter()
+            .map(|z| zone_id_to_u64(&z.id))
+            .collect::<Result<_, _>>()?,
         levels: vec![refinement_level.get() as u32],
         compression: None,
     };
