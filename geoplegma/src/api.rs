@@ -75,6 +75,13 @@ pub trait DggrsApi: Send + Sync {
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
+    /// Get the direct parent zone for a given ZoneID.
+    fn parent_from_zone(
+        &self,
+        zone_id: ZoneId,
+        config: Option<DggrsApiConfig>,
+    ) -> Result<Zones, DggrsError>;
+
     /// Get a zone based on a ZoneID
     fn zone_from_id(
         &self,
