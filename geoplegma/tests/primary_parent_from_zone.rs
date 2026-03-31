@@ -56,7 +56,7 @@ fn test_parent_from_zone_contains_child_zone<T: DggrsApi>(adapter: &T) {
         let child_zone = child_zone_result.first().map(|zone| zone.id.clone()).unwrap();
 
         let parent_zone = adapter
-            .parent_from_zone(child_zone.clone(), Some(parent_config))
+            .primary_parent_from_zone(child_zone.clone(), Some(parent_config))
             .unwrap()
             .zones
             .first()

@@ -124,7 +124,7 @@ impl DggrsApi for DggalImpl {
         Ok(to_zones(dggrs, zones, cfg)?)
     }
 
-    fn parent_from_zone(
+    fn primary_parent_from_zone(
         &self,
         zone_id: ZoneId,
         config: Option<DggrsApiConfig>,
@@ -142,15 +142,23 @@ impl DggrsApi for DggalImpl {
             return Err(DggrsError::Dggal(DggalError::InvalidDggalZoneId));
         }
 
-        let parent = dggrs
-            .getZoneParents(zone_u64)
-            .into_iter()
-            .next()
-            .ok_or_else(|| {
-                DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
+        let parents = dggrs.getZoneParents(zone_u64);
+        let parent = match parents.len() {
+            0 => {
+                return Err(DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
                     "Root-level zones do not have a parent".to_string(),
-                ))
-            })?;
+                )));
+            }
+            1 => parents[0],
+            _ => parents
+                .into_iter()
+                .find(|p| dggrs.isZoneCentroidChild(*p))
+                .ok_or_else(|| {
+                    DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
+                        "Could not determine a primary parent for this zone".to_string(),
+                    ))
+                })?,
+        };
 
         Ok(to_zones(dggrs, vec![parent], cfg)?)
     }

@@ -118,7 +118,7 @@ impl DggrsApi for H3Impl {
         Ok(to_zones(h3o_sub_zones, cfg)?)
     }
 
-    fn parent_from_zone(
+    fn primary_parent_from_zone(
         &self,
         zone_id: ZoneId,
         config: Option<DggrsApiConfig>,

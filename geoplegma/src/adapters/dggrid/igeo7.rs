@@ -217,7 +217,7 @@ impl DggrsApi for Igeo7Impl {
         Ok(result)
     }
 
-    fn parent_from_zone(
+    fn primary_parent_from_zone(
         &self,
         zone_id: ZoneId,
         config: Option<DggrsApiConfig>,
