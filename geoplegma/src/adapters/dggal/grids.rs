@@ -151,11 +151,18 @@ impl DggrsApi for DggalImpl {
             }
             1 => parents[0],
             _ => {
-                let first = parents[0];
-                parents
-                    .into_iter()
-                    .find(|p| dggrs.isZoneCentroidChild(*p))
-                    .unwrap_or(first)
+                if self.id.spec().aperture == 7 {
+                    parents[0]
+                } else {
+                    parents
+                        .into_iter()
+                        .find(|p| dggrs.isZoneCentroidChild(*p))
+                        .ok_or_else(|| {
+                            DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
+                                "Could not determine a primary parent for this zone".to_string(),
+                            ))
+                        })?
+                }
             }
         };
 
