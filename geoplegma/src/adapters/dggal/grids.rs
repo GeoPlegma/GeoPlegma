@@ -150,14 +150,13 @@ impl DggrsApi for DggalImpl {
                 )));
             }
             1 => parents[0],
-            _ => parents
-                .into_iter()
-                .find(|p| dggrs.isZoneCentroidChild(*p))
-                .ok_or_else(|| {
-                    DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
-                        "Could not determine a primary parent for this zone".to_string(),
-                    ))
-                })?,
+            _ => {
+                let first = parents[0];
+                parents
+                    .into_iter()
+                    .find(|p| dggrs.isZoneCentroidChild(*p))
+                    .unwrap_or(first)
+            }
         };
 
         Ok(to_zones(dggrs, vec![parent], cfg)?)
