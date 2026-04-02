@@ -75,6 +75,15 @@ pub trait DggrsApi: Send + Sync {
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
+    /// Get the primary parent zone for a given ZoneID.
+    /// 
+    /// The zone returned by this function is exactly one refinement level above the input zone. Which zone gets returned as the primary parent is dependent on the DGGRS implementation.
+    fn primary_parent_from_zone(
+        &self,
+        zone_id: ZoneId,
+        config: Option<DggrsApiConfig>,
+    ) -> Result<Zones, DggrsError>;
+
     /// Get a zone based on a ZoneID
     fn zone_from_id(
         &self,

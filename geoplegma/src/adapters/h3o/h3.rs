@@ -117,6 +117,39 @@ impl DggrsApi for H3Impl {
 
         Ok(to_zones(h3o_sub_zones, cfg)?)
     }
+
+    fn primary_parent_from_zone(
+        &self,
+        zone_id: ZoneId,
+        config: Option<DggrsApiConfig>,
+    ) -> Result<Zones, DggrsError> {
+        let cfg = config.unwrap_or_default();
+        let h3o_zone = CellIndex::from_str(&zone_id.to_string()).map_err(|e| {
+            DggrsError::H3o(H3oError::InvalidZoneID {
+                zone_id: zone_id.to_string(),
+                source: e,
+            })
+        })?;
+
+        let refinement_level = RefinementLevel::new(h3o_zone.resolution() as i32)?;
+        if refinement_level <= self.min_refinement_level()? {
+            return Err(DggrsError::H3o(H3oError::ResolutionLimitReached {
+                zone_id: zone_id.to_string(),
+            }));
+        }
+
+        let parent_level = RefinementLevel::new(refinement_level.get() - 1)?;
+        let parent = h3o_zone
+            .parent(refinement_level_to_h3_resolution(parent_level)?)
+            .ok_or_else(|| {
+                DggrsError::H3o(H3oError::ResolutionLimitReached {
+                    zone_id: zone_id.to_string(),
+                })
+            })?;
+
+        Ok(to_zones(vec![parent], cfg)?)
+    }
+
     fn zone_from_id(
         &self,
         zone_id: ZoneId, // ToDo: needs validation function
