@@ -6,9 +6,9 @@
 // <LICENCE-MIT or http://opensource.org/licenses/MIT>, at your
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
-use api::error;
-use api::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
-use api::{get, registry};
+use geoplegma::error;
+use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
+use geoplegma::{get, registry};
 use geo::{Point, Rect};
 use std::time::Instant;
 
@@ -38,7 +38,7 @@ pub fn main() -> Result<(), error::DggrsError> {
 
     let bbox = Rect::new(Point::new(-10.0, -10.0), Point::new(10.0, 10.0));
 
-    let mut options = api::config {
+    let mut options = geoplegma::config {
         region: true,
         children: false,
         center: false,

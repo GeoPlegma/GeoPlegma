@@ -82,9 +82,9 @@ Make sure DGGRID is compiled and available on your system. Remember the path whe
 
 ## Usage Example
 
-Check out `dggrs/example/basic.rs` for a simple example of how to use the `dggrs` crate of GeoPlegma.
+Check out `geoplegma/example/basic.rs` for a simple example of how to use the `geoplegma` crate of GeoPlegma.
 ```bash
-cd dggrs
+cd geoplegma
 cargo run --example basic
 ```
 

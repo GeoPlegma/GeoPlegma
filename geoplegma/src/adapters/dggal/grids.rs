@@ -123,6 +123,52 @@ impl DggrsApi for DggalImpl {
 
         Ok(to_zones(dggrs, zones, cfg)?)
     }
+
+    fn primary_parent_from_zone(
+        &self,
+        zone_id: ZoneId,
+        config: Option<DggrsApiConfig>,
+    ) -> Result<Zones, DggrsError> {
+        let cfg = config.unwrap_or_default();
+        let dggrs = self.get_dggrs()?;
+
+        let zone_u64 = match &zone_id {
+            ZoneId::IntId(id) => *id,
+            ZoneId::StrId(s) => dggrs.getZoneFromTextID(s),
+            ZoneId::HexId(h) => dggrs.getZoneFromTextID(&h.to_string()),
+        };
+
+        if dggrs.getZoneArea(zone_u64).is_infinite() {
+            return Err(DggrsError::Dggal(DggalError::InvalidDggalZoneId));
+        }
+
+        let parents = dggrs.getZoneParents(zone_u64);
+        let parent = match parents.len() {
+            0 => {
+                return Err(DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
+                    "Root-level zones do not have a parent".to_string(),
+                )));
+            }
+            1 => parents[0],
+            _ => {
+                if self.id.spec().aperture == 7 {
+                    parents[0]
+                } else {
+                    parents
+                        .into_iter()
+                        .find(|p| dggrs.isZoneCentroidChild(*p))
+                        .ok_or_else(|| {
+                            DggrsError::Dggal(DggalError::InvalidZoneIdFormat(
+                                "Could not determine a primary parent for this zone".to_string(),
+                            ))
+                        })?
+                }
+            }
+        };
+
+        Ok(to_zones(dggrs, vec![parent], cfg)?)
+    }
+
     fn zone_from_id(
         &self,
         zone_id: ZoneId,

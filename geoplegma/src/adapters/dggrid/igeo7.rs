@@ -216,6 +216,71 @@ impl DggrsApi for Igeo7Impl {
         );
         Ok(result)
     }
+
+    fn primary_parent_from_zone(
+        &self,
+        zone_id: ZoneId,
+        config: Option<DggrsApiConfig>,
+    ) -> Result<Zones, DggrsError> {
+        let cfg = config.unwrap_or_default();
+        let (meta_path, aigen_path, children_path, neighbor_path, bbox_path, input_path) =
+            common::dggrid::setup(&self.adapter.workdir);
+
+        let child_level = get_refinement_level_from_z7_zone_id(&zone_id)?;
+        if child_level.get() == 0 {
+            return Err(DggrsError::Dggrid(DggridError::InvalidZ7Format(
+                "Root-level zones do not have a parent".to_string(),
+            )));
+        }
+        let parent_level = RefinementLevel::new(child_level.get() - 1)?;
+
+        let _ = common::write::metafile(
+            &meta_path,
+            &parent_level,
+            &aigen_path.with_extension(""),
+            &children_path.with_extension(""),
+            &neighbor_path.with_extension(""),
+            &cfg,
+        );
+
+        let _ = igeo7_metafile(&meta_path);
+
+        let mut meta_file = OpenOptions::new()
+            .append(true)
+            .write(true)
+            .open(&meta_path)
+            .expect("cannot open file");
+
+        let _ = writeln!(
+            meta_file,
+            "input_file_name {}",
+            &input_path.to_string_lossy()
+        );
+
+        let mut input_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&input_path)
+            .expect("cannot open file");
+        let _ = writeln!(input_file, "{}", zone_id).expect("Cannot create zone id input file");
+
+        let _ = writeln!(meta_file, "dggrid_operation TRANSFORM_POINTS");
+        let _ = writeln!(meta_file, "input_address_type Z7");
+        common::write::file(&meta_path);
+        common::dggrid::execute(&self.adapter.executable, &meta_path);
+        let result = common::output::ingest(&aigen_path, &children_path, &neighbor_path, &cfg)?;
+        common::cleanup(
+            &meta_path,
+            &aigen_path,
+            &children_path,
+            &neighbor_path,
+            &bbox_path,
+            &input_path,
+        );
+        Ok(result)
+    }
+
     fn zone_from_id(
         &self,
         zone_id: ZoneId,
