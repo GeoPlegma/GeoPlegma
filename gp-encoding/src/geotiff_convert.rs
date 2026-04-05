@@ -8,7 +8,7 @@ use geo::Rect;
 use geo_types::Point;
 use geoplegma::api::DggrsApi;
 use geoplegma::get;
-use geoplegma::models::common::{DggrsUid, RefinementLevel};
+use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
 use rayon::prelude::*;
 
 use crate::AttributeSchema;
@@ -227,9 +227,7 @@ where
         ));
     }
 
-    let first_band = dataset.rasterband(1)?;
-
-    let (width, height) = first_band.size();
+    let (width, height) = dataset.raster_size();
 
     if width == 0 || height == 0 {
         return Err(EncodingError::GeoTiff(
@@ -265,6 +263,29 @@ where
     }
     println!("zones in bbox: {}", chunk_zones.zones.len());
 
+    let relative_depth = RelativeDepth::new(refinement_level.get() - chunk_level.get())?;
+    let chunk_child_ids: Vec<Vec<u64>> = chunk_zones
+        .zones
+        .iter()
+        .map(|chunk_zone| {
+            let children = grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(CONFIG))?;
+            if children.zones.len() > chunk_size as usize {
+                return Err(EncodingError::Grid(format!(
+                    "chunk {} has {} children but chunk_size is {}",
+                    zone_id_to_u64(&chunk_zone.id)?,
+                    children.zones.len(),
+                    chunk_size
+                )));
+            }
+
+            children
+                .zones
+                .iter()
+                .map(|child| zone_id_to_u64(&child.id))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .collect::<Result<_, EncodingError>>()?;
+
     let metadata = DatasetMetadata {
         dggrs,
         attributes: metadata_bands,
@@ -278,7 +299,9 @@ where
         compression: None,
     };
 
-    let zones = grid.zone_count(refinement_level)?;
+    let encoded_num_cells = (chunk_zones.zones.len() as u64)
+        .checked_mul(chunk_size)
+        .ok_or_else(|| EncodingError::Storage("encoded cell count overflow".into()))?;
     let mut backend = B::create(output_path, metadata)?;
 
     for (band_index, band_type) in bands.into_iter().enumerate() {
@@ -403,27 +426,27 @@ where
 
         let linear_values: BTreeMap<u64, Vec<u8>> = computed_entries.into_iter().collect();
 
-        backend.create_level(refinement_level.get() as u32, band_index as u32, zones)?;
+        backend.create_level(
+            refinement_level.get() as u32,
+            band_index as u32,
+            encoded_num_cells,
+        )?;
 
-        let mut chunks: BTreeMap<u64, Vec<u8>> = BTreeMap::new();
-        for (linear_index, value_bytes) in linear_values {
-            let chunk_index = linear_index / chunk_size;
-            let in_chunk_index = (linear_index % chunk_size) as usize;
+        for (chunk_index, child_ids) in chunk_child_ids.iter().enumerate() {
+            let mut bytes = vec![0_u8; chunk_size as usize * value_size];
 
-            let chunk_buf = chunks
-                .entry(chunk_index)
-                .or_insert_with(|| vec![0_u8; chunk_size as usize * value_size]);
+            for (in_chunk_index, child_id) in child_ids.iter().enumerate() {
+                if let Some(value_bytes) = linear_values.get(child_id) {
+                    let start = in_chunk_index * value_size;
+                    let end = start + value_size;
+                    bytes[start..end].copy_from_slice(value_bytes);
+                }
+            }
 
-            let start = in_chunk_index * value_size;
-            let end = start + value_size;
-            chunk_buf[start..end].copy_from_slice(&value_bytes);
-        }
-
-        for (chunk_index, bytes) in chunks {
             backend.write_chunk(
                 refinement_level.get() as u32,
                 band_index as u32,
-                chunk_index,
+                chunk_index as u64,
                 &bytes,
             )?;
         }
