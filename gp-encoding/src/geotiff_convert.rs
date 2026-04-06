@@ -12,7 +12,7 @@ use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
 use rayon::prelude::*;
 
 use crate::AttributeSchema;
-use crate::common::{CONFIG, zone_id_to_u64};
+use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::models::{DataType, DatasetMetadata};
 use crate::storage::StorageBackend;
@@ -100,7 +100,7 @@ fn compute_entries_from_data<T>(
     gt: [f64; 6],
     grid: &dyn DggrsApi,
     refinement_level: RefinementLevel,
-) -> Result<Vec<(u64, Vec<u8>)>, EncodingError>
+) -> Result<Vec<(String, Vec<u8>)>, EncodingError>
 where
     T: NativeBytes + Copy + Send + Sync,
 {
@@ -127,8 +127,7 @@ where
                 .first()
                 .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
 
-            let key = zone_id_to_u64(&zone.id)?;
-            Ok((key, v.to_native_bytes()))
+            Ok((zone.id.to_string(), v.to_native_bytes()))
         })
         .collect()
 }
@@ -264,25 +263,28 @@ where
     println!("zones in bbox: {}", chunk_zones.zones.len());
 
     let relative_depth = RelativeDepth::new(refinement_level.get() - chunk_level.get())?;
-    let chunk_child_ids: Vec<Vec<u64>> = chunk_zones
+    let chunk_child_ids: Vec<Vec<String>> = chunk_zones
         .zones
         .iter()
         .map(|chunk_zone| {
-            let children = grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(CONFIG))?;
+            let children =
+                grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(CONFIG))?;
             if children.zones.len() > chunk_size as usize {
                 return Err(EncodingError::Grid(format!(
                     "chunk {} has {} children but chunk_size is {}",
-                    zone_id_to_u64(&chunk_zone.id)?,
+                    chunk_zone.id,
                     children.zones.len(),
                     chunk_size
                 )));
             }
 
-            children
-                .zones
-                .iter()
-                .map(|child| zone_id_to_u64(&child.id))
-                .collect::<Result<Vec<_>, _>>()
+            Ok(
+                children
+                    .zones
+                    .iter()
+                    .map(|child| child.id.to_string())
+                    .collect::<Vec<_>>(),
+            )
         })
         .collect::<Result<_, EncodingError>>()?;
 
@@ -293,8 +295,8 @@ where
         chunk_ids: chunk_zones
             .zones
             .iter()
-            .map(|z| zone_id_to_u64(&z.id))
-            .collect::<Result<_, _>>()?,
+            .map(|z| z.id.to_string())
+            .collect::<Vec<_>>(),
         levels: vec![refinement_level.get() as u32],
         compression: None,
     };
@@ -424,7 +426,7 @@ where
             ))),
         }?;
 
-        let linear_values: BTreeMap<u64, Vec<u8>> = computed_entries.into_iter().collect();
+        let linear_values: BTreeMap<String, Vec<u8>> = computed_entries.into_iter().collect();
 
         backend.create_level(
             refinement_level.get() as u32,

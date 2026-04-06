@@ -2,7 +2,7 @@ use geo_types::Point;
 use geoplegma::get;
 use geoplegma::models::common::{RefinementLevel, RelativeDepth, ZoneId};
 
-use crate::common::{CONFIG, zone_id_to_u64};
+use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::storage::StorageBackend;
 
@@ -57,7 +57,7 @@ pub fn query_value_bytes_by_cell_index<B: StorageBackend>(
     band: u32,
     zone_id: &ZoneId,
 ) -> Result<Vec<u8>, EncodingError> {
-    let cell_index = zone_id_to_u64(zone_id)?;
+    let cell_index = zone_id.to_string();
     let value_size = backend
         .metadata()
         .attributes
@@ -124,13 +124,13 @@ pub fn query_value_bytes_by_cell_index<B: StorageBackend>(
         chunk_zone_id = parent_zone.id.clone();
     }
 
-    let chunk_id = zone_id_to_u64(&chunk_zone_id)?;
+    let chunk_id = chunk_zone_id.to_string();
 
     let chunk_index = backend
         .metadata()
         .chunk_ids
         .iter()
-        .position(|id| *id == chunk_id)
+        .position(|id| id == &chunk_id)
         .ok_or_else(|| {
             EncodingError::Storage(format!(
                 "zone {cell_index} belongs to chunk id {chunk_id}, which is not present in dataset metadata"
@@ -173,7 +173,7 @@ mod tests {
     use geoplegma::get;
     use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
 
-    use crate::common::{CONFIG, zone_id_to_u64};
+    use crate::common::CONFIG;
     use crate::models::{AttributeSchema, DataType, DatasetMetadata};
     use crate::query::query_value_bytes_by_cell_index;
     use crate::storage::StorageBackend;
@@ -235,10 +235,7 @@ mod tests {
                 fill_value: None,
             }],
             chunk_size,
-            chunk_ids: vec![
-                zone_id_to_u64(&chunk0).expect("chunk0 id"),
-                zone_id_to_u64(&chunk1).expect("chunk1 id"),
-            ],
+            chunk_ids: vec![chunk0.to_string(), chunk1.to_string()],
             levels: vec![refinement_level.get() as u32],
             compression: None,
         };

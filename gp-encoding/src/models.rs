@@ -30,7 +30,7 @@ pub struct DatasetMetadata {
     pub chunk_size: u64,
 
     /// IDs of the chunks stored in this dataset.
-    pub chunk_ids: Vec<u64>,
+    pub chunk_ids: Vec<String>,
 
     /// Resolution levels stored in this dataset.
     pub levels: Vec<u32>,
