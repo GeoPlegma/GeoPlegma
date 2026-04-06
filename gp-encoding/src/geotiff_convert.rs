@@ -9,7 +9,6 @@ use geo_types::Point;
 use geoplegma::api::DggrsApi;
 use geoplegma::get;
 use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
-use rayon::prelude::*;
 
 use crate::AttributeSchema;
 use crate::common::CONFIG;
@@ -98,14 +97,18 @@ fn compute_entries_from_data<T>(
     total_pixels: usize,
     width: usize,
     gt: [f64; 6],
+    src_srs: &SpatialRef,
     grid: &dyn DggrsApi,
     refinement_level: RefinementLevel,
 ) -> Result<Vec<(String, Vec<u8>)>, EncodingError>
 where
-    T: NativeBytes + Copy + Send + Sync,
+    T: NativeBytes + Copy,
 {
+    let mut wgs84 = SpatialRef::from_epsg(4326)?;
+    wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
+    let to_wgs84 = CoordTransform::new(src_srs, &wgs84)?;
+
     (0..total_pixels)
-        .into_par_iter()
         .map(|idx| {
             let row = idx / width;
             let col = idx % width;
@@ -119,8 +122,13 @@ where
 
             // pixel center
             let (x, y) = gt.apply(col as f64 + 0.5, row as f64 + 0.5);
+            let mut xs = vec![x];
+            let mut ys = vec![y];
+            let mut zs = vec![0.0f64];
+            to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
 
-            let zones = grid.zone_from_point(refinement_level, Point::new(x, y), Some(CONFIG))?;
+            let zones =
+                grid.zone_from_point(refinement_level, Point::new(xs[0], ys[0]), Some(CONFIG))?;
 
             let zone = zones
                 .zones
@@ -237,6 +245,7 @@ where
     let total_pixels = height * width;
 
     let gt = dataset.geo_transform()?;
+    let src_srs = dataset.spatial_ref()?;
     let (bbox, pixel_width, pixel_height) = get_corners_and_pixel_size(&dataset)?;
     let refinement_level = get_closest_refinement_level(&grid, pixel_width, pixel_height)?;
 
@@ -246,7 +255,8 @@ where
     let chunk_size = dggrs
         .spec()
         .aperture
-        .pow((refinement_level.get() - chunk_level.get()) as u32) as u64;
+        .pow((refinement_level.get() - chunk_level.get()) as u32) as u64
+        * 2;
     println!(
         "refinement level: {}, chunk level: {}, chunk size: {}",
         refinement_level.get(),
@@ -278,13 +288,11 @@ where
                 )));
             }
 
-            Ok(
-                children
-                    .zones
-                    .iter()
-                    .map(|child| child.id.to_string())
-                    .collect::<Vec<_>>(),
-            )
+            Ok(children
+                .zones
+                .iter()
+                .map(|child| child.id.to_string())
+                .collect::<Vec<_>>())
         })
         .collect::<Result<_, EncodingError>>()?;
 
@@ -318,6 +326,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -329,6 +338,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -340,6 +350,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -351,6 +362,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -362,6 +374,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -373,6 +386,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -384,6 +398,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -395,6 +410,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -406,6 +422,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -417,6 +434,7 @@ where
                     total_pixels,
                     width,
                     gt,
+                    &src_srs,
                     grid.as_ref(),
                     refinement_level,
                 )
@@ -426,7 +444,7 @@ where
             ))),
         }?;
 
-        let linear_values: BTreeMap<String, Vec<u8>> = computed_entries.into_iter().collect();
+        let values_map: BTreeMap<String, Vec<u8>> = computed_entries.into_iter().collect();
 
         backend.create_level(
             refinement_level.get() as u32,
@@ -434,11 +452,12 @@ where
             encoded_num_cells,
         )?;
 
+
         for (chunk_index, child_ids) in chunk_child_ids.iter().enumerate() {
             let mut bytes = vec![0_u8; chunk_size as usize * value_size];
 
             for (in_chunk_index, child_id) in child_ids.iter().enumerate() {
-                if let Some(value_bytes) = linear_values.get(child_id) {
+                if let Some(value_bytes) = values_map.get(child_id) {
                     let start = in_chunk_index * value_size;
                     let end = start + value_size;
                     bytes[start..end].copy_from_slice(value_bytes);

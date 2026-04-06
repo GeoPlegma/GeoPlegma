@@ -1,7 +1,4 @@
 use geoplegma::api::DggrsApiConfig;
-use geoplegma::models::common::ZoneId;
-
-use crate::error::EncodingError;
 
 pub(crate) const CONFIG: DggrsApiConfig = DggrsApiConfig {
     region: true,
