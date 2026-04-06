@@ -49,7 +49,7 @@ pub fn main() -> () {
     let projection = Vgc;
     let icosahedron = new();
 
-    let coords = projection.geo_to_face(points.to_vec(), Some(&icosahedron));
+    let coords = projection.geo_to_cartesian(points.to_vec(), Some(&icosahedron), None);
 
     // let coef = Vgc::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
     // let coords_cart = projection.geo_to_cartesian(points.to_vec(), Some(&icosahedron), None);
@@ -58,14 +58,14 @@ pub fn main() -> () {
         println!("----------------------------------");
         // println!("Longitude: {}, Latitude: {}", points[i].x(), points[i].y());
         // println!("Face: {}", c.face);
-        println!(
-            "{} Barycentric ({:?},{:?},{:?})",
-            i+1, c.coords.x, c.coords.y, c.coords.z
-        );
-        //  println!(
-        //     "Cartesian coordinates: ({:?},{:?})",
-        //     coords_cart[i].coords.x, coords_cart[i].coords.y
+        // println!(
+        //     "{} Barycentric ({:?},{:?},{:?})",
+        //     i+1, c.coords.x, c.coords.y, c.coords.z
         // );
+         println!(
+            "{} Cartesian coordinates: ({:?},{:?})", i+1,
+            coords[i].coords.x, coords[i].coords.y
+        );
     }
     // println!(
     //     "Basic example for gp-proj. Convert geographic coordinates to cartesian coordinates, and vice-versa."
@@ -140,12 +140,12 @@ pub fn main() -> () {
     // let coords = projection.geo_to_face(all.to_vec(), Some(&icosahedron));
     // println!("{:?}", coords);
 
-    // let distortion = projection.compute_distortion(38.68499, -9.49420, &icosahedron);
-    // println!("h: {} (expected: 0.7580403)", distortion.h);
-    // println!("k: {} (expected: 1.333174)", distortion.k);
-    // println!(
-    //     "Angular deformation: {}° (expected: 33.045°)",
-    //     distortion.angular_deformation
-    // );
-    // println!("Areal scale: {} (expected: ~1.0)", distortion.areal_scale);
+    let distortion = projection.compute_distortion(38.68499, -9.49420, &icosahedron);
+    println!("h: {} (expected: 0.7580403)", distortion.h);
+    println!("k: {} (expected: 1.333174)", distortion.k);
+    println!(
+        "Angular deformation: {}° (expected: 33.045°)",
+        distortion.angular_deformation
+    );
+    println!("Areal scale: {} (expected: ~1.0)", distortion.areal_scale);
 }

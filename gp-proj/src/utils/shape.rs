@@ -67,6 +67,8 @@ pub fn triangle(
         }
     }
 
+    let t = found.unwrap().0;
+
     let (macro_tri, (i0, i1)) = found.or_else(|| {
         // fallback: find nearest macro triangle by minimum angle
         let mut best: Option<([Vector3D; 3], (usize, usize), f64)> = None;
@@ -106,14 +108,14 @@ pub fn triangle(
     let left = [c, mid, v0];
 
     if spherical_geometry::point_in_spherical_triangle(point_p, left) {
-        return Some(([mid, v0, c], (i0 * 2 +1) as u8));
+        return Some(([mid, v0, c], (i0 * 2) as u8));
     }
 
     // Right sub-triangle = (C, V1, mid)
     let right = [c, v1, mid];
 
     if spherical_geometry::point_in_spherical_triangle(point_p, right) {
-        return Some(([mid, v1, c], (i1 * 2) as u8));
+        return Some(([mid, v1, c], (i0 * 2 +1) as u8));
     }
 
     // -------------------------------
@@ -125,12 +127,48 @@ pub fn triangle(
     let d_right = spherical_geometry::stable_angle_between(point_p, right.spherical_barycenter());
 
     if d_left < d_right {
-        Some(([mid, v0, c], i0 as u8))
+        Some(([mid, v0, c], (i0 * 2) as u8))
     } else {
-        Some(([mid, v1, c], i1 as u8))
+        Some(([mid, v1, c], (i1 * 2 + 1) as u8))
     }
 }
+pub const SUB_TRIANGLE_TEMPLATE: [(f64, f64); 3] = [
+    (0.0, 0.0),          // B (corner) at origin
+    (-1.0, 0.0),         // A (v_mid) on negative x-axis
+    (-0.5, 0.866025404), // C (center) - forms equilateral triangle
+];
+pub const FACE_TEMPLATE_UP: [(f64, f64); 3] = [(0.0, 0.0), (-1.107149, 0.0), (-0.553574, 0.958819)];
 
+pub const FACE_TEMPLATE_DOWN: [(f64, f64); 3] =
+    [(0.0, 0.0), (-1.107149, 0.0), (-0.553574, -0.958819)];
+
+/// Get the position of sub-triangle vertices in face 2D coordinates
+pub fn get_subtriangle_vertices_in_face(
+    sub_triangle_id: u8,
+    face_template: [(f64, f64); 3],
+) -> [(f64, f64); 3] {
+    // Face vertices
+    let [f0, f1, f2] = face_template;
+
+    // Compute face center
+    let center = ((f0.0 + f1.0 + f2.0) / 3.0, (f0.1 + f1.1 + f2.1) / 3.0);
+
+    // Compute midpoints
+    let mid_01 = ((f0.0 + f1.0) / 2.0, (f0.1 + f1.1) / 2.0);
+    let mid_12 = ((f1.0 + f2.0) / 2.0, (f1.1 + f2.1) / 2.0);
+    let mid_20 = ((f2.0 + f0.0) / 2.0, (f2.1 + f0.1) / 2.0);
+
+    // Map sub-triangle ID to its vertices [v_mid, corner, center]
+    match sub_triangle_id {
+        0 => [mid_01, f0, center], // Between f1-f2
+        1 => [mid_01, f1, center], // Between f1-f2
+        2 => [mid_12, f1, center], // Between f2-f0
+        3 => [mid_12, f2, center], // Between f2-f0
+        4 => [mid_20, f2, center], // Between f0-f1
+        5 => [mid_20, f0, center], // Between f0-f1
+        _ => panic!("Invalid sub-triangle ID"),
+    }
+}
 // Map spherical triangle into a planar triangle.
 pub fn triangle3d_to_2d(
     ab: f64,
@@ -163,7 +201,7 @@ pub fn triangle3d_to_2d(
     // let v2 = (v2_x, v2_y);
 
     // [v1, v0, v2]
-     let a01 = ab;
+    let a01 = ab;
     let a12 = bc;
     let a20 = ac;
 
@@ -205,13 +243,13 @@ pub fn triangle3d_to_2d(
 
 /// Map sub-triangle vertices (in 3D) to face 2D coordinate system
 pub fn map_subtriangle_vertices_to_face_2d(
-    sub_vertices_3d: &[Vector3D; 3],  // [A, B, C]
-    face_vertices_3d: &[Vector3D],    // Face vertices
-    face_2d: &[(f64, f64); 3],        // Face 2D template
+    sub_vertices_3d: &[Vector3D; 3], // [A, B, C]
+    face_vertices_3d: &[Vector3D],   // Face vertices
+    face_2d: &[(f64, f64); 3],       // Face 2D template
 ) -> ((f64, f64), (f64, f64), (f64, f64)) {
     // For each sub-triangle vertex, compute its position in face 2D
     let mut result = [(0.0, 0.0); 3];
-    
+
     for i in 0..3 {
         let bary = compute_spherical_barycentric(
             sub_vertices_3d[i],
@@ -219,13 +257,13 @@ pub fn map_subtriangle_vertices_to_face_2d(
             face_vertices_3d[1],
             face_vertices_3d[2],
         );
-        
+
         result[i] = (
             face_2d[0].0 * bary.0 + face_2d[1].0 * bary.1 + face_2d[2].0 * bary.2,
             face_2d[0].1 * bary.0 + face_2d[1].1 * bary.1 + face_2d[2].1 * bary.2,
         );
     }
-    
+
     (result[0], result[1], result[2])
 }
 
@@ -235,13 +273,27 @@ pub fn affine_transform_triangle(
     source_tri: [(f64, f64); 3],
     dest_tri: [(f64, f64); 3],
 ) -> (f64, f64) {
-    // Convert point to barycentric in source triangle
-    let (u, v, w) = cartesian_2d_to_barycentric(point, source_tri);
-    
-    // Apply same barycentric weights in destination triangle
-    let x = dest_tri[0].0 * u + dest_tri[1].0 * v + dest_tri[2].0 * w;
-    let y = dest_tri[0].1 * u + dest_tri[1].1 * v + dest_tri[2].1 * w;
-    
+    // Source vectors relative to source_tri[0]
+    let (ax, ay) = (source_tri[1].0 - source_tri[0].0, source_tri[1].1 - source_tri[0].1);
+    let (bx, by) = (source_tri[2].0 - source_tri[0].0, source_tri[2].1 - source_tri[0].1);
+
+    // Destination vectors relative to dest_tri[0]
+    let (cx, cy) = (dest_tri[1].0 - dest_tri[0].0, dest_tri[1].1 - dest_tri[0].1);
+    let (dx, dy) = (dest_tri[2].0 - dest_tri[0].0, dest_tri[2].1 - dest_tri[0].1);
+
+    // Point relative to source_tri[0]
+    let (px, py) = (point.0 - source_tri[0].0, point.1 - source_tri[0].1);
+
+    // Solve: [ax bx] [s]   [px]
+    //        [ay by] [t] = [py]
+    let det = ax * by - bx * ay;
+    let s = (px * by - bx * py) / det;
+    let t = (ax * py - px * ay) / det;
+
+    // Apply same s,t to destination
+    let x = dest_tri[0].0 + s * cx + t * dx;
+    let y = dest_tri[0].1 + s * cy + t * dy;
+
     (x, y)
 }
 // @TODO - needs to be added to spherical geometry, the other function there is not behaving correctly

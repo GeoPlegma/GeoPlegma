@@ -18,7 +18,10 @@ use crate::{
         projections::traits::{DistortionMetrics, ForwardBary, ForwardCartesian, Projection},
     },
     utils::shape::{
-        affine_transform_triangle, cartesian_2d_to_barycentric, compute_spherical_barycentric, map_subtriangle_vertices_to_face_2d, triangle, triangle3d_to_2d
+        FACE_TEMPLATE_DOWN, FACE_TEMPLATE_UP, SUB_TRIANGLE_TEMPLATE, affine_transform_triangle,
+        cartesian_2d_to_barycentric, compute_spherical_barycentric,
+        get_subtriangle_vertices_in_face, map_subtriangle_vertices_to_face_2d, triangle,
+        triangle3d_to_2d,
     },
 };
 use geo::{Coord, Point};
@@ -202,7 +205,6 @@ impl Projection for Vgc {
                     let p_x_local = subtriangle_2d[0].0 + (pd_x - subtriangle_2d[0].0) * xy;
                     let p_y_local = subtriangle_2d[0].1 + (pd_y - subtriangle_2d[0].1) * xy;
 
-
                     // STEP 4: Find where sub-triangle vertices A, B, C are in face 2D
                     // We need to know which sub-triangle this is to map vertices correctly
                     let (a_face_2d, b_face_2d, c_face_2d) = map_subtriangle_vertices_to_face_2d(
@@ -312,91 +314,116 @@ impl Projection for Vgc {
 
                     // Parameterization values of the slice and dice projection.
                     let [xy, uv] = slice_and_dice(ac, ab, bc, ap, bp);
+                    /*
+                    // // Get barycentric coordinates of sub-triangle vertices with respect to face
+                    // let subtriangle_a_bary_face = compute_spherical_barycentric(
+                    //     sub_triangle_3d.0[0], // v_mid
+                    //     face_vertices_3d[0],
+                    //     face_vertices_3d[1],
+                    //     face_vertices_3d[2],
+                    // );
+                    // // Result: A = F0 × a0 + F1 × a1 + F2 × a2
 
-                    // Get barycentric coordinates of sub-triangle vertices with respect to face
-                    let subtriangle_a_bary_face = compute_spherical_barycentric(
-                        sub_triangle_3d.0[0], // v_mid
-                        face_vertices_3d[0],
-                        face_vertices_3d[1],
-                        face_vertices_3d[2],
-                    );
-                    // Result: A = F0 × a0 + F1 × a1 + F2 × a2
+                    // let subtriangle_b_bary_face = compute_spherical_barycentric(
+                    //     sub_triangle_3d.0[1], // corner
+                    //     face_vertices_3d[0],
+                    //     face_vertices_3d[1],
+                    //     face_vertices_3d[2],
+                    // );
+                    // // Result: B = F0 × b0 + F1 × b1 + F2 × b2
 
-                    let subtriangle_b_bary_face = compute_spherical_barycentric(
-                        sub_triangle_3d.0[1], // corner
-                        face_vertices_3d[0],
-                        face_vertices_3d[1],
-                        face_vertices_3d[2],
-                    );
-                    // Result: B = F0 × b0 + F1 × b1 + F2 × b2
+                    // let subtriangle_c_bary_face = compute_spherical_barycentric(
+                    //     sub_triangle_3d.0[2], // center
+                    //     face_vertices_3d[0],
+                    //     face_vertices_3d[1],
+                    //     face_vertices_3d[2],
+                    // );
 
-                    let subtriangle_c_bary_face = compute_spherical_barycentric(
-                        sub_triangle_3d.0[2], // center
-                        face_vertices_3d[0],
-                        face_vertices_3d[1],
-                        face_vertices_3d[2],
-                    );
+                    // let face_edge_lengths = polyhedron.face_arc_lengths(face).unwrap(); */
 
-                    let face_edge_lengths = polyhedron.face_arc_lengths(face).unwrap();
+                    // let subtriangle_2d = triangle3d_to_2d(ab, bc, ac, true, sub_area);
+                    /*   // // need to scale each face individually based on that specific face's spherical area
+                          // let face_spherical_area = spherical_triangle_area([
+                          //     face_vertices_3d[0],
+                          //     face_vertices_3d[1],
+                          //     face_vertices_3d[2],
+                          // ])
+                          // .unwrap();
 
-                    let is_upward = if face % 2 == 0 { true } else { false };
+                          // // println!("Face {}: edges={:?}, area={:.6}", face, face_edge_lengths, face_spherical_area);
+                          // let face_2d_vertices = triangle3d_to_2d(
+                          //     face_edge_lengths[0],
+                          //     face_edge_lengths[1],
+                          //     face_edge_lengths[2],
+                          //     is_upward,
+                          //     face_spherical_area,
+                          // );
+                    // println!("Face {} edge lengths: {:?}", face, face_2d_vertices);
+                          // // println!("Face 2D vertices: {:?}", face_2d_vertices);
+                          // let subtriangle_a_x = face_2d_vertices[0].0 * subtriangle_a_bary_face.0
+                          //     + face_2d_vertices[1].0 * subtriangle_a_bary_face.1
+                          //     + face_2d_vertices[2].0 * subtriangle_a_bary_face.2;
 
-                    // need to scale each face individually based on that specific face's spherical area
-                    let face_spherical_area = spherical_triangle_area([
-                        face_vertices_3d[0],
-                        face_vertices_3d[1],
-                        face_vertices_3d[2],
-                    ])
-                    .unwrap();
+                          // let subtriangle_a_y = face_2d_vertices[0].1 * subtriangle_a_bary_face.0
+                          //     + face_2d_vertices[1].1 * subtriangle_a_bary_face.1
+                          //     + face_2d_vertices[2].1 * subtriangle_a_bary_face.2;
 
-                    // println!("Face {}: edges={:?}, area={:.6}", face, face_edge_lengths, face_spherical_area);
-                    let face_2d_vertices = triangle3d_to_2d(
-                        face_edge_lengths[0],
-                        face_edge_lengths[1],
-                        face_edge_lengths[2],
-                        is_upward,
-                        face_spherical_area,
-                    );
-                    println!("Face {} edge lengths: {:?}", face, face_2d_vertices);
-                    // println!("Face 2D vertices: {:?}", face_2d_vertices);
-                    let subtriangle_a_x = face_2d_vertices[0].0 * subtriangle_a_bary_face.0
-                        + face_2d_vertices[1].0 * subtriangle_a_bary_face.1
-                        + face_2d_vertices[2].0 * subtriangle_a_bary_face.2;
+                          // let subtriangle_b_x = face_2d_vertices[0].0 * subtriangle_b_bary_face.0
+                          //     + face_2d_vertices[1].0 * subtriangle_b_bary_face.1
+                          //     + face_2d_vertices[2].0 * subtriangle_b_bary_face.2;
 
-                    let subtriangle_a_y = face_2d_vertices[0].1 * subtriangle_a_bary_face.0
-                        + face_2d_vertices[1].1 * subtriangle_a_bary_face.1
-                        + face_2d_vertices[2].1 * subtriangle_a_bary_face.2;
+                          // let subtriangle_b_y = face_2d_vertices[0].1 * subtriangle_b_bary_face.0
+                          //     + face_2d_vertices[1].1 * subtriangle_b_bary_face.1
+                          //     + face_2d_vertices[2].1 * subtriangle_b_bary_face.2;
 
-                    let subtriangle_b_x = face_2d_vertices[0].0 * subtriangle_b_bary_face.0
-                        + face_2d_vertices[1].0 * subtriangle_b_bary_face.1
-                        + face_2d_vertices[2].0 * subtriangle_b_bary_face.2;
+                          // let subtriangle_c_x = face_2d_vertices[0].0 * subtriangle_c_bary_face.0
+                          //     + face_2d_vertices[1].0 * subtriangle_c_bary_face.1
+                          //     + face_2d_vertices[2].0 * subtriangle_c_bary_face.2;
 
-                    let subtriangle_b_y = face_2d_vertices[0].1 * subtriangle_b_bary_face.0
-                        + face_2d_vertices[1].1 * subtriangle_b_bary_face.1
-                        + face_2d_vertices[2].1 * subtriangle_b_bary_face.2;
-
-                    let subtriangle_c_x = face_2d_vertices[0].0 * subtriangle_c_bary_face.0
-                        + face_2d_vertices[1].0 * subtriangle_c_bary_face.1
-                        + face_2d_vertices[2].0 * subtriangle_c_bary_face.2;
-
-                    let subtriangle_c_y = face_2d_vertices[0].1 * subtriangle_c_bary_face.0
-                        + face_2d_vertices[1].1 * subtriangle_c_bary_face.1
-                        + face_2d_vertices[2].1 * subtriangle_c_bary_face.2;
+                          // let subtriangle_c_y = face_2d_vertices[0].1 * subtriangle_c_bary_face.0
+                          //     + face_2d_vertices[1].1 * subtriangle_c_bary_face.1
+                          //     + face_2d_vertices[2].1 * subtriangle_c_bary_face.2;*/
 
                     // ==== Interpolation ====
                     // Between A and C it gives point D
-                    let pd_x = subtriangle_c_x + (subtriangle_a_x - subtriangle_c_x) * uv;
-                    let pd_y = subtriangle_c_y + (subtriangle_a_y - subtriangle_c_y) * uv;
-
+                    let pd_x = SUB_TRIANGLE_TEMPLATE[2].0
+                        + (SUB_TRIANGLE_TEMPLATE[0].0 - SUB_TRIANGLE_TEMPLATE[2].0) * uv;
+                    let pd_y = SUB_TRIANGLE_TEMPLATE[2].1
+                        + (SUB_TRIANGLE_TEMPLATE[0].1 - SUB_TRIANGLE_TEMPLATE[2].1) * uv;
                     // Between D and B it gives point P
-                    let p_x = subtriangle_b_x + (pd_x - subtriangle_b_x) * xy;
-                    let p_y = subtriangle_b_y + (pd_y - subtriangle_b_y) * xy;
+                    let p_x_local =
+                        SUB_TRIANGLE_TEMPLATE[1].0 + (pd_x - SUB_TRIANGLE_TEMPLATE[1].0) * xy;
+                    let p_y_local =
+                        SUB_TRIANGLE_TEMPLATE[1].1 + (pd_y - SUB_TRIANGLE_TEMPLATE[1].1) * xy;
                     // ======================
+
+                    let is_upward = if face % 2 == 0 { true } else { false };
+                    let face_template = if is_upward {
+                        FACE_TEMPLATE_UP
+                    } else {
+                        FACE_TEMPLATE_DOWN
+                    };
+
+                    // STEP 3: Get sub-triangle vertices in face coordinates
+                    let sub_triangle_id = sub_triangle_3d.1;
+                    let sub_vertices_in_face =
+                        get_subtriangle_vertices_in_face(sub_triangle_id, face_template);
+                    println!("{:?}", (point_p));
+
+                    // STEP 4: Transform from sub-triangle local to face coordinates
+                    let (p_x_face, p_y_face) = affine_transform_triangle(
+                        (p_x_local, p_y_local),
+                        SUB_TRIANGLE_TEMPLATE,
+                        sub_vertices_in_face,
+                    );
+
+                    // STEP 5: Convert to meters
+                    let r = 6371007.181;
 
                     out.push(ForwardCartesian {
                         coords: Coord {
-                            x: p_x, //* 6371007.181,
-                            y: p_y, //* 6371007.181,
+                            x: p_x_face,
+                            y: p_y_face,
                         },
                         face: index,
                     });
