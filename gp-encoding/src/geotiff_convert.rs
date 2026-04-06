@@ -34,6 +34,8 @@ macro_rules! impl_native_bytes {
 
 impl_native_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
 
+const ZARR_TARGET_UNCOMPRESSED_CHUNK_BYTES: u64 = 1024 * 1024;
+
 fn get_corners_and_pixel_size(
     dataset: &Dataset,
 ) -> Result<(Option<Rect<f64>>, f64, f64), EncodingError> {
@@ -183,6 +185,65 @@ fn get_closest_refinement_level(
     best_level.ok_or_else(|| EncodingError::Grid("no valid refinement level found".into()))
 }
 
+fn choose_best_chunk_level_and_size(
+    refinement_level: RefinementLevel,
+    min_chunk_level: RefinementLevel,
+    max_relative_depth_allowed: RelativeDepth,
+    aperture: u64,
+    data_type_size_bytes: usize,
+) -> Result<(RefinementLevel, u64), EncodingError> {
+    if data_type_size_bytes == 0 {
+        return Err(EncodingError::Storage(
+            "data type size must be greater than zero".into(),
+        ));
+    }
+    if aperture < 2 {
+        return Err(EncodingError::Grid(
+            "grid aperture must be at least 2 for chunk sizing".into(),
+        ));
+    }
+    if min_chunk_level.get() > refinement_level.get() {
+        return Err(EncodingError::Storage(format!(
+            "min chunk level ({}) is greater than refinement level ({})",
+            min_chunk_level.get(),
+            refinement_level.get()
+        )));
+    }
+
+    let max_relative_depth_from_levels = refinement_level.get() - min_chunk_level.get();
+    let max_relative_depth = max_relative_depth_from_levels.min(max_relative_depth_allowed.get());
+    let target_bytes = ZARR_TARGET_UNCOMPRESSED_CHUNK_BYTES as u128;
+    let dtype_bytes = data_type_size_bytes as u128;
+
+    let mut best_relative_depth = 0i32;
+    let mut best_chunk_cells = 1u128;
+    let mut best_diff = target_bytes.abs_diff(dtype_bytes); // depth 0 => 1 cell
+
+    let mut chunk_cells = 1u128;
+    for relative_depth in 1..=max_relative_depth {
+        chunk_cells = chunk_cells.checked_mul(aperture as u128).ok_or_else(|| {
+            EncodingError::Storage("chunk size overflow while computing aperture growth".into())
+        })?;
+
+        let chunk_bytes = chunk_cells.checked_mul(dtype_bytes).ok_or_else(|| {
+            EncodingError::Storage("chunk byte size overflow while tuning chunk level".into())
+        })?;
+
+        let diff = target_bytes.abs_diff(chunk_bytes);
+        if diff < best_diff {
+            best_diff = diff;
+            best_relative_depth = relative_depth;
+            best_chunk_cells = chunk_cells;
+        }
+    }
+
+    let chunk_level = RefinementLevel::new_const(refinement_level.get() - best_relative_depth);
+    let chunk_size = u64::try_from(best_chunk_cells)
+        .map_err(|_| EncodingError::Storage("chunk size does not fit into u64".into()))?;
+
+    Ok((chunk_level, chunk_size))
+}
+
 pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
     output_path: &Path,
@@ -249,19 +310,28 @@ where
     let (bbox, pixel_width, pixel_height) = get_corners_and_pixel_size(&dataset)?;
     let refinement_level = get_closest_refinement_level(&grid, pixel_width, pixel_height)?;
 
-    let chunk_level = RefinementLevel::new_const(
-        (refinement_level.get() - 4).max(grid.min_refinement_level()?.get()),
-    );
-    let chunk_size = dggrs
-        .spec()
-        .aperture
-        .pow((refinement_level.get() - chunk_level.get()) as u32) as u64
-        * 2;
+    let data_type_size_bytes = metadata_bands
+        .iter()
+        .map(|band| band.dtype.byte_size())
+        .max()
+        .ok_or_else(|| {
+            EncodingError::Storage("dataset metadata must define at least one attribute".into())
+        })?;
+    let min_chunk_level = grid.min_refinement_level()?;
+    let max_relative_depth_allowed = grid.max_relative_depth()?;
+    let (chunk_level, chunk_size) = choose_best_chunk_level_and_size(
+        refinement_level,
+        min_chunk_level,
+        max_relative_depth_allowed,
+        dggrs.spec().aperture as u64,
+        data_type_size_bytes,
+    )?;
     println!(
-        "refinement level: {}, chunk level: {}, chunk size: {}",
+        "refinement level: {}, chunk level: {}, chunk size: {}, chunk bytes: {}",
         refinement_level.get(),
         chunk_level.get(),
-        chunk_size
+        chunk_size,
+        chunk_size * data_type_size_bytes as u64
     );
 
     let chunk_zones = grid.zones_from_bbox(chunk_level, bbox, Some(CONFIG))?;
