@@ -146,9 +146,9 @@ pub fn point_in_spherical_triangle(p: Vector3D, triangle: [Vector3D; 3]) -> bool
     let n_ca = c.cross(a);
 
     // Check if P is on same side as opposite vertex
-    let inside_ab = n_ab.dot(c) * n_ab.dot(p) >= DEGENERATE_TRIANGLE_THRESHOLD;
-    let inside_bc = n_bc.dot(a) * n_bc.dot(p) >= DEGENERATE_TRIANGLE_THRESHOLD;
-    let inside_ca = n_ca.dot(b) * n_ca.dot(p) >= DEGENERATE_TRIANGLE_THRESHOLD;
+    let inside_ab = n_ab.dot(c) * n_ab.dot(p) >= -DEGENERATE_TRIANGLE_THRESHOLD;
+    let inside_bc = n_bc.dot(a) * n_bc.dot(p) >= -DEGENERATE_TRIANGLE_THRESHOLD;
+    let inside_ca = n_ca.dot(b) * n_ca.dot(p) >= -DEGENERATE_TRIANGLE_THRESHOLD;
 
     inside_ab && inside_bc && inside_ca
 }

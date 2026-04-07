@@ -67,8 +67,6 @@ pub fn triangle(
         }
     }
 
-    let t = found.unwrap().0;
-
     let (macro_tri, (i0, i1)) = found.or_else(|| {
         // fallback: find nearest macro triangle by minimum angle
         let mut best: Option<([Vector3D; 3], (usize, usize), f64)> = None;
@@ -134,13 +132,14 @@ pub fn triangle(
 }
 pub const SUB_TRIANGLE_TEMPLATE: [(f64, f64); 3] = [
     (0.0, 0.0),          // B (corner) at origin
-    (-1.0, 0.0),         // A (v_mid) on negative x-axis
-    (-0.5, 0.866025404), // C (center) - forms equilateral triangle
+    (-0.563874, 0.0),        // A = mid
+    (0.550995,  0.371430),   // C (center) - forms equilateral triangle
 ];
-pub const FACE_TEMPLATE_UP: [(f64, f64); 3] = [(0.0, 0.0), (-1.107149, 0.0), (-0.553574, 0.958819)];
+const SCALE: f64 = 1.0880715;
+pub const FACE_TEMPLATE_UP: [(f64, f64); 3] = [(0.0, 0.0), (-1.107149* SCALE, 0.0), (-0.553574* SCALE, 0.958819* SCALE)];
 
 pub const FACE_TEMPLATE_DOWN: [(f64, f64); 3] =
-    [(0.0, 0.0), (-1.107149, 0.0), (-0.553574, -0.958819)];
+    [(0.0, 0.0), (-1.107149* SCALE, 0.0), (-0.553574* SCALE, -0.958819* SCALE)];
 
 /// Get the position of sub-triangle vertices in face 2D coordinates
 pub fn get_subtriangle_vertices_in_face(

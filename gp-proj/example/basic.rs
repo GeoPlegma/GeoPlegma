@@ -42,7 +42,7 @@ pub fn main() -> () {
         Point::new(63.501735, 80.099071),
         Point::new(0.0, 45.0),
         // Point::new(20.0, 50.0),
-        // Point::new(40.0, 55.0), 
+        // Point::new(40.0, 55.0),
         Point::new(30.0, 30.0),
     ];
 
@@ -62,80 +62,73 @@ pub fn main() -> () {
         //     "{} Barycentric ({:?},{:?},{:?})",
         //     i+1, c.coords.x, c.coords.y, c.coords.z
         // );
-         println!(
-            "{} Cartesian coordinates: ({:?},{:?})", i+1,
-            coords[i].coords.x, coords[i].coords.y
+        println!(
+            "{} Cartesian coordinates: ({:?},{:?})",
+            i + 1,
+            coords[i].coords.x,
+            coords[i].coords.y
         );
     }
     // println!(
     //     "Basic example for gp-proj. Convert geographic coordinates to cartesian coordinates, and vice-versa."
     // // );
     let coef = Vgc::fourier_coefficients(KarneyCoefficients::GEODETIC_TO_AUTHALIC);
-
+    let r = 6371007.181;
     // // // let mut all: Vec<Point> = [].to_vec();
     let polyhedron = new();
-    // for lat in [10.0, 30.0, 50.0, 70.0] {
-    // // for lat in [0.0, 20.0, 40.0] {
-    // //     for lon in [45.0, 50.0,55.0] {
-    //     for lon in [-120.0, -60.0, 0.0, 60.0, 120.0] {
-    //          let p1 = Point::new(lon, lat);
-    //         let p2 = Point::new(lon + 1.0, lat);
-    //         let p3 = Point::new(lon + 1.0, lat + 1.0);
-    //         let p4 = Point::new(lon, lat + 1.0);
+    for lat in [10.0, 30.0, 50.0, 70.0] {
+    // for lat in [0.0, 20.0, 40.0] {
+    //     for lon in [45.0, 50.0,55.0] {
+        for lon in [-120.0, -60.0, 0.0, 60.0, 120.0] {
+            let p1 = Point::new(lon,       lat);
+            let p2 = Point::new(lon + 1.0, lat);
+            let p3 = Point::new(lon + 1.0, lat + 1.0);
+            let p4 = Point::new(lon,       lat + 1.0);
 
-    //         let bary_results = projection.geo_to_face(vec![p1, p2, p3, p4], Some(&polyhedron));
+            let proj = projection.geo_to_cartesian(
+                vec![p1, p2, p3, p4],
+                Some(&icosahedron), None
+            );
 
-    //         // Skip if not all on same face
-    //         if bary_results.len() != 4 ||
-    //            bary_results[0].face != bary_results[1].face ||
-    //            bary_results[0].face != bary_results[2].face ||
-    //            bary_results[0].face != bary_results[3].face {
-    //             continue;
-    //         }
+            if proj.len() < 4 {
+                println!("lat={lat}, lon={lon} - SKIPPED (empty result)");
+                continue;
+            }
 
-    //         let face = bary_results[0].face;
+            // Skip if not all on same face
+            if proj[0].face != proj[1].face
+            || proj[0].face != proj[2].face
+            || proj[0].face != proj[3].face {
+                println!("lat={lat}, lon={lon} - SPANS MULTIPLE FACES: {},{},{},{}",
+                    proj[0].face, proj[1].face, proj[2].face, proj[3].face);
+                continue;
+            }
 
-    //         // Convert barycentric to 2D Cartesian for area calculation
-    //         let face_verts = polyhedron.face_vertices(face).unwrap();
-    //         let face_edges = polyhedron.face_arc_lengths(face).unwrap();
-    //         let is_upward = face % 2 == 0;
-    //         let face_area = spherical_triangle_area([face_verts[0], face_verts[1], face_verts[2]]).unwrap();
-    //         let face_2d = triangle3d_to_2d(face_edges[0], face_edges[1], face_edges[2], is_upward, face_area);
+            // Authalic spherical area
+            let lat0_auth = Vgc::lat_geodetic_to_authalic(lat.to_radians(), &coef);
+            let lat1_auth = Vgc::lat_geodetic_to_authalic((lat + 1.0).to_radians(), &coef);
+            let dlon_rad  = 1.0_f64.to_radians();
+            let spherical_area = r * r * dlon_rad
+                * (lat1_auth.sin() - lat0_auth.sin()).abs();
 
-    //         let r = 6371007.181;
+            // Projected area via shoelace
+            let (x1, y1) = (proj[0].coords.x, proj[0].coords.y);
+            let (x2, y2) = (proj[1].coords.x, proj[1].coords.y);
+            let (x3, y3) = (proj[2].coords.x, proj[2].coords.y);
+            let (x4, y4) = (proj[3].coords.x, proj[3].coords.y);
 
-    //         let to_xy = |bary: &ForwardBary| -> (f64, f64) {
-    //             let u = bary.coords.x;
-    //             let v = bary.coords.y;
-    //             let w = bary.coords.z;
+            let projected_area = 0.5 * (
+                (x1*y2 - x2*y1)
+              + (x2*y3 - x3*y2)
+              + (x3*y4 - x4*y3)
+              + (x4*y1 - x1*y4)
+            ).abs();
 
-    //             let x = (face_2d[0].0 * u + face_2d[1].0 * v + face_2d[2].0 * w) * r;
-    //             let y = (face_2d[0].1 * u + face_2d[1].1 * v + face_2d[2].1 * w) * r;
-    //             (x, y)
-    //         };
-
-    //         let coords: Vec<(f64, f64)> = bary_results.iter().map(to_xy).collect();
-
-    //         // Authalic spherical area
-    //         let lat0_auth = Vgc::lat_geodetic_to_authalic(lat.to_radians(), &coef).to_degrees();
-    //         let lat1_auth = Vgc::lat_geodetic_to_authalic((lat + 1.0).to_radians(), &coef).to_degrees();
-    //         let dlon_rad = 1.0_f64.to_radians();
-    //         let spherical_area = r.powi(2) * dlon_rad *
-    //             (lat1_auth.to_radians().sin() - lat0_auth.to_radians().sin()).abs();
-
-    //         // Projected area
-    //         let projected_area = 0.5 * (
-    //             (coords[0].0 * coords[1].1 - coords[1].0 * coords[0].1) +
-    //             (coords[1].0 * coords[2].1 - coords[2].0 * coords[1].1) +
-    //             (coords[2].0 * coords[3].1 - coords[3].0 * coords[2].1) +
-    //             (coords[3].0 * coords[0].1 - coords[0].0 * coords[3].1)
-    //         ).abs();
-
-    //         let ratio = projected_area / spherical_area;
-
-    //         println!("lat={}, lon={}, face={}, ratio={:.4}", lat, lon, face, ratio);
-    //     }
-    // }
+            let ratio = projected_area / spherical_area;
+            println!("lat={lat:>3}, lon={lon:>5}, face={}, ratio={ratio:.4}",
+                proj[0].face);
+        }
+    }
 
     // let coords = projection.geo_to_face(all.to_vec(), Some(&icosahedron));
     // println!("{:?}", coords);
@@ -148,4 +141,29 @@ pub fn main() -> () {
         distortion.angular_deformation
     );
     println!("Areal scale: {} (expected: ~1.0)", distortion.areal_scale);
+
+    // let test_points = [
+    //     (-9.494, 38.685), // Lisbon
+    //     (0.0, 45.0),
+    //     (30.0, 30.0),
+    //     (0.0, 0.0),
+    //     (0.0, 90.0), // North pole
+    // ];
+
+    // for (lon, lat) in test_points {
+    //     let result =
+    //         projection.geo_to_cartesian(vec![Point::new(lon, lat)], Some(&polyhedron), None);
+    //     println!("Input:  lat={:.4}, lon={:.4}", lat, lon);
+    //     println!(
+    //         "Output: x={:.4}, y={:.4}, face={}",
+    //         result[0].coords.x, result[0].coords.y, result[0].face
+    //     );
+    //     println!();
+    // }
+
+    // let p1 = projection.geo_to_cartesian(vec![Point::new(-9.494, 38.685)], Some(&polyhedron), None);
+    // let p2 = projection.geo_to_cartesian(vec![Point::new(-9.500, 38.690)], Some(&polyhedron), None);
+    // println!("p1: ({:.6}, {:.6})", p1[0].coords.x, p1[0].coords.y);
+    // println!("p2: ({:.6}, {:.6})", p2[0].coords.x, p2[0].coords.y);
+    // // These should be very close to each other
 }

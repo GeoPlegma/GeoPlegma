@@ -221,7 +221,6 @@ impl Projection for Vgc {
                         [b_face_2d, a_face_2d, c_face_2d], // destination triangle
                     );
 
-                    println!("{:?}", p_face_2d);
                     // println!("Point 2D: ({:.6}, {:.6})", p_x, p_y);
                     // Convert 2D Cartesian to barycentric w.r.t. face
                     let (bary_u, bary_v, bary_w) =
@@ -408,7 +407,6 @@ impl Projection for Vgc {
                     let sub_triangle_id = sub_triangle_3d.1;
                     let sub_vertices_in_face =
                         get_subtriangle_vertices_in_face(sub_triangle_id, face_template);
-                    println!("{:?}", (point_p));
 
                     // STEP 4: Transform from sub-triangle local to face coordinates
                     let (p_x_face, p_y_face) = affine_transform_triangle(
@@ -419,11 +417,10 @@ impl Projection for Vgc {
 
                     // STEP 5: Convert to meters
                     let r = 6371007.181;
-
                     out.push(ForwardCartesian {
                         coords: Coord {
-                            x: p_x_face,
-                            y: p_y_face,
+                            x: p_x_face * r,
+                            y: p_y_face * r,
                         },
                         face: index,
                     });
@@ -443,23 +440,16 @@ impl Projection for Vgc {
     // @TODO - Needs to be reviewed
     // Calculate distortion and compare with Geocart values
     fn compute_distortion(&self, lat: f64, lon: f64, polyhedron: &Polyhedron) -> DistortionMetrics {
-        let r_authalic = 6371007.181;
-        let epsilon = 1e-8;
+        let epsilon = 1e-5_f64; // degrees
 
         let center_xy =
             &self.geo_to_cartesian(vec![Point::new(lon, lat)], Some(polyhedron), None)[0];
-
-        // Perturb latitude (north-south)
         let north_xy =
             &self.geo_to_cartesian(vec![Point::new(lon, lat + epsilon)], Some(polyhedron), None)[0];
-
-        // Perturb longitude (east-west)
         let east_xy =
             &self.geo_to_cartesian(vec![Point::new(lon + epsilon, lat)], Some(polyhedron), None)[0];
-        println!("{:?}", center_xy);
-        // Handle face discontinuities
+
         if center_xy.face != north_xy.face || center_xy.face != east_xy.face {
-            // Point is near face boundary, derivatives unreliable
             return DistortionMetrics {
                 h: f64::NAN,
                 k: f64::NAN,
@@ -468,63 +458,47 @@ impl Projection for Vgc {
             };
         }
 
-        // Derivatives in radians per radian
-        let dx_dphi = (north_xy.coords.x - center_xy.coords.x) / epsilon.to_radians();
-        let dy_dphi = (north_xy.coords.y - center_xy.coords.y) / epsilon.to_radians();
+        // epsilon in radians — coordinates are in meters, input was in degrees
+        let eps_rad = epsilon.to_radians();
 
-        let dx_dlambda = (east_xy.coords.x - center_xy.coords.x) / epsilon.to_radians();
-        let dy_dlambda = (east_xy.coords.y - center_xy.coords.y) / epsilon.to_radians();
+        let dx_dphi = (north_xy.coords.x - center_xy.coords.x) / eps_rad;
+        let dy_dphi = (north_xy.coords.y - center_xy.coords.y) / eps_rad;
+        let dx_dlambda = (east_xy.coords.x - center_xy.coords.x) / eps_rad;
+        let dy_dlambda = (east_xy.coords.y - center_xy.coords.y) / eps_rad;
 
-        // // // Convert to meters
-        // // let dx_dphi = dx_dphi_rad * r_authalic;
-        // // let dy_dphi = dy_dphi_rad * r_authalic;
-        // // let dx_dlambda = dx_dlambda_rad * r_authalic;
-        // // let dy_dlambda = dy_dlambda_rad * r_authalic;
+        // WGS84 radii of curvature (meters/radian)
+        let a = 6378137.0_f64;
+        let e2 = 0.00669437999014_f64;
+        let lat_rad = lat.to_radians();
+        let sin_lat = lat_rad.sin();
+        let cos_lat = lat_rad.cos();
 
-        // // WGS84 ellipsoid parameters for GEODETIC coordinates
-        // let a = 6378137.0;
-        // let e2 = 0.00669437999014;
-        // let lat_rad = lat.to_radians();
+        let m = a * (1.0 - e2) / (1.0 - e2 * sin_lat.powi(2)).powf(1.5);
+        let n = a / (1.0 - e2 * sin_lat.powi(2)).sqrt();
 
-        // let sin_lat = lat_rad.sin();
-        // let cos_lat = lat_rad.cos();
+// Normalize derivatives by geodetic radii
+let e  = dx_dlambda / (n * cos_lat);
+let f  = dy_dlambda / (n * cos_lat);
+let g  = dx_dphi    / m;
+let h_ = dy_dphi    / m;
 
-        // // Radii of curvature on the ellipsoid
-        // let m = a * (1.0 - e2) / (1.0 - e2 * sin_lat.powi(2)).powf(1.5);
-        // let n = a / (1.0 - e2 * sin_lat.powi(2)).sqrt();
+// Tissot: a and b are semi-axes of the indicatrix ellipse
+let p = (e.powi(2) + f.powi(2)).sqrt();
+let q = (g.powi(2) + h_.powi(2)).sqrt();
+let t = e * g + f * h_;
 
-        // Scale factors
-        let h = (dx_dphi.powi(2) + dy_dphi.powi(2)).sqrt();
-        // let h = (dx_dphi.powi(2) + dy_dphi.powi(2)).sqrt() / m;
-        // let k = (dx_dlambda.powi(2) + dy_dlambda.powi(2)).sqrt() / (n * cos_lat);
-        let k = (dx_dlambda.powi(2) + dy_dlambda.powi(2)).sqrt();
+let a_tissot = ((p + q).powi(2) - 2.0 * (e*h_ - f*g).abs() * (1.0 - (t / (p * q)).powi(2)).sqrt()).sqrt() / 2.0_f64.sqrt();
+let b_tissot = ((p - q).powi(2) + 2.0 * (e*h_ - f*g).abs() * (1.0 - (t / (p * q)).powi(2)).sqrt()).sqrt() / 2.0_f64.sqrt();
 
-        // // Angular deformation
+let areal_scale = (e * h_ - f * g).abs();
+let omega = 2.0 * ((a_tissot - b_tissot) / (a_tissot + b_tissot)).asin();
 
-        // // Correct Tissot formulas
-        // let a_tissot = ((h.powi(2) + k.powi(2)) / 2.0
-        //     + ((dx_dphi * dy_dlambda - dy_dphi * dx_dlambda) / (m * n * cos_lat))
-        //         .powi(2)
-        //         .sqrt())
-        // .sqrt();
-        let areal_scale = dx_dlambda * dy_dphi - dx_dphi * dy_dlambda;
-
-        let angular_distortion = ((dx_dlambda * dx_dphi + dy_dlambda * dy_dphi) / (h * k)).acos();
-
-        // let b_tissot = ((h.powi(2) + k.powi(2)) / 2.0
-        //     - ((dx_dphi * dy_dlambda - dy_dphi * dx_dlambda) / (m * n * cos_lat))
-        //         .powi(2)
-        //         .sqrt())
-        // .sqrt();
-
-        // // Maximum angular deformation
-        // let omega = 2.0 * ((a_tissot - b_tissot) / (a_tissot + b_tissot)).asin();
-        DistortionMetrics {
-            h,
-            k,
-            angular_deformation: angular_distortion.to_degrees(),
-            areal_scale: areal_scale,
-        }
+DistortionMetrics {
+    h: a_tissot,
+    k: b_tissot,
+    angular_deformation: omega.to_degrees(),
+    areal_scale,
+}
     }
 }
 
