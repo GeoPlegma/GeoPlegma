@@ -130,16 +130,49 @@ pub fn triangle(
         Some(([mid, v1, c], (i1 * 2 + 1) as u8))
     }
 }
-pub const SUB_TRIANGLE_TEMPLATE: [(f64, f64); 3] = [
-    (0.0, 0.0),          // B (corner) at origin
-    (-0.563874, 0.0),        // A = mid
-    (0.550995,  0.371430),   // C (center) - forms equilateral triangle
-];
-const SCALE: f64 = 1.0880715;
-pub const FACE_TEMPLATE_UP: [(f64, f64); 3] = [(0.0, 0.0), (-1.107149* SCALE, 0.0), (-0.553574* SCALE, 0.958819* SCALE)];
 
-pub const FACE_TEMPLATE_DOWN: [(f64, f64); 3] =
-    [(0.0, 0.0), (-1.107149* SCALE, 0.0), (-0.553574* SCALE, -0.958819* SCALE)];
+// SUB_TRIANGLE_TEMPLATE
+// Each icosahedron face is divided into 6 sub-triangles by connecting the face center
+// to the midpoints of each edge. All 6 sub-triangles are congruent right triangles.
+// Arc lengths measured on the unit sphere for one sub-triangle:
+//   ab (corner to mid) = 0.553574 rad
+//   bc (corner to center) = 0.652358 rad  
+//   ac (mid to center) = 0.364864 rad
+// Template is built with B (corner) at origin, A (mid) on negative x-axis,
+// C (center) placed using law of cosines at B:
+//   cos(angle_B) = (ab² + bc² - ac²) / (2·ab·bc)
+//   C = (bc·cos(angle_B), bc·sin(angle_B))
+// Raw planar area = 0.5 * |ab * C.y| ≈ 0.100929
+// Spherical sub-triangle area = 4π / 120 ≈ 0.104720 (unit sphere, 20 faces × 6 sub-triangles)
+// Scale factor = sqrt(0.104720 / 0.100929) ≈ 1.018606
+// All coordinates multiplied by 1.018606 to match spherical sub-triangle area.
+const SCALE_SUB: f64 = 1.018606;
+pub const SUB_TRIANGLE_TEMPLATE: [(f64, f64); 3] = [
+    (0.0,                           0.0),        // B = corner (origin)
+    (-0.553574 * SCALE_SUB,         0.0),        // A = mid
+    ( 0.540930 * SCALE_SUB,         0.364645 * SCALE_SUB), // C = center
+];
+// FACE_TEMPLATE_UP and FACE_TEMPLATE_DOWN
+// Edge lengths come from the regular icosahedron on a unit sphere:
+//   - edge 0-1: π/3 ≈ 1.107149 rad (exact)
+//   - edge 1-2 and 2-0: ≈ 1.107149 rad (all equal, regular icosahedron)
+// Triangle is built with f1 at origin, f0 on negative x-axis, f2 using law of cosines at f1.
+// Raw planar area = 0.5 * |(-1.107149 * 0.958819)| ≈ 0.530938
+// Spherical face area = 4π / 20 ≈ 0.628318 (unit sphere, 20 equal faces)
+// Scale factor = sqrt(0.628318 / 0.530938) ≈ 1.088072
+// All coordinates multiplied by 1.088072 to make planar area equal spherical face area,
+// ensuring the equal-area property is preserved when mapping to the face plane.
+const SCALE_FACE: f64 = 1.0880715;
+pub const FACE_TEMPLATE_UP: [(f64, f64); 3] = [
+    (0.0,                          0.0),
+    (-1.107149 * SCALE_FACE,       0.0),
+    (-0.553574 * SCALE_FACE,       0.958819 * SCALE_FACE),
+];
+pub const FACE_TEMPLATE_DOWN: [(f64, f64); 3] = [
+    (0.0,                          0.0),
+    (-1.107149 * SCALE_FACE,       0.0),
+    (-0.553574 * SCALE_FACE,      -0.958819 * SCALE_FACE),
+];
 
 /// Get the position of sub-triangle vertices in face 2D coordinates
 pub fn get_subtriangle_vertices_in_face(

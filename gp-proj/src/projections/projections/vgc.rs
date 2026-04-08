@@ -476,29 +476,35 @@ impl Projection for Vgc {
         let m = a * (1.0 - e2) / (1.0 - e2 * sin_lat.powi(2)).powf(1.5);
         let n = a / (1.0 - e2 * sin_lat.powi(2)).sqrt();
 
-// Normalize derivatives by geodetic radii
-let e  = dx_dlambda / (n * cos_lat);
-let f  = dy_dlambda / (n * cos_lat);
-let g  = dx_dphi    / m;
-let h_ = dy_dphi    / m;
+        // Normalize derivatives by geodetic radii
+        let e = dx_dlambda / (n * cos_lat);
+        let f = dy_dlambda / (n * cos_lat);
+        let g = dx_dphi / m;
+        let h_ = dy_dphi / m;
 
-// Tissot: a and b are semi-axes of the indicatrix ellipse
-let p = (e.powi(2) + f.powi(2)).sqrt();
-let q = (g.powi(2) + h_.powi(2)).sqrt();
-let t = e * g + f * h_;
+        // Tissot: a and b are semi-axes of the indicatrix ellipse
+        let p = (e.powi(2) + f.powi(2)).sqrt();
+        let q = (g.powi(2) + h_.powi(2)).sqrt();
+        let t = e * g + f * h_;
 
-let a_tissot = ((p + q).powi(2) - 2.0 * (e*h_ - f*g).abs() * (1.0 - (t / (p * q)).powi(2)).sqrt()).sqrt() / 2.0_f64.sqrt();
-let b_tissot = ((p - q).powi(2) + 2.0 * (e*h_ - f*g).abs() * (1.0 - (t / (p * q)).powi(2)).sqrt()).sqrt() / 2.0_f64.sqrt();
+        let a_tissot = ((p + q).powi(2)
+            - 2.0 * (e * h_ - f * g).abs() * (1.0 - (t / (p * q)).powi(2)).sqrt())
+        .sqrt()
+            / 2.0_f64.sqrt();
+        let b_tissot = ((p - q).powi(2)
+            + 2.0 * (e * h_ - f * g).abs() * (1.0 - (t / (p * q)).powi(2)).sqrt())
+        .sqrt()
+            / 2.0_f64.sqrt();
 
-let areal_scale = (e * h_ - f * g).abs();
-let omega = 2.0 * ((a_tissot - b_tissot) / (a_tissot + b_tissot)).asin();
+        let areal_scale = (e * h_ - f * g).abs();
+        let omega = 2.0 * ((a_tissot - b_tissot) / (a_tissot + b_tissot)).asin();
 
-DistortionMetrics {
-    h: a_tissot,
-    k: b_tissot,
-    angular_deformation: omega.to_degrees(),
-    areal_scale,
-}
+        DistortionMetrics {
+            h: a_tissot,
+            k: b_tissot,
+            angular_deformation: omega.to_degrees(),
+            areal_scale,
+        }
     }
 }
 
