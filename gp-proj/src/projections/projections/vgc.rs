@@ -147,6 +147,7 @@ impl Projection for Vgc {
                         sub_vertices_in_face,
                     );
 
+                    // Authalic radius
                     let r = 6371007.181;
                     out.push(ForwardCartesian {
                         coords: Coord {
