@@ -7,12 +7,13 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use crate::api::{BoundingBox, Point as ApiPoint};
 use crate::api::DggrsApiConfig;
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
 use crate::models::common::{Zone, ZoneId, Zones};
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
-use geo::{GeodesicArea, LineString, Point, Polygon, Rect, coord};
+use geo::{GeodesicArea, LineString, Point, Polygon, coord};
 
 pub fn to_zones(
     dggrs: DGGRS,
@@ -131,26 +132,23 @@ fn to_str_zone_id(dggrs: &DGGRS, zone: DGGRSZone) -> Result<ZoneId, DggalError> 
         .map_err(|e: DggrsError| DggalError::InvalidZoneIdFormat(format!("{txt} ({e})")))
 }
 
-pub fn to_geo_point(pt: Point) -> GeoPoint {
+pub fn to_geo_point(pt: ApiPoint) -> GeoPoint {
     GeoPoint {
-        lat: pt.y().to_radians(),
-        lon: pt.x().to_radians(),
+        lat: pt.lat.to_radians(),
+        lon: pt.lon.to_radians(),
     }
 }
 
 /// Convert geo::Rect BBox to DGGAL::GeoExtent
-pub fn bbox_to_geoextent(bbox: &Rect<f64>) -> GeoExtent {
-    let min = bbox.min(); // lower-left in degrees
-    let max = bbox.max(); // upper-right in degrees
-
+pub fn bbox_to_geoextent(bbox: &BoundingBox) -> GeoExtent {
     GeoExtent {
         ll: GeoPoint {
-            lat: min.y.to_radians(),
-            lon: min.x.to_radians(),
+            lat: bbox.min_lat.to_radians(),
+            lon: bbox.min_lon.to_radians(),
         },
         ur: GeoPoint {
-            lat: max.y.to_radians(),
-            lon: max.x.to_radians(),
+            lat: bbox.max_lat.to_radians(),
+            lon: bbox.max_lon.to_radians(),
         },
     }
 }

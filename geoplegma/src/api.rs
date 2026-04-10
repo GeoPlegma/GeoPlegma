@@ -9,7 +9,44 @@
 
 use crate::error::DggrsError;
 use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
-use geo::{Point, Rect};
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Point {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl Point {
+    pub fn new(lat: f64, lon: f64) -> Self {
+        Self { lat, lon }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct BoundingBox {
+    pub min_lon: f64,
+    pub min_lat: f64,
+    pub max_lon: f64,
+    pub max_lat: f64,
+}
+
+impl BoundingBox {
+    pub fn new(min_lon: f64, min_lat: f64, max_lon: f64, max_lat: f64) -> Self {
+        Self {
+            min_lon,
+            min_lat,
+            max_lon,
+            max_lat,
+        }
+    }
+
+    pub const WORLD: Self = Self {
+        min_lon: -180.0,
+        min_lat: -90.0,
+        max_lon: 180.0,
+        max_lat: 90.0,
+    };
+}
 
 /// Addresses all the configuration options that apply to all port functions
 ///
@@ -55,7 +92,7 @@ pub trait DggrsApi: Send + Sync {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
-        bbox: Option<Rect<f64>>,
+        bbox: Option<BoundingBox>,
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 

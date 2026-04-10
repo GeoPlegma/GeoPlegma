@@ -35,9 +35,8 @@ pub mod dggrid {
 }
 
 pub mod write {
-    use crate::api::DggrsApiConfig;
+    use crate::api::{BoundingBox, DggrsApiConfig};
     use crate::models::common::RefinementLevel;
-    use geo::Rect;
     use std::fs;
     use std::io::{self, Write};
     use std::path::Path;
@@ -95,12 +94,9 @@ pub mod write {
         Ok(())
     }
 
-    pub fn bbox(bbox: &Rect<f64>, bboxfile: &Path) -> io::Result<()> {
-        let min = bbox.min();
-        let max = bbox.max();
-
-        let (minx, miny) = (min.x, min.y);
-        let (maxx, maxy) = (max.x, max.y);
+    pub fn bbox(bbox: &BoundingBox, bboxfile: &Path) -> io::Result<()> {
+        let (minx, miny) = (bbox.min_lat, bbox.min_lon);
+        let (maxx, maxy) = (bbox.max_lat, bbox.max_lon);
 
         // define the 5 vertices (closing the polygon)
         let vertices = vec![

@@ -1,9 +1,8 @@
-use geo::Point;
 use geoplegma::adapters::dggal::grids::DggalImpl;
 use geoplegma::adapters::dggrid::igeo7::Igeo7Impl;
 use geoplegma::adapters::dggrid::isea3h::Isea3hImpl;
 use geoplegma::adapters::h3o::h3::H3Impl;
-use geoplegma::api::{DggrsApi, DggrsApiConfig};
+use geoplegma::api::{DggrsApi, DggrsApiConfig, Point};
 use geoplegma::models::common::{DggrsUid, RefinementLevel};
 
 #[test]
@@ -31,7 +30,7 @@ fn isea3h_parent_from_zone_contains_child_zone() {
 }
 
 fn test_parent_from_zone_contains_child_zone<T: DggrsApi>(adapter: &T) {
-    let point = Point::new(9.06, 52.98);
+    let point = Point::new(52.98, 9.06);
     let base_config = DggrsApiConfig {
         area_sqm: false,
         densify: false,
