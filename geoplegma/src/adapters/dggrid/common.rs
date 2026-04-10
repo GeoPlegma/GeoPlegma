@@ -95,8 +95,8 @@ pub mod write {
     }
 
     pub fn bbox(bbox: &BoundingBox, bboxfile: &Path) -> io::Result<()> {
-        let (minx, miny) = (bbox.min_lat, bbox.min_lon);
-        let (maxx, maxy) = (bbox.max_lat, bbox.max_lon);
+        let (minx, miny) = (bbox.min_lon, bbox.min_lat);
+        let (maxx, maxy) = (bbox.max_lon, bbox.max_lat);
 
         // define the 5 vertices (closing the polygon)
         let vertices = vec![

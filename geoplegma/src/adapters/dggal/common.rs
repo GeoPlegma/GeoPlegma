@@ -105,7 +105,7 @@ pub fn to_zones(
 }
 
 fn to_point(pt: &GeoPoint) -> Point<f64> {
-    Point::new(pt.lon, pt.lat)
+    Point::new(pt.lon.to_degrees(), pt.lat.to_degrees())
 }
 
 fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
