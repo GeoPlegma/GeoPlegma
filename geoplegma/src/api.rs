@@ -96,7 +96,7 @@ pub trait DggrsApi: Send + Sync {
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
-    /// Get zones for a geo::Point.
+    /// Get zones for a Point.
     fn zone_from_point(
         &self,
         refinement_level: RefinementLevel,

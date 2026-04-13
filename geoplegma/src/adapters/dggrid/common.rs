@@ -134,11 +134,12 @@ pub mod write {
 }
 
 pub mod read {
+    use crate::api::Point as ApiPoint;
     use crate::error::DggrsError;
     use crate::error::dggrid::DggridError;
     use crate::models::common::{Zone, ZoneId};
     use core::f64;
-    use geo::{LineString, Point, Polygon};
+    use geo::{LineString, Polygon};
     use std::collections::{BTreeMap, HashMap};
     use std::fs;
     use std::fs::File;
@@ -190,7 +191,7 @@ pub mod read {
                         // there are options to control the cell_output_type and
                         // point_output_type in DGGRID, maybe we can avoid generating everything
                         // so we do not have to parse it also.
-                        let pnt = Some(Point::from(z.xy));
+                        let pnt = Some(ApiPoint::new(z.xy.1, z.xy.0));
 
                         let poly = if z.vec_xy.len() >= 2 {
                             Some(Polygon::new(LineString::from(z.vec_xy.clone()), vec![]))

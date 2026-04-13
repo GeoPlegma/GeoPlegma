@@ -8,11 +8,11 @@
 // except according to those terms.
 
 use crate::{
-    api::DggrsApiConfig,
+    api::{DggrsApiConfig, Point as ApiPoint},
     error::{DggrsError, h3o::H3oError},
     models::common::{RefinementLevel, Zone, ZoneId, Zones},
 };
-use geo::{Coord, CoordsIter, GeodesicArea, LineString, Point, Polygon};
+use geo::{Coord, CoordsIter, GeodesicArea, LineString, Polygon};
 use h3o::{Boundary, CellIndex, LatLng, Resolution};
 
 /// Translates integer resolution to H3 string resolution
@@ -55,8 +55,8 @@ pub fn ring_to_strings(iter: impl Iterator<Item = Option<CellIndex>>) -> Vec<Str
         .collect()
 }
 
-pub fn latlng_to_point(latlng: LatLng) -> Point {
-    Point::new(latlng.lng(), latlng.lat())
+pub fn latlng_to_point(latlng: LatLng) -> ApiPoint {
+    ApiPoint::new(latlng.lat(), latlng.lng())
 }
 
 pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsApiConfig) -> Result<Zones, DggrsError> {
@@ -67,7 +67,7 @@ pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsApiConfig) -> Result<Zones
 
             let center = if conf.center {
                 let ll = LatLng::from(h3o_zone);
-                Some(latlng_to_point(ll)) // geo::Point
+                Some(latlng_to_point(ll))
             } else {
                 None
             };

@@ -13,7 +13,7 @@ use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
 use crate::models::common::{Zone, ZoneId, Zones};
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
-use geo::{GeodesicArea, LineString, Point, Polygon, coord};
+use geo::{GeodesicArea, LineString, Polygon, coord};
 
 pub fn to_zones(
     dggrs: DGGRS,
@@ -104,8 +104,8 @@ pub fn to_zones(
     Ok(Zones { zones })
 }
 
-fn to_point(pt: &GeoPoint) -> Point<f64> {
-    Point::new(pt.lon.to_degrees(), pt.lat.to_degrees())
+fn to_point(pt: &GeoPoint) -> ApiPoint {
+    ApiPoint::new(pt.lat.to_degrees(), pt.lon.to_degrees())
 }
 
 fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {

@@ -9,7 +9,8 @@
 use crate::constants::DGGRS_SPECS;
 use crate::error::DggrsError;
 use crate::error::factory::DggrsUidError;
-use geo::{Point, Polygon};
+use crate::api::Point;
+use geo::Polygon;
 use std::convert::{From, TryFrom};
 use std::fmt;
 use std::str::FromStr;
