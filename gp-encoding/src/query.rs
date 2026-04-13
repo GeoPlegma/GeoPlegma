@@ -10,7 +10,7 @@ use crate::storage::StorageBackend;
 ///
 /// The point is resolved to a DGGS cell at `refinement_level`, then the
 /// corresponding value bytes are retrieved from the storage backend.
-pub fn query_value_bytes_for_point<B: StorageBackend>(
+pub fn query_value_for_point<B: StorageBackend>(
     backend: &B,
     refinement_level: RefinementLevel,
     band: u32,
@@ -44,14 +44,14 @@ pub fn query_value_bytes_for_point<B: StorageBackend>(
         band
     );
 
-    query_value_bytes_by_cell_index(backend, level, band, &zone.id)
+    query_value_by_cell_index(backend, level, band, &zone.id)
 }
 
 /// Query a single cell value by linearized cell index.
 ///
 /// Returns the raw bytes for one attribute value according to the dataset
 /// attribute schema.
-pub fn query_value_bytes_by_cell_index<B: StorageBackend>(
+pub fn query_value_by_cell_index<B: StorageBackend>(
     backend: &B,
     level: u32,
     band: u32,
@@ -175,7 +175,7 @@ mod tests {
 
     use crate::common::CONFIG;
     use crate::models::{AttributeSchema, DataType, DatasetMetadata};
-    use crate::query::query_value_bytes_by_cell_index;
+    use crate::query::query_value_by_cell_index;
     use crate::storage::StorageBackend;
     use crate::zarr::ZarrBackend;
 
@@ -269,19 +269,19 @@ mod tests {
             .expect("write chunk1");
 
         let bytes =
-            query_value_bytes_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell0)
+            query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell0)
                 .expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 10);
 
         let bytes =
-            query_value_bytes_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell1)
+            query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell1)
                 .expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 20);
 
         let bytes =
-            query_value_bytes_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell2)
+            query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell2)
                 .expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 60);

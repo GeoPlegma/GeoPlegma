@@ -5,7 +5,7 @@ use geo_types::Point;
 use geoplegma::models::common::{DggrsUid, RefinementLevel};
 use gp_encoding::{
     StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
-    query_value_bytes_for_point,
+    query_value_for_point,
 };
 
 #[derive(Parser, Debug)]
@@ -129,7 +129,7 @@ fn run_query(args: QueryArgs) -> Result<(), String> {
     );
 
     for band in bands {
-        let value_bytes = query_value_bytes_for_point(&backend, refinement, band, point)
+        let value_bytes = query_value_for_point(&backend, refinement, band, point)
             .map_err(|e| format!("query failed for band {band}: {e}"))?;
         let dtype = &backend.metadata().attributes[band as usize].dtype;
         let formatted = format_value(dtype, &value_bytes)
