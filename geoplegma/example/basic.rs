@@ -7,7 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 use geoplegma::error;
-use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
+use geoplegma::types::{DggrsUid, RefinementLevel, RelativeDepth};
 use geoplegma::{get, registry};
 use geo::{Point, Rect};
 use std::time::Instant;

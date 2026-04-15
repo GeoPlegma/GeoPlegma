@@ -10,7 +10,7 @@
 use crate::api::DggrsApiConfig;
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
-use crate::models::common::{Zone, ZoneId, Zones};
+use crate::types::{Zone, ZoneId, Zones};
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
 use geo::{GeodesicArea, LineString, Point, Polygon, Rect, coord};
 

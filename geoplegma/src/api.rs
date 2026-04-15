@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use crate::error::DggrsError;
-use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{RefinementLevel, RelativeDepth, ZoneId, Zones};
 use geo::{Point, Rect};
 
 /// Addresses all the configuration options that apply to all port functions
