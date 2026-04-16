@@ -7,7 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::models::common::{
+use crate::types::{
     DggrsImplementation, DggrsName, DggrsSpec, DggrsUid, RefinementLevel, RelativeDepth,
 };
 pub const DGGRS_SPECS: [DggrsSpec; 11] = [

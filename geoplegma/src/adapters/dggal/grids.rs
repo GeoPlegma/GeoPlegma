@@ -12,7 +12,7 @@ use crate::adapters::dggal::context::GLOBAL_DGGAL;
 use crate::api::{BoundingBox, DggrsApi, DggrsApiConfig, Point};
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
-use crate::models::common::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use dggal::DGGRS;
 use dggal_rust::dggal;
 

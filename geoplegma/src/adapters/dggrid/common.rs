@@ -36,7 +36,7 @@ pub mod dggrid {
 
 pub mod write {
     use crate::api::{BoundingBox, DggrsApiConfig};
-    use crate::models::common::RefinementLevel;
+    use crate::types::RefinementLevel;
     use std::fs;
     use std::io::{self, Write};
     use std::path::Path;
@@ -137,7 +137,7 @@ pub mod read {
     use crate::api::Point as ApiPoint;
     use crate::error::DggrsError;
     use crate::error::dggrid::DggridError;
-    use crate::models::common::{Zone, ZoneId};
+    use crate::types::{Zone, ZoneId};
     use core::f64;
     use geo::{LineString, Polygon};
     use std::collections::{BTreeMap, HashMap};
@@ -272,7 +272,7 @@ pub mod read {
 pub mod output {
     use crate::api::DggrsApiConfig;
     use crate::error::DggrsError;
-    use crate::models::common::{ZoneId, Zones};
+    use crate::types::{ZoneId, Zones};
     use geo::GeodesicArea;
     use itertools::Itertools;
     use std::collections::HashMap;

@@ -10,7 +10,7 @@
 use crate::{
     api::{DggrsApiConfig, Point as ApiPoint},
     error::{DggrsError, h3o::H3oError},
-    models::common::{RefinementLevel, Zone, ZoneId, Zones},
+    types::{RefinementLevel, Zone, ZoneId, Zones},
 };
 use geo::{Coord, CoordsIter, GeodesicArea, LineString, Polygon};
 use h3o::{Boundary, CellIndex, LatLng, Resolution};

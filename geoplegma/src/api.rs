@@ -8,7 +8,7 @@
 // except according to those terms.
 
 use crate::error::DggrsError;
-use crate::models::common::{RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{RefinementLevel, RelativeDepth, ZoneId, Zones};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Point {

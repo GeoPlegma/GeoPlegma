@@ -12,7 +12,7 @@ use crate::adapters::h3o::h3o::H3oAdapter;
 use crate::api::{BoundingBox, DggrsApi, DggrsApiConfig, Point};
 use crate::error::DggrsError;
 use crate::error::h3o::H3oError;
-use crate::models::common::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use geo::{Rect, coord};
 use h3o::geom::{ContainmentMode, TilerBuilder};
 use h3o::{CellIndex, LatLng};

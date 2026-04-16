@@ -3,7 +3,8 @@ use geoplegma::adapters::dggrid::igeo7::Igeo7Impl;
 use geoplegma::adapters::dggrid::isea3h::Isea3hImpl;
 use geoplegma::adapters::h3o::h3::H3Impl;
 use geoplegma::api::{DggrsApi, DggrsApiConfig, Point};
-use geoplegma::models::common::{DggrsUid, RefinementLevel};
+use geoplegma::types::{DggrsUid, RefinementLevel};
+
 
 #[test]
 fn h3_parent_from_zone_contains_child_zone() {
