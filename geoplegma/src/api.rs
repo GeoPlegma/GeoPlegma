@@ -8,45 +8,7 @@
 // except according to those terms.
 
 use crate::error::DggrsError;
-use crate::types::{RefinementLevel, RelativeDepth, ZoneId, Zones};
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Point {
-    pub lat: f64,
-    pub lon: f64,
-}
-
-impl Point {
-    pub fn new(lat: f64, lon: f64) -> Self {
-        Self { lat, lon }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct BoundingBox {
-    pub min_lon: f64,
-    pub min_lat: f64,
-    pub max_lon: f64,
-    pub max_lat: f64,
-}
-
-impl BoundingBox {
-    pub fn new(min_lon: f64, min_lat: f64, max_lon: f64, max_lat: f64) -> Self {
-        Self {
-            min_lon,
-            min_lat,
-            max_lon,
-            max_lat,
-        }
-    }
-
-    pub const WORLD: Self = Self {
-        min_lon: -180.0,
-        min_lat: -90.0,
-        max_lon: 180.0,
-        max_lat: 90.0,
-    };
-}
+use crate::types::{BoundingBox, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
 
 /// Addresses all the configuration options that apply to all port functions
 ///
@@ -113,7 +75,7 @@ pub trait DggrsApi: Send + Sync {
     ) -> Result<Zones, DggrsError>;
 
     /// Get the primary parent zone for a given ZoneID.
-    /// 
+    ///
     /// The zone returned by this function is exactly one refinement level above the input zone. Which zone gets returned as the primary parent is dependent on the DGGRS implementation.
     fn primary_parent_from_zone(
         &self,

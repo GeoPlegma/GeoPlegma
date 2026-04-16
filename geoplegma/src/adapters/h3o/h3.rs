@@ -9,10 +9,10 @@
 
 use crate::adapters::h3o::common::{refinement_level_to_h3_resolution, to_zones};
 use crate::adapters::h3o::h3o::H3oAdapter;
-use crate::api::{BoundingBox, DggrsApi, DggrsApiConfig, Point};
+use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::h3o::H3oError;
-use crate::types::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use geo::{Rect, coord};
 use h3o::geom::{ContainmentMode, TilerBuilder};
 use h3o::{CellIndex, LatLng};

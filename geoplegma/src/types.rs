@@ -9,11 +9,48 @@
 use crate::constants::DGGRS_SPECS;
 use crate::error::DggrsError;
 use crate::error::factory::DggrsUidError;
-use crate::api::Point;
 use geo::Polygon;
 use std::convert::{From, TryFrom};
 use std::fmt;
 use std::str::FromStr;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Point {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+impl Point {
+    pub fn new(lat: f64, lon: f64) -> Self {
+        Self { lat, lon }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct BoundingBox {
+    pub min_lon: f64,
+    pub min_lat: f64,
+    pub max_lon: f64,
+    pub max_lat: f64,
+}
+
+impl BoundingBox {
+    pub fn new(min_lon: f64, min_lat: f64, max_lon: f64, max_lat: f64) -> Self {
+        Self {
+            min_lon,
+            min_lat,
+            max_lon,
+            max_lat,
+        }
+    }
+
+    pub const WORLD: Self = Self {
+        min_lon: -180.0,
+        min_lat: -90.0,
+        max_lon: 180.0,
+        max_lat: 90.0,
+    };
+}
 
 // NOTE: The naming needs to be adjusted to the DGGRS Registry
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

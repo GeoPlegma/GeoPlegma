@@ -9,10 +9,10 @@
 
 use crate::adapters::dggrid::common;
 use crate::adapters::dggrid::dggrid::DggridAdapter;
-use crate::api::{BoundingBox, DggrsApi, DggrsApiConfig, Point};
+use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::dggrid::DggridError;
-use crate::types::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
