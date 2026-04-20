@@ -1,7 +1,8 @@
-use geoplegma::models::common::DggrsUid;
+use geoplegma::types::DggrsUid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+#[allow(non_camel_case_types)]
 #[serde(remote = "DggrsUid")]
 pub enum DggrsUidDef {
     ISEA3HDGGRID,

@@ -4,11 +4,9 @@ use std::path::Path;
 use gdal::raster::GdalDataType;
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
 use gdal::{Dataset, GeoTransformEx};
-use geo::Rect;
-use geo_types::Point;
 use geoplegma::api::DggrsApi;
 use geoplegma::get;
-use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
+use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth};
 
 use crate::AttributeSchema;
 use crate::common::CONFIG;
@@ -38,7 +36,7 @@ const ZARR_TARGET_UNCOMPRESSED_CHUNK_BYTES: u64 = 1024 * 1024;
 
 fn get_corners_and_pixel_size(
     dataset: &Dataset,
-) -> Result<(Option<Rect<f64>>, f64, f64), EncodingError> {
+) -> Result<(Option<BoundingBox>, f64, f64), EncodingError> {
     let (width_px, height_px) = dataset.raster_size();
     let w = width_px as f64;
     let h = height_px as f64;
@@ -85,10 +83,7 @@ fn get_corners_and_pixel_size(
     let bbox = if is_global {
         None
     } else {
-        Some(Rect::new(
-            Point::new(lon_min, lat_min),
-            Point::new(lon_max, lat_max),
-        ))
+        Some(BoundingBox::new(lon_min, lat_min, lon_max, lat_max))
     };
 
     Ok((bbox, pixel_w, pixel_h))
@@ -129,8 +124,11 @@ where
             let mut zs = vec![0.0f64];
             to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
 
-            let zones =
-                grid.zone_from_point(refinement_level, Point::new(xs[0], ys[0]), Some(CONFIG))?;
+            let zones = grid.zone_from_point(
+                refinement_level,
+                Point::new(ys[0], xs[0]),
+                Some(CONFIG),
+            )?;
 
             let zone = zones
                 .zones

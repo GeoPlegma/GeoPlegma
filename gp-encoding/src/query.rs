@@ -1,6 +1,5 @@
-use geo_types::Point;
 use geoplegma::get;
-use geoplegma::models::common::{RefinementLevel, RelativeDepth, ZoneId};
+use geoplegma::types::{Point, RefinementLevel, RelativeDepth, ZoneId};
 
 use crate::common::CONFIG;
 use crate::error::EncodingError;
@@ -14,7 +13,7 @@ pub fn query_value_for_point<B: StorageBackend>(
     backend: &B,
     refinement_level: RefinementLevel,
     band: u32,
-    point: Point<f64>,
+    point: Point,
 ) -> Result<Vec<u8>, EncodingError> {
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
@@ -37,8 +36,8 @@ pub fn query_value_for_point<B: StorageBackend>(
 
     println!(
         "Resolved point ({}, {}) to zone ID {:?} at level {} and band {}",
-        point.x(),
-        point.y(),
+        point.lon,
+        point.lat,
         zone.id,
         level,
         band
@@ -171,7 +170,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use geoplegma::get;
-    use geoplegma::models::common::{DggrsUid, RefinementLevel, RelativeDepth};
+    use geoplegma::types::{DggrsUid, RefinementLevel, RelativeDepth};
 
     use crate::common::CONFIG;
     use crate::models::{AttributeSchema, DataType, DatasetMetadata};

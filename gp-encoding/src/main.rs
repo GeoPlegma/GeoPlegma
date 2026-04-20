@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
-use geo_types::Point;
-use geoplegma::models::common::{DggrsUid, RefinementLevel};
+use geoplegma::types::{DggrsUid, Point, RefinementLevel};
 use gp_encoding::{
     StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
     query_value_for_point,
@@ -109,7 +108,7 @@ fn run_query(args: QueryArgs) -> Result<(), String> {
     let backend = ZarrBackend::open(&args.store).map_err(|e| e.to_string())?;
 
     let refinement = RefinementLevel::from(args.level);
-    let point = Point::new(args.lon, args.lat);
+    let point = Point::new(args.lat, args.lon);
 
     let band_count = backend.band_count();
     let bands: Vec<u32> = if let Some(band) = args.band {
