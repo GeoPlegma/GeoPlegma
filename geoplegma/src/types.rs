@@ -9,7 +9,6 @@
 use crate::constants::DGGRS_SPECS;
 use crate::error::DggrsError;
 use crate::error::factory::DggrsUidError;
-use geo::Polygon;
 use std::convert::{From, TryFrom};
 use std::fmt;
 use std::str::FromStr;
@@ -23,6 +22,35 @@ pub struct Point {
 impl Point {
     pub fn new(lat: f64, lon: f64) -> Self {
         Self { lat, lon }
+    }
+
+    pub fn to_coord(&self) -> geo::Coord {
+        geo::coord! { x: self.lon, y: self.lat }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Region {
+    pub exterior: Vec<Point>,
+}
+
+impl Region {
+    pub fn new(mut exterior: Vec<Point>) -> Self {
+        if let Some(first) = exterior.first().copied() {
+            if exterior.last().copied() != Some(first) {
+                exterior.push(first);
+            }
+        }
+        Self { exterior }
+    }
+
+    pub fn coords_count(&self) -> usize {
+        self.exterior.len()
+    }
+
+    pub fn to_geo_polygon(&self) -> geo::Polygon<f64> {
+        let coords: Vec<_> = self.exterior.iter().map(Point::to_coord).collect();
+        geo::Polygon::new(geo::LineString::from(coords), vec![])
     }
 }
 
@@ -189,7 +217,7 @@ pub struct DggrsSpec {
 #[derive(Debug, Clone, Default)]
 pub struct Zone {
     pub id: ZoneId,
-    pub region: Option<Polygon>,
+    pub region: Option<Region>,
     pub center: Option<Point>,
     pub vertex_count: Option<u32>,
     pub children: Option<Vec<ZoneId>>,

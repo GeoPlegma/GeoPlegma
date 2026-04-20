@@ -50,7 +50,7 @@ impl Default for DggrsApiConfig {
 
 /// The DGGRS port trait. Each adapter can only implement the functions defined here.
 pub trait DggrsApi: Send + Sync {
-    /// Get zones for geo::Rect bounding box. If no bbox is supplied the whole world is taken.
+    /// Get zones in the bounding box. If no bbox is supplied the whole world is taken.
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,

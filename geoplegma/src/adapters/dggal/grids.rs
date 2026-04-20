@@ -9,10 +9,10 @@
 
 use crate::adapters::dggal::common::{bbox_to_geoextent, to_geo_point, to_zones};
 use crate::adapters::dggal::context::GLOBAL_DGGAL;
-use crate::api::{BoundingBox, DggrsApi, DggrsApiConfig, Point};
+use crate::api::{DggrsApiConfig, DggrsApi};
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
-use crate::types::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones, BoundingBox, Point};
 use dggal::DGGRS;
 use dggal_rust::dggal;
 

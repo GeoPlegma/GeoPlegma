@@ -8,11 +8,11 @@
 // except according to those terms.
 
 use crate::{
-    api::{DggrsApiConfig, Point as ApiPoint},
+    api::DggrsApiConfig,
     error::{DggrsError, h3o::H3oError},
-    types::{RefinementLevel, Zone, ZoneId, Zones},
+    types::{Point, RefinementLevel, Region, Zone, ZoneId, Zones},
 };
-use geo::{Coord, CoordsIter, GeodesicArea, LineString, Polygon};
+use geo::GeodesicArea;
 use h3o::{Boundary, CellIndex, LatLng, Resolution};
 
 /// Translates integer resolution to H3 string resolution
@@ -27,23 +27,20 @@ pub fn refinement_level_to_h3_resolution(
     })
 }
 
-pub fn boundary_to_polygon(boundary: &Boundary) -> Polygon<f64> {
-    let mut coords: Vec<Coord<f64>> = boundary
+pub fn boundary_to_polygon(boundary: &Boundary) -> Region {
+    let mut points: Vec<Point> = boundary
         .iter()
-        .map(|latlng| Coord {
-            x: latlng.lng(),
-            y: latlng.lat(),
-        })
+        .map(|latlng| Point::new(latlng.lat(), latlng.lng()))
         .collect();
 
     // Ensure the ring is closed
-    if coords.first() != coords.last() {
-        if let Some(first) = coords.first().copied() {
-            coords.push(first);
+    if points.first() != points.last() {
+        if let Some(first) = points.first().copied() {
+            points.push(first);
         }
     }
 
-    Polygon::new(LineString::from(coords), vec![])
+    Region::new(points)
 }
 
 pub fn children_to_strings(iter: impl Iterator<Item = CellIndex>) -> Vec<String> {
@@ -55,8 +52,8 @@ pub fn ring_to_strings(iter: impl Iterator<Item = Option<CellIndex>>) -> Vec<Str
         .collect()
 }
 
-pub fn latlng_to_point(latlng: LatLng) -> ApiPoint {
-    ApiPoint::new(latlng.lat(), latlng.lng())
+pub fn latlng_to_point(latlng: LatLng) -> Point {
+    Point::new(latlng.lat(), latlng.lng())
 }
 
 pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsApiConfig) -> Result<Zones, DggrsError> {
@@ -74,19 +71,19 @@ pub fn to_zones(h3o_zones: Vec<CellIndex>, conf: DggrsApiConfig) -> Result<Zones
 
             let region = if conf.region || conf.area_sqm || conf.vertex_count {
                 let boundary = h3o_zone.boundary();
-                Some(boundary_to_polygon(&boundary)) // geo::Polygon
+                Some(boundary_to_polygon(&boundary))
             } else {
                 None
             };
 
             let area_sqm = if conf.area_sqm {
-                region.as_ref().map(|r| r.geodesic_area_unsigned()) // NOTE: It is also an option to use the build in area function of H3o
+                region.as_ref().map(|r| r.to_geo_polygon().geodesic_area_unsigned()) // NOTE: It is also an option to use the build in area function of H3o
             } else {
                 None
             };
 
             let vertex_count = if conf.vertex_count {
-                region.as_ref().map(|r| r.exterior().coords_count() as u32) // NOTE: It is also an option to use the build-in vertex function of H3o
+                region.as_ref().map(|r| r.coords_count() as u32) // NOTE: It is also an option to use the build-in vertex function of H3o
             } else {
                 None
             };

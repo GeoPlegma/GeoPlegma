@@ -7,13 +7,12 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::api::{BoundingBox, Point as ApiPoint};
 use crate::api::DggrsApiConfig;
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
-use crate::types::{Zone, ZoneId, Zones};
+use crate::types::{BoundingBox, Point, Region, Zone, ZoneId, Zones};
 use dggal_rust::dggal::{DGGRS, DGGRSZone, GeoExtent, GeoPoint};
-use geo::{GeodesicArea, LineString, Polygon, coord};
+use geo::GeodesicArea;
 
 pub fn to_zones(
     dggrs: DGGRS,
@@ -47,7 +46,7 @@ pub fn to_zones(
             };
 
             let area_sqm = if conf.area_sqm {
-                region.as_ref().map(|r| r.geodesic_area_unsigned())
+                region.as_ref().map(|r| r.to_geo_polygon().geodesic_area_unsigned())
             } else {
                 None
             };
@@ -104,21 +103,23 @@ pub fn to_zones(
     Ok(Zones { zones })
 }
 
-fn to_point(pt: &GeoPoint) -> ApiPoint {
-    ApiPoint::new(pt.lat.to_degrees(), pt.lon.to_degrees())
+fn to_point(pt: &GeoPoint) -> Point {
+    Point::new(pt.lat.to_degrees(), pt.lon.to_degrees())
 }
 
-fn to_polygon(points: &[GeoPoint]) -> Polygon<f64> {
-    let mut coords: Vec<_> = points
+fn to_polygon(points: &[GeoPoint]) -> Region {
+    let mut pts: Vec<_> = points
         .iter()
-        .map(|pt| coord! { x: pt.lon.to_degrees(), y: pt.lat.to_degrees() })
+        .map(|pt| Point::new(pt.lat.to_degrees(), pt.lon.to_degrees()))
         .collect();
 
-    if coords.first() != coords.last() {
-        coords.push(coords[0]);
+    if let Some(first) = pts.first().copied() {
+        if pts.last().copied() != Some(first) {
+            pts.push(first);
+        }
     }
 
-    Polygon::new(LineString::from(coords), vec![])
+    Region::new(pts)
 }
 
 fn to_u64_zone_id(id: DGGRSZone) -> ZoneId {
@@ -132,14 +133,13 @@ fn to_str_zone_id(dggrs: &DGGRS, zone: DGGRSZone) -> Result<ZoneId, DggalError> 
         .map_err(|e: DggrsError| DggalError::InvalidZoneIdFormat(format!("{txt} ({e})")))
 }
 
-pub fn to_geo_point(pt: ApiPoint) -> GeoPoint {
+pub fn to_geo_point(pt: Point) -> GeoPoint {
     GeoPoint {
         lat: pt.lat.to_radians(),
         lon: pt.lon.to_radians(),
     }
 }
 
-/// Convert geo::Rect BBox to DGGAL::GeoExtent
 pub fn bbox_to_geoextent(bbox: &BoundingBox) -> GeoExtent {
     GeoExtent {
         ll: GeoPoint {
