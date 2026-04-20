@@ -12,7 +12,7 @@ use crate::adapters::dggrid::dggrid::DggridAdapter;
 use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::dggrid::DggridError;
-use crate::models::common::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use core::f64;
 use geo::geometry::Point;
 use std::fs;

@@ -13,7 +13,7 @@ use crate::adapters::{
 use crate::api::DggrsApi;
 use crate::constants::DGGRS_SPECS;
 use crate::error::factory::{DggrsUidError, FactoryError};
-use crate::models::common::{DggrsImplementation, DggrsSpec, DggrsUid};
+use crate::types::{DggrsImplementation, DggrsSpec, DggrsUid};
 use std::sync::Arc;
 
 pub fn get(id: DggrsUid) -> Result<Arc<dyn DggrsApi>, FactoryError> {

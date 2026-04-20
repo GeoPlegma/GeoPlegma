@@ -7,7 +7,7 @@
 // discretion. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use crate::models::common::{
+use crate::types::{
     DggrsImplementation, DggrsName, DggrsSpec, DggrsUid, RefinementLevel, RelativeDepth,
 };
 use geo::{Coord, Rect};
