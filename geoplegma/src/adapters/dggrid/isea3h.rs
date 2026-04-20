@@ -12,9 +12,7 @@ use crate::adapters::dggrid::dggrid::DggridAdapter;
 use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::dggrid::DggridError;
-use crate::models::common::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
-use core::f64;
-use geo::{Point, Rect};
+use crate::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -50,7 +48,7 @@ impl DggrsApi for Isea3hImpl {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
-        bbox: Option<Rect<f64>>,
+        bbox: Option<BoundingBox>,
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
@@ -143,7 +141,7 @@ impl DggrsApi for Isea3hImpl {
             .create(true)
             .open(&input_path)
             .expect("cannot open file");
-        let _ = writeln!(input_file, "{} {}", point.y(), point.x())
+        let _ = writeln!(input_file, "{} {}", point.lon, point.lat)
             .expect("Cannot create point input file");
 
         common::write::file(&meta_path);

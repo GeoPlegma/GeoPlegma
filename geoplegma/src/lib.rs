@@ -13,7 +13,7 @@ pub mod api;
 pub mod constants;
 pub mod error;
 pub mod factory;
-pub mod models;
+pub mod types;
 
 pub use api::DggrsApiConfig as config;
 /// This is the only re-export that is needed.

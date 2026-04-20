@@ -9,14 +9,12 @@
 
 use crate::adapters::dggal::common::{bbox_to_geoextent, to_geo_point, to_zones};
 use crate::adapters::dggal::context::GLOBAL_DGGAL;
-use crate::api::{DggrsApi, DggrsApiConfig};
-use crate::constants::whole_earth_bbox;
+use crate::api::{DggrsApiConfig, DggrsApi};
 use crate::error::DggrsError;
 use crate::error::dggal::DggalError;
-use crate::models::common::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use crate::types::{DggrsName, DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones, BoundingBox, Point};
 use dggal::DGGRS;
 use dggal_rust::dggal;
-use geo::{Point, Rect};
 
 pub struct DggalImpl {
     pub id: DggrsUid,
@@ -44,7 +42,7 @@ impl DggrsApi for DggalImpl {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
-        bbox: Option<Rect<f64>>,
+        bbox: Option<BoundingBox>,
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
@@ -59,7 +57,7 @@ impl DggrsApi for DggalImpl {
         let geo_extent = if let Some(b) = bbox {
             bbox_to_geoextent(&b)
         } else {
-            bbox_to_geoextent(&whole_earth_bbox())
+            bbox_to_geoextent(&BoundingBox::WORLD)
         };
 
         let dggrs = self.get_dggrs()?;

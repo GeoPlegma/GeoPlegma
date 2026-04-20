@@ -36,8 +36,7 @@ pub mod dggrid {
 
 pub mod write {
     use crate::api::DggrsApiConfig;
-    use crate::models::common::RefinementLevel;
-    use geo::Rect;
+    use crate::types::{BoundingBox, RefinementLevel};
     use std::fs;
     use std::io::{self, Write};
     use std::path::Path;
@@ -95,12 +94,9 @@ pub mod write {
         Ok(())
     }
 
-    pub fn bbox(bbox: &Rect<f64>, bboxfile: &Path) -> io::Result<()> {
-        let min = bbox.min();
-        let max = bbox.max();
-
-        let (minx, miny) = (min.x, min.y);
-        let (maxx, maxy) = (max.x, max.y);
+    pub fn bbox(bbox: &BoundingBox, bboxfile: &Path) -> io::Result<()> {
+        let (minx, miny) = (bbox.min_lon, bbox.min_lat);
+        let (maxx, maxy) = (bbox.max_lon, bbox.max_lat);
 
         // define the 5 vertices (closing the polygon)
         let vertices = vec![
@@ -140,9 +136,9 @@ pub mod write {
 pub mod read {
     use crate::error::DggrsError;
     use crate::error::dggrid::DggridError;
-    use crate::models::common::{Zone, ZoneId};
+    use crate::types::Point;
+    use crate::types::{Region, Zone, ZoneId};
     use core::f64;
-    use geo::{LineString, Point, Polygon};
     use std::collections::{BTreeMap, HashMap};
     use std::fs;
     use std::fs::File;
@@ -194,10 +190,15 @@ pub mod read {
                         // there are options to control the cell_output_type and
                         // point_output_type in DGGRID, maybe we can avoid generating everything
                         // so we do not have to parse it also.
-                        let pnt = Some(Point::from(z.xy));
+                        let pnt = Some(Point::new(z.xy.1, z.xy.0));
 
                         let poly = if z.vec_xy.len() >= 2 {
-                            Some(Polygon::new(LineString::from(z.vec_xy.clone()), vec![]))
+                            let region_points: Vec<Point> = z
+                                .vec_xy
+                                .iter()
+                                .map(|(x, y)| Point::new(*y, *x))
+                                .collect();
+                            Some(Region::new(region_points))
                         } else {
                             None
                         };
@@ -275,7 +276,7 @@ pub mod read {
 pub mod output {
     use crate::api::DggrsApiConfig;
     use crate::error::DggrsError;
-    use crate::models::common::{ZoneId, Zones};
+    use crate::types::{ZoneId, Zones};
     use geo::GeodesicArea;
     use itertools::Itertools;
     use std::collections::HashMap;
@@ -335,7 +336,7 @@ pub mod output {
                     // It may be a good idea to wrap geodesic_area_unsigned into
                     // a separate extension trait, so that we don't use a different
                     // calculation elsewhere by accident.
-                    z.area_sqm = Some(poly.geodesic_area_unsigned());
+                    z.area_sqm = Some(poly.to_geo_polygon().geodesic_area_unsigned());
                 }
             }
 
@@ -358,10 +359,11 @@ pub mod output {
 }
 
 pub mod helper {
+    use crate::types::Region;
     use geo::CoordsIter;
     use geo::prelude::ConvexHull;
-    pub fn corner_count_convex(poly: &geo::Polygon<f64>) -> u32 {
-        let hull: geo::Polygon<f64> = poly.convex_hull();
+    pub fn corner_count_convex(poly: &Region) -> u32 {
+        let hull = poly.to_geo_polygon().convex_hull();
         // coords_count() includes the closing vertex => subtract 1
         (hull.exterior().coords_count() as u32).saturating_sub(1)
     }
