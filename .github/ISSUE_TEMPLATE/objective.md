@@ -1,3 +1,10 @@
+---
+name: Roadmap Issue
+about: Structured roadmap objective for GeoPlegma
+labels: ''
+assignees: ''
+---
+
 ## Description
 <!-- What needs to be done and why -->
 
