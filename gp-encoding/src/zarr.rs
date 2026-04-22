@@ -245,6 +245,6 @@ impl StorageBackend for ZarrBackend {
             .get(&level)
             .ok_or_else(|| EncodingError::Zarr(format!("level {level} not found")))?;
         let chunk_size = self.metadata.chunk_size;
-        Ok((num_cells + chunk_size - 1) / chunk_size)
+        Ok(num_cells.div_ceil(chunk_size))
     }
 }
