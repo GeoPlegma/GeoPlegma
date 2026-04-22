@@ -8,8 +8,7 @@
 // except according to those terms.
 
 use crate::error::DggrsError;
-use crate::types::{RefinementLevel, RelativeDepth, ZoneId, Zones};
-use geo::{Point, Rect};
+use crate::types::{BoundingBox, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
 
 /// Addresses all the configuration options that apply to all port functions
 ///
@@ -51,15 +50,15 @@ impl Default for DggrsApiConfig {
 
 /// The DGGRS port trait. Each adapter can only implement the functions defined here.
 pub trait DggrsApi: Send + Sync {
-    /// Get zones for geo::Rect bounding box. If no bbox is supplied the whole world is taken.
+    /// Get zones in the bounding box. If no bbox is supplied the whole world is taken.
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
-        bbox: Option<Rect<f64>>,
+        bbox: Option<BoundingBox>,
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError>;
 
-    /// Get zones for a geo::Point.
+    /// Get zones for a Point.
     fn zone_from_point(
         &self,
         refinement_level: RefinementLevel,
@@ -76,7 +75,7 @@ pub trait DggrsApi: Send + Sync {
     ) -> Result<Zones, DggrsError>;
 
     /// Get the primary parent zone for a given ZoneID.
-    /// 
+    ///
     /// The zone returned by this function is exactly one refinement level above the input zone. Which zone gets returned as the primary parent is dependent on the DGGRS implementation.
     fn primary_parent_from_zone(
         &self,

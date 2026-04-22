@@ -12,16 +12,13 @@ use crate::adapters::dggrid::dggrid::DggridAdapter;
 use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::dggrid::DggridError;
-use crate::types::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
-use core::f64;
-use geo::geometry::Point;
+use crate::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use tracing::debug;
 pub const CLIP_CELL_DENSIFICATION: u8 = 50; // DGGRID option
-use geo::Rect;
 
 pub struct Igeo7Impl {
     id: DggrsUid,
@@ -51,7 +48,7 @@ impl DggrsApi for Igeo7Impl {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
-        bbox: Option<Rect<f64>>,
+        bbox: Option<BoundingBox>,
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
@@ -144,7 +141,7 @@ impl DggrsApi for Igeo7Impl {
             .create(true)
             .open(&input_path)
             .expect("cannot open file");
-        let _ = writeln!(input_file, "{} {}", point.y(), point.x())
+        let _ = writeln!(input_file, "{} {}", point.lon, point.lat)
             .expect("Cannot create point input file");
 
         common::write::file(&meta_path);
