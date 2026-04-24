@@ -2,11 +2,26 @@ import {Deck} from '@deck.gl/core';
 import {H3HexagonLayer} from '@deck.gl/geo-layers';
 import {PolygonLayer} from '@deck.gl/layers';
 
-// const lon =  [4.326247, 4.469885]
-// const lat =  [52.166899, 52.258604]
+const presets = {
+  'large_raster': {
+    lon:  [4.326247, 4.469885],
+    lat:  [52.166899, 52.258604],
+    elevation: 0,
+    fillColor: d => [
+      Math.round((d.band_2 / 11652) * 255) * 7,
+      Math.round((d.band_1 / 11652) * 255) * 7,
+      Math.round((d.band_0 / 11652) * 255) * 7
+    ]
+  },
+  'elevation': {
+    lon: [-9.238194, -9.086250],
+    lat: [38.679861, 38.796806],
+    elevation: d => d.band_0 / 2,
+    fillColor: d => [d.band_0, d.band_0, d.band_0],
+  }
+}
 
-const lon = [-9.238194, -9.086250]
-const lat = [38.679861, 38.796806]
+const {lon, lat, elevation, fillColor} = presets['elevation'];
 
 const BBOX_POLYGON = [
   [lon[0], lat[0]],
@@ -23,14 +38,8 @@ const layer = new H3HexagonLayer({
   elevationScale: 20,
   extruded: true,
   filled: true,
-  getElevation: d => d.band_0 / 2,
-  getFillColor: d => [d.band_0 * 10, d.band_0 * 10, d.band_0 * 10],
-  // getElevation: d => 0,
-  // getFillColor: d => [
-  //   Math.round((d.band_2 / 11652) * 255) * 7,
-  //   Math.round((d.band_1 / 11652) * 255) * 7,
-  //   Math.round((d.band_0 / 11652) * 255) * 7
-  // ],
+  getElevation: elevation,
+  getFillColor: fillColor,
   getHexagon: d => d.hex,
   wireframe: false,
   pickable: true,
