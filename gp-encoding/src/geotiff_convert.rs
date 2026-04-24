@@ -2,7 +2,7 @@ use std::path::Path;
 
 use gdal::raster::GdalDataType;
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
-use gdal::Dataset;
+use gdal::{Dataset, GeoTransformEx};
 use geoplegma::api::DggrsApiConfig;
 use geoplegma::get;
 use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth};
@@ -47,13 +47,20 @@ fn get_corners_and_pixel_size(
     wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
     let to_wgs84 = CoordTransform::new(&src_srs, &wgs84)?;
 
-    let mut xs = vec![gt[0], gt[0] + w * gt[1] + h * gt[2]];
-    let mut ys = vec![gt[3], gt[3] + w * gt[4] + h * gt[5]];
+    let (ulx, uly) = gt.apply(0.0, 0.0);
+    let (urx, ury) = gt.apply(w, 0.0);
+    let (lrx, lry) = gt.apply(w, h);
+    let (llx, lly) = gt.apply(0.0, h);
+
+    let mut xs = vec![ulx, urx, lrx, llx];
+    let mut ys = vec![uly, ury, lry, lly];
     let mut zs = vec![];
     to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
 
-    let (lon_min, lon_max) = (xs[0].min(xs[1]), xs[0].max(xs[1]));
-    let (lat_min, lat_max) = (ys[0].min(ys[1]), ys[0].max(ys[1]));
+    let lon_min = xs.iter().fold(f64::INFINITY, |acc, x| acc.min(*x));
+    let lon_max = xs.iter().fold(f64::NEG_INFINITY, |acc, x| acc.max(*x));
+    let lat_min = ys.iter().fold(f64::INFINITY, |acc, y| acc.min(*y));
+    let lat_max = ys.iter().fold(f64::NEG_INFINITY, |acc, y| acc.max(*y));
 
     println!("Bounding box (WGS84):");
     println!("  lon: [{lon_min:.6}, {lon_max:.6}]");
