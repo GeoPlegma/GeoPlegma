@@ -1,10 +1,9 @@
-use std::collections::BTreeMap;
 use std::path::Path;
 
 use gdal::raster::GdalDataType;
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
-use gdal::{Dataset, GeoTransformEx};
-use geoplegma::api::DggrsApi;
+use gdal::Dataset;
+use geoplegma::api::DggrsApiConfig;
 use geoplegma::get;
 use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth};
 
@@ -89,62 +88,95 @@ fn get_corners_and_pixel_size(
     Ok((bbox, pixel_w, pixel_h))
 }
 
-fn compute_entries_from_data<T>(
-    data: &[T],
-    total_pixels: usize,
-    width: usize,
+fn nearest_pixel_index_for_center(
+    center: &Point,
+    wgs84_to_src: &CoordTransform,
     gt: [f64; 6],
-    src_srs: &SpatialRef,
-    grid: &dyn DggrsApi,
-    refinement_level: RefinementLevel,
-) -> Result<BTreeMap<String, Vec<u8>>, EncodingError>
+    width: usize,
+    height: usize,
+) -> Result<Option<usize>, EncodingError> {
+    if width == 0 || height == 0 {
+        return Err(EncodingError::GeoTiff(
+            "raster has zero width or height".into(),
+        ));
+    }
+
+    let mut xs = vec![center.lon];
+    let mut ys = vec![center.lat];
+    let mut zs = vec![];
+    wgs84_to_src.transform_coords(&mut xs, &mut ys, &mut zs)?;
+
+    let det = gt[1] * gt[5] - gt[2] * gt[4];
+    if det.abs() < f64::EPSILON {
+        return Err(EncodingError::GeoTiff(
+            "geotransform is not invertible".into(),
+        ));
+    }
+
+    let dx = xs[0] - gt[0];
+    let dy = ys[0] - gt[3];
+
+    // Inverse affine transform gives corner-based pixel coordinates.
+    // Subtract 0.5 so rounding selects the nearest pixel center.
+    let col_corner = (gt[5] * dx - gt[2] * dy) / det;
+    let row_corner = (-gt[4] * dx + gt[1] * dy) / det;
+
+    let col = (col_corner - 0.5).round();
+    let row = (row_corner - 0.5).round();
+
+    // Do not clamp. If center is outside raster extent, keep fill value.
+    if !(0.0..(width as f64)).contains(&col) || !(0.0..(height as f64)).contains(&row) {
+        return Ok(None);
+    }
+
+    Ok(Some((row as usize) * width + (col as usize)))
+}
+
+fn compute_chunk_bytes_from_data<T>(
+    data: &[T],
+    width: usize,
+    height: usize,
+    gt: [f64; 6],
+    wgs84_to_src: &CoordTransform,
+    chunk_child_centers: &[Vec<Point>],
+    chunk_size: u64,
+) -> Result<Vec<Vec<u8>>, EncodingError>
 where
     T: NativeBytes + Copy,
 {
-    let mut wgs84 = SpatialRef::from_epsg(4326)?;
-    wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
-    let to_wgs84 = CoordTransform::new(src_srs, &wgs84)?;
-
-    let mut values_map = BTreeMap::new();
-
-    for idx in 0..total_pixels {
-        let row = idx / width;
-        let col = idx % width;
-
-        let value_bytes = data
-            .get(idx)
-            .ok_or_else(|| {
-                EncodingError::GeoTiff(format!(
-                    "index {idx} out of bounds for data length {}",
-                    data.len()
-                ))
-            })?
-            .to_native_bytes();
-
-        let (ulx, uly) = gt.apply(col as f64, row as f64);
-        let (urx, ury) = gt.apply(col as f64 + 1.0, row as f64);
-        let (lrx, lry) = gt.apply(col as f64 + 1.0, row as f64 + 1.0);
-        let (llx, lly) = gt.apply(col as f64, row as f64 + 1.0);
-
-        let mut xs = vec![ulx, urx, lrx, llx];
-        let mut ys = vec![uly, ury, lry, lly];
-        let mut zs = vec![];
-        to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
-
-        let lon_min = xs.iter().fold(f64::INFINITY, |acc, x| acc.min(*x));
-        let lon_max = xs.iter().fold(f64::NEG_INFINITY, |acc, x| acc.max(*x));
-        let lat_min = ys.iter().fold(f64::INFINITY, |acc, y| acc.min(*y));
-        let lat_max = ys.iter().fold(f64::NEG_INFINITY, |acc, y| acc.max(*y));
-
-        let pixel_bbox = BoundingBox::new(lon_min, lat_min, lon_max, lat_max);
-        let zones_from_bbox = grid.zones_from_bbox(refinement_level, Some(pixel_bbox), Some(CONFIG))?;
-
-        for zone in zones_from_bbox.zones {
-            values_map.insert(zone.id.to_string(), value_bytes.clone());
-        }
+    let expected_pixels = width
+        .checked_mul(height)
+        .ok_or_else(|| EncodingError::GeoTiff("raster pixel count overflow".into()))?;
+    if data.len() != expected_pixels {
+        return Err(EncodingError::GeoTiff(format!(
+            "raster data length {} does not match expected pixel count {}",
+            data.len(),
+            expected_pixels
+        )));
     }
 
-    Ok(values_map)
+    let value_size = std::mem::size_of::<T>();
+    let mut all_chunks = Vec::with_capacity(chunk_child_centers.len());
+
+    for child_centers in chunk_child_centers {
+        let mut bytes = vec![0_u8; chunk_size as usize * value_size];
+
+        for (in_chunk_index, center) in child_centers.iter().enumerate() {
+            if let Some(pixel_index) =
+                nearest_pixel_index_for_center(center, wgs84_to_src, gt, width, height)?
+            {
+                let value_bytes = data[pixel_index].to_native_bytes();
+
+                let start = in_chunk_index * value_size;
+                let end = start + value_size;
+                bytes[start..end].copy_from_slice(&value_bytes);
+            }
+        }
+
+        all_chunks.push(bytes);
+    }
+
+    Ok(all_chunks)
 }
 
 fn get_closest_refinement_level(
@@ -310,8 +342,6 @@ where
         ));
     }
 
-    let total_pixels = height * width;
-
     let gt = dataset.geo_transform()?;
     let src_srs = dataset.spatial_ref()?;
     let (bbox, pixel_width, pixel_height) = get_corners_and_pixel_size(&dataset)?;
@@ -350,12 +380,16 @@ where
     println!("zones in bbox: {}", chunk_zones.zones.len());
 
     let relative_depth = RelativeDepth::new(refinement_level.get() - chunk_level.get())?;
-    let chunk_child_ids: Vec<Vec<String>> = chunk_zones
+    let center_config = DggrsApiConfig {
+        center: true,
+        ..CONFIG
+    };
+    let chunk_child_centers: Vec<Vec<Point>> = chunk_zones
         .zones
         .iter()
         .map(|chunk_zone| {
             let children =
-                grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(CONFIG))?;
+                grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(center_config))?;
             if children.zones.len() > chunk_size as usize {
                 return Err(EncodingError::Grid(format!(
                     "chunk {} has {} children but chunk_size is {}",
@@ -365,11 +399,18 @@ where
                 )));
             }
 
-            Ok(children
+            children
                 .zones
                 .iter()
-                .map(|child| child.id.to_string())
-                .collect::<Vec<_>>())
+                .map(|child| {
+                    child.center.ok_or_else(|| {
+                        EncodingError::Grid(format!(
+                            "zone {} in chunk {} has no center coordinates",
+                            child.id, chunk_zone.id
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<_>, EncodingError>>()
         })
         .collect::<Result<_, EncodingError>>()?;
 
@@ -391,129 +432,132 @@ where
         .ok_or_else(|| EncodingError::Storage("encoded cell count overflow".into()))?;
     let mut backend = B::create(output_path, metadata)?;
 
+    let mut wgs84 = SpatialRef::from_epsg(4326)?;
+    wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
+    let wgs84_to_src = CoordTransform::new(&wgs84, &src_srs)?;
+
     for (band_index, band_type) in bands.into_iter().enumerate() {
         let band = dataset.rasterband(band_index + 1)?;
-        let value_size = band_type.bytes() as usize;
 
-        let computed_entries = match band_type {
+        let chunk_bytes = match band_type {
             GdalDataType::UInt8 => {
                 let raster = band.read_band_as::<u8>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::Int8 => {
                 let raster = band.read_band_as::<i8>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::UInt16 => {
                 let raster = band.read_band_as::<u16>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::Int16 => {
                 let raster = band.read_band_as::<i16>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::UInt32 => {
                 let raster = band.read_band_as::<u32>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::Int32 => {
                 let raster = band.read_band_as::<i32>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::UInt64 => {
                 let raster = band.read_band_as::<u64>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::Int64 => {
                 let raster = band.read_band_as::<i64>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::Float32 => {
                 let raster = band.read_band_as::<f32>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             GdalDataType::Float64 => {
                 let raster = band.read_band_as::<f64>()?;
-                compute_entries_from_data(
+                compute_chunk_bytes_from_data(
                     raster.data(),
-                    total_pixels,
                     width,
+                    height,
                     gt,
-                    &src_srs,
-                    grid.as_ref(),
-                    refinement_level,
+                    &wgs84_to_src,
+                    &chunk_child_centers,
+                    chunk_size,
                 )
             }
             _ => Err(EncodingError::GeoTiff(format!(
@@ -521,31 +565,18 @@ where
             ))),
         }?;
 
-        let values_map = computed_entries;
-
         backend.create_level(
             refinement_level.get() as u32,
             band_index as u32,
             encoded_num_cells,
         )?;
 
-
-        for (chunk_index, child_ids) in chunk_child_ids.iter().enumerate() {
-            let mut bytes = vec![0_u8; chunk_size as usize * value_size];
-
-            for (in_chunk_index, child_id) in child_ids.iter().enumerate() {
-                if let Some(value_bytes) = values_map.get(child_id) {
-                    let start = in_chunk_index * value_size;
-                    let end = start + value_size;
-                    bytes[start..end].copy_from_slice(value_bytes);
-                }
-            }
-
+        for (chunk_index, bytes) in chunk_bytes.iter().enumerate() {
             backend.write_chunk(
                 refinement_level.get() as u32,
                 band_index as u32,
                 chunk_index as u64,
-                &bytes,
+                bytes,
             )?;
         }
     }
