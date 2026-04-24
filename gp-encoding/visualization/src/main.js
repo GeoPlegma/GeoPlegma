@@ -11,17 +11,26 @@ const presets = {
       Math.round((d.band_2 / 11652) * 255) * 7,
       Math.round((d.band_1 / 11652) * 255) * 7,
       Math.round((d.band_0 / 11652) * 255) * 7
-    ]
+    ],
+    zoom: 11
   },
   'elevation': {
     lon: [-9.238194, -9.086250],
     lat: [38.679861, 38.796806],
     elevation: d => d.band_0 / 2,
     fillColor: d => [d.band_0, d.band_0, d.band_0],
+    zoom: 11
+  },
+  'ne': {
+    lon: [-180, 180],
+    lat: [-90, 90],
+    elevation: 0,
+    fillColor: d => [d.band_0, d.band_1, d.band_2],
+    zoom: 1
   }
 }
 
-const {lon, lat, elevation, fillColor} = presets['elevation'];
+const {lon, lat, elevation, fillColor, zoom} = presets['ne'];
 
 const BBOX_POLYGON = [
   [lon[0], lat[0]],
@@ -72,7 +81,7 @@ new Deck({
   initialViewState: {
     longitude: (lon[0] + lon[1]) / 2,
     latitude: (lat[0] + lat[1]) / 2,
-    zoom: 11,
+    zoom: zoom,
     maxZoom: 20,
     pitch: 30,
     bearing: 0
