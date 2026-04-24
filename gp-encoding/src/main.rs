@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use geoplegma::types::{DggrsUid, Point, RefinementLevel};
 use gp_encoding::{
     StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
-    query_value_for_point,
+    export_h3_level_as_visualization_json, format_value, query_value_for_point,
 };
 
 #[derive(Parser, Debug)]
@@ -26,6 +26,8 @@ enum Commands {
     Query(QueryArgs),
     /// Print summary statistics for an encoded Zarr store.
     Stats(StatsArgs),
+    /// Export an H3 store level as JSON for the visualization app.
+    ExportH3Json(ExportH3JsonArgs),
 }
 
 #[derive(Args, Debug)]
@@ -67,6 +69,19 @@ struct StatsArgs {
     store: PathBuf,
 }
 
+#[derive(Args, Debug)]
+struct ExportH3JsonArgs {
+    /// H3 Zarr store path.
+    #[arg(short, long)]
+    store: PathBuf,
+    /// Refinement level to export.
+    #[arg(short, long)]
+    level: u32,
+    /// Output JSON file path. If omitted, auto-detects visualization/public.
+    #[arg(short, long)]
+    output: Option<PathBuf>,
+}
+
 fn main() {
     let cli = Cli::parse();
 
@@ -74,6 +89,7 @@ fn main() {
         Commands::ConvertGeotiff(args) => run_convert_geotiff(args),
         Commands::Query(args) => run_query(args),
         Commands::Stats(args) => run_stats(args),
+        Commands::ExportH3Json(args) => run_export_h3_json(args),
     };
 
     if let Err(err) = result {
@@ -157,7 +173,7 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
         let num_chunks = backend.num_chunks(level).map_err(|e| e.to_string())?;
         println!("\nLevel {level}");
         println!("  Logical chunk count: {num_chunks}");
-        
+
         for band in 0..band_count {
             let dtype = &metadata.attributes[band as usize].dtype;
 
@@ -168,32 +184,49 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
     Ok(())
 }
 
-fn format_value(dtype: &gp_encoding::DataType, bytes: &[u8]) -> Result<String, String> {
-    use gp_encoding::DataType;
+fn run_export_h3_json(args: ExportH3JsonArgs) -> Result<(), String> {
+    let backend = ZarrBackend::open(&args.store).map_err(|e| e.to_string())?;
+    let rows = export_h3_level_as_visualization_json(&backend, args.level)
+        .map_err(|e| e.to_string())?;
+    let output = resolve_visualization_output_path(args.output);
 
-    match dtype {
-        DataType::Float32 => parse_fixed::<4>(bytes).map(|arr| f32::from_ne_bytes(arr).to_string()),
-        DataType::Float64 => parse_fixed::<8>(bytes).map(|arr| f64::from_ne_bytes(arr).to_string()),
-        DataType::Int8 => parse_fixed::<1>(bytes).map(|arr| i8::from_ne_bytes(arr).to_string()),
-        DataType::Int16 => parse_fixed::<2>(bytes).map(|arr| i16::from_ne_bytes(arr).to_string()),
-        DataType::Int32 => parse_fixed::<4>(bytes).map(|arr| i32::from_ne_bytes(arr).to_string()),
-        DataType::Int64 => parse_fixed::<8>(bytes).map(|arr| i64::from_ne_bytes(arr).to_string()),
-        DataType::UInt8 => parse_fixed::<1>(bytes).map(|arr| u8::from_ne_bytes(arr).to_string()),
-        DataType::UInt16 => parse_fixed::<2>(bytes).map(|arr| u16::from_ne_bytes(arr).to_string()),
-        DataType::UInt32 => parse_fixed::<4>(bytes).map(|arr| u32::from_ne_bytes(arr).to_string()),
-        DataType::UInt64 => parse_fixed::<8>(bytes).map(|arr| u64::from_ne_bytes(arr).to_string()),
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "failed to create output directory {}: {e}",
+                parent.display()
+            )
+        })?;
     }
+
+    let json = serde_json::to_string_pretty(&rows).map_err(|e| e.to_string())?;
+    std::fs::write(&output, json)
+        .map_err(|e| format!("failed to write JSON output {}: {e}", output.display()))?;
+
+    println!("Export successful");
+    println!("  Store:      {}", args.store.display());
+    println!("  Level:      {}", args.level);
+    println!("  Bands:      {}", backend.band_count());
+    println!("  Cells:      {}", rows.len());
+    println!("  Output:     {}", output.display());
+
+    Ok(())
 }
 
-fn parse_fixed<const N: usize>(bytes: &[u8]) -> Result<[u8; N], String> {
-    if bytes.len() < N {
-        return Err(format!(
-            "not enough bytes to decode value: expected at least {N}, got {}",
-            bytes.len()
-        ));
+fn resolve_visualization_output_path(explicit: Option<PathBuf>) -> PathBuf {
+    if let Some(path) = explicit {
+        return path;
     }
 
-    let mut arr = [0_u8; N];
-    arr.copy_from_slice(&bytes[..N]);
-    Ok(arr)
+    let local = PathBuf::from("./visualization/public/h3cells.json");
+    if PathBuf::from("./visualization").is_dir() {
+        return local;
+    }
+
+    let workspace = PathBuf::from("./gp-encoding/visualization/public/h3cells.json");
+    if PathBuf::from("./gp-encoding/visualization").is_dir() {
+        return workspace;
+    }
+
+    local
 }

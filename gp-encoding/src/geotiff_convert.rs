@@ -50,7 +50,7 @@ fn get_corners_and_pixel_size(
 
     let mut xs = vec![gt[0], gt[0] + w * gt[1] + h * gt[2]];
     let mut ys = vec![gt[3], gt[3] + w * gt[4] + h * gt[5]];
-    let mut zs = vec![0.0f64; 2];
+    let mut zs = vec![];
     to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
 
     let (lon_min, lon_max) = (xs[0].min(xs[1]), xs[0].max(xs[1]));
@@ -68,7 +68,7 @@ fn get_corners_and_pixel_size(
 
     let mut px = vec![cx, cx + gt[1], cx + gt[2]];
     let mut py = vec![cy, cy + gt[4], cy + gt[5]];
-    let mut pz = vec![0.0f64; 3];
+    let mut pz = vec![];
     to_metric.transform_coords(&mut px, &mut py, &mut pz)?;
 
     let pixel_w = f64::hypot(px[1] - px[0], py[1] - py[0]);
@@ -97,7 +97,7 @@ fn compute_entries_from_data<T>(
     src_srs: &SpatialRef,
     grid: &dyn DggrsApi,
     refinement_level: RefinementLevel,
-) -> Result<Vec<(String, Vec<u8>)>, EncodingError>
+) -> Result<BTreeMap<String, Vec<u8>>, EncodingError>
 where
     T: NativeBytes + Copy,
 {
@@ -105,39 +105,46 @@ where
     wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
     let to_wgs84 = CoordTransform::new(src_srs, &wgs84)?;
 
-    (0..total_pixels)
-        .map(|idx| {
-            let row = idx / width;
-            let col = idx % width;
+    let mut values_map = BTreeMap::new();
 
-            let v = *data.get(idx).ok_or_else(|| {
+    for idx in 0..total_pixels {
+        let row = idx / width;
+        let col = idx % width;
+
+        let value_bytes = data
+            .get(idx)
+            .ok_or_else(|| {
                 EncodingError::GeoTiff(format!(
                     "index {idx} out of bounds for data length {}",
                     data.len()
                 ))
-            })?;
+            })?
+            .to_native_bytes();
 
-            // pixel center
-            let (x, y) = gt.apply(col as f64 + 0.5, row as f64 + 0.5);
-            let mut xs = vec![x];
-            let mut ys = vec![y];
-            let mut zs = vec![0.0f64];
-            to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
+        let (ulx, uly) = gt.apply(col as f64, row as f64);
+        let (urx, ury) = gt.apply(col as f64 + 1.0, row as f64);
+        let (lrx, lry) = gt.apply(col as f64 + 1.0, row as f64 + 1.0);
+        let (llx, lly) = gt.apply(col as f64, row as f64 + 1.0);
 
-            let zones = grid.zone_from_point(
-                refinement_level,
-                Point::new(ys[0], xs[0]),
-                Some(CONFIG),
-            )?;
+        let mut xs = vec![ulx, urx, lrx, llx];
+        let mut ys = vec![uly, ury, lry, lly];
+        let mut zs = vec![];
+        to_wgs84.transform_coords(&mut xs, &mut ys, &mut zs)?;
 
-            let zone = zones
-                .zones
-                .first()
-                .ok_or_else(|| EncodingError::Grid("zone_from_point returned no zones".into()))?;
+        let lon_min = xs.iter().fold(f64::INFINITY, |acc, x| acc.min(*x));
+        let lon_max = xs.iter().fold(f64::NEG_INFINITY, |acc, x| acc.max(*x));
+        let lat_min = ys.iter().fold(f64::INFINITY, |acc, y| acc.min(*y));
+        let lat_max = ys.iter().fold(f64::NEG_INFINITY, |acc, y| acc.max(*y));
 
-            Ok((zone.id.to_string(), v.to_native_bytes()))
-        })
-        .collect()
+        let pixel_bbox = BoundingBox::new(lon_min, lat_min, lon_max, lat_max);
+        let zones_from_bbox = grid.zones_from_bbox(refinement_level, Some(pixel_bbox), Some(CONFIG))?;
+
+        for zone in zones_from_bbox.zones {
+            values_map.insert(zone.id.to_string(), value_bytes.clone());
+        }
+    }
+
+    Ok(values_map)
 }
 
 fn get_closest_refinement_level(
@@ -514,7 +521,7 @@ where
             ))),
         }?;
 
-        let values_map: BTreeMap<String, Vec<u8>> = computed_entries.into_iter().collect();
+        let values_map = computed_entries;
 
         backend.create_level(
             refinement_level.get() as u32,

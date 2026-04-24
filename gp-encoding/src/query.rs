@@ -1,9 +1,22 @@
+use std::collections::BTreeMap;
+use std::str::FromStr;
+
 use geoplegma::get;
-use geoplegma::types::{Point, RefinementLevel, RelativeDepth, ZoneId};
+use geoplegma::types::{DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::storage::StorageBackend;
+use crate::value::decode_value_to_json;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct H3VisualizationCell {
+    pub hex: String,
+    #[serde(flatten)]
+    pub bands: BTreeMap<String, Value>,
+}
 
 /// Query a cell value by geographic point.
 ///
@@ -36,11 +49,7 @@ pub fn query_value_for_point<B: StorageBackend>(
 
     println!(
         "Resolved point ({}, {}) to zone ID {:?} at level {} and band {}",
-        point.lon,
-        point.lat,
-        zone.id,
-        level,
-        band
+        point.lon, point.lat, zone.id, level, band
     );
 
     query_value_by_cell_index(backend, level, band, &zone.id)
@@ -74,26 +83,7 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
     }
 
     let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
-    if aperture <= 1 {
-        return Err(EncodingError::Storage(format!(
-            "invalid DGGS aperture {aperture} for chunk resolution"
-        )));
-    }
-
-    let mut depth_i32 = 0_i32;
-    let mut size_check = 1_u64;
-    while size_check < chunk_size {
-        size_check = size_check.checked_mul(aperture).ok_or_else(|| {
-            EncodingError::Storage("chunk_size power computation overflow".into())
-        })?;
-        depth_i32 += 1;
-    }
-
-    if size_check != chunk_size {
-        return Err(EncodingError::Storage(format!(
-            "chunk_size {chunk_size} is not a power of aperture {aperture}"
-        )));
-    }
+    let depth_i32 = compute_chunk_depth(chunk_size, aperture)?;
 
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
@@ -162,6 +152,116 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
     }
 
     Ok(chunk[start..end].to_vec())
+}
+
+pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
+    backend: &B,
+    level: u32,
+) -> Result<Vec<H3VisualizationCell>, EncodingError> {
+    if backend.metadata().dggrs != DggrsUid::H3 {
+        return Err(EncodingError::Storage(format!(
+            "export requires H3 store, got {:?}",
+            backend.metadata().dggrs
+        )));
+    }
+
+    let band_count = backend.band_count();
+    if band_count == 0 {
+        return Err(EncodingError::Storage(
+            "dataset metadata must define at least one band".into(),
+        ));
+    }
+
+    let chunk_size = backend.metadata().chunk_size;
+    let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
+    let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
+    let target_level = RefinementLevel::new(
+        i32::try_from(level)
+            .map_err(|_| EncodingError::Storage(format!("level {level} cannot fit i32")))?,
+    )?;
+
+    if target_level.get() < chunk_depth {
+        return Err(EncodingError::Storage(format!(
+            "level {} is below derived chunk depth {}",
+            target_level.get(),
+            chunk_depth
+        )));
+    }
+
+    let chunk_level = RefinementLevel::new(target_level.get() - chunk_depth)?;
+    let relative_depth = RelativeDepth::new(target_level.get() - chunk_level.get())?;
+    let grid = get(backend.metadata().dggrs)
+        .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
+
+    let mut rows = Vec::new();
+
+    for (chunk_index, chunk_id) in backend.metadata().chunk_ids.iter().enumerate() {
+        let chunk_zone_id = ZoneId::from_str(chunk_id)
+            .map_err(|e| EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}")))?;
+
+        let children = grid
+            .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+            .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+        let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
+            .map(|band| backend.read_chunk(level, band, chunk_index as u64))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        for (in_chunk_index, zone) in children.zones.iter().enumerate() {
+            let mut bands = BTreeMap::new();
+
+            for band in 0..band_count {
+                let dtype = &backend.metadata().attributes[band as usize].dtype;
+                let value_size = dtype.byte_size();
+                let start = in_chunk_index * value_size;
+                let end = start + value_size;
+                let chunk = &chunks_for_bands[band as usize];
+
+                if chunk.len() < end {
+                    return Err(EncodingError::Storage(format!(
+                        "chunk {chunk_index} at level {level} is too small for child index {in_chunk_index} and band {band}"
+                    )));
+                }
+
+                bands.insert(
+                    format!("band_{band}"),
+                    decode_value_to_json(dtype, &chunk[start..end])?,
+                );
+            }
+
+            rows.push(H3VisualizationCell {
+                hex: zone.id.to_string(),
+                bands,
+            });
+        }
+    }
+
+    Ok(rows)
+}
+
+fn compute_chunk_depth(chunk_size: u64, aperture: u64) -> Result<i32, EncodingError> {
+    if aperture <= 1 {
+        return Err(EncodingError::Storage(format!(
+            "invalid DGGS aperture {aperture} for chunk resolution"
+        )));
+    }
+
+    let mut depth_i32 = 0_i32;
+    let mut size_check = 1_u64;
+    while size_check < chunk_size {
+        size_check = size_check.checked_mul(aperture).ok_or_else(|| {
+            EncodingError::Storage("chunk_size power computation overflow".into())
+        })?;
+        depth_i32 += 1;
+    }
+
+    if size_check != chunk_size {
+        return Err(EncodingError::Storage(format!(
+            "chunk_size {chunk_size} is not a power of aperture {aperture}"
+        )));
+    }
+
+    Ok(depth_i32)
 }
 
 #[cfg(test)]
@@ -267,21 +367,18 @@ mod tests {
             .write_chunk(refinement_level.get() as u32, 0, 1, &chunk1_bytes)
             .expect("write chunk1");
 
-        let bytes =
-            query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell0)
-                .expect("query cell");
+        let bytes = query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell0)
+            .expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 10);
 
-        let bytes =
-            query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell1)
-                .expect("query cell");
+        let bytes = query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell1)
+            .expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 20);
 
-        let bytes =
-            query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell2)
-                .expect("query cell");
+        let bytes = query_value_by_cell_index(&backend, refinement_level.get() as u32, 0, &cell2)
+            .expect("query cell");
         let value = u16::from_ne_bytes([bytes[0], bytes[1]]);
         assert_eq!(value, 60);
 
