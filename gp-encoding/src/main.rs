@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand};
 use geoplegma::types::{DggrsUid, Point, RefinementLevel};
 use gp_encoding::{
     StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
-    export_h3_level_as_visualization_json, format_value, query_value_for_point,
+    format_value, query_value_for_point, write_h3_level_as_visualization_json,
 };
 
 #[derive(Parser, Debug)]
@@ -186,8 +186,6 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
 
 fn run_export_h3_json(args: ExportH3JsonArgs) -> Result<(), String> {
     let backend = ZarrBackend::open(&args.store).map_err(|e| e.to_string())?;
-    let rows = export_h3_level_as_visualization_json(&backend, args.level)
-        .map_err(|e| e.to_string())?;
     let output = resolve_visualization_output_path(args.output);
 
     if let Some(parent) = output.parent() {
@@ -199,15 +197,17 @@ fn run_export_h3_json(args: ExportH3JsonArgs) -> Result<(), String> {
         })?;
     }
 
-    let json = serde_json::to_string_pretty(&rows).map_err(|e| e.to_string())?;
-    std::fs::write(&output, json)
-        .map_err(|e| format!("failed to write JSON output {}: {e}", output.display()))?;
+    let file = std::fs::File::create(&output)
+        .map_err(|e| format!("failed to create JSON output {}: {e}", output.display()))?;
+    let writer = std::io::BufWriter::new(file);
+    let cell_count = write_h3_level_as_visualization_json(&backend, args.level, writer)
+        .map_err(|e| e.to_string())?;
 
     println!("Export successful");
     println!("  Store:      {}", args.store.display());
     println!("  Level:      {}", args.level);
     println!("  Bands:      {}", backend.band_count());
-    println!("  Cells:      {}", rows.len());
+    println!("  Cells:      {}", cell_count);
     println!("  Output:     {}", output.display());
 
     Ok(())

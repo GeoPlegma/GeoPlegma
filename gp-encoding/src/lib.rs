@@ -13,8 +13,8 @@ pub use geoplegma::types::{RefinementLevel, RelativeDepth, Zone, ZoneId, Zones};
 pub use geotiff_convert::convert_geotiff_file_to_backend;
 pub use models::{AttributeSchema, DataType, DatasetMetadata};
 pub use query::{
-    H3VisualizationCell, export_h3_level_as_visualization_json, query_value_by_cell_index,
-    query_value_for_point,
+    H3VisualizationCell, export_h3_level_as_visualization_json,
+    query_value_by_cell_index, query_value_for_point, write_h3_level_as_visualization_json,
 };
 pub use storage::StorageBackend;
 pub use value::{decode_value_to_json, format_value};

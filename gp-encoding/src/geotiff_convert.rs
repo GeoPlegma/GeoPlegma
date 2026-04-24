@@ -3,6 +3,7 @@ use std::path::Path;
 use gdal::raster::GdalDataType;
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
 use gdal::{Dataset, GeoTransformEx};
+use indicatif::{ProgressBar, ProgressStyle};
 use geoplegma::api::DggrsApiConfig;
 use geoplegma::get;
 use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth};
@@ -391,6 +392,15 @@ where
         center: true,
         ..CONFIG
     };
+    let total_chunk_zones = chunk_zones.zones.len();
+    let chunk_progress = ProgressBar::new(total_chunk_zones as u64);
+    let style = ProgressStyle::with_template(
+        "processing chunk zones [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+    )
+    .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+    .progress_chars("=> ");
+    chunk_progress.set_style(style);
+
     let chunk_child_centers: Vec<Vec<Point>> = chunk_zones
         .zones
         .iter()
@@ -418,8 +428,10 @@ where
                     })
                 })
                 .collect::<Result<Vec<_>, EncodingError>>()
+                .inspect(|_| chunk_progress.inc(1))
         })
         .collect::<Result<_, EncodingError>>()?;
+    chunk_progress.finish_with_message("processing chunk zones [done]");
 
     let metadata = DatasetMetadata {
         dggrs,

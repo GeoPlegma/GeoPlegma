@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use geoplegma::get;
 use geoplegma::types::{DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId};
+use indicatif::{ProgressBar, ProgressStyle};
+use serde::ser::{SerializeSeq, Serializer};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -158,6 +160,46 @@ pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
     backend: &B,
     level: u32,
 ) -> Result<Vec<H3VisualizationCell>, EncodingError> {
+    let mut rows = Vec::new();
+    visit_h3_level_as_visualization_cells(backend, level, |cell| {
+        rows.push(cell);
+        Ok(())
+    })?;
+
+    Ok(rows)
+}
+
+pub fn write_h3_level_as_visualization_json<B: StorageBackend, W: std::io::Write>(
+    backend: &B,
+    level: u32,
+    writer: W,
+) -> Result<usize, EncodingError> {
+    let mut serializer = serde_json::Serializer::new(writer);
+    let mut sequence = serializer
+        .serialize_seq(None)
+        .map_err(|e: serde_json::Error| EncodingError::Storage(e.to_string()))?;
+
+    let cell_count = visit_h3_level_as_visualization_cells(backend, level, |cell| {
+        sequence
+            .serialize_element(&cell)
+            .map_err(|e: serde_json::Error| EncodingError::Storage(e.to_string()))
+    })?;
+
+    sequence
+        .end()
+        .map_err(|e: serde_json::Error| EncodingError::Storage(e.to_string()))?;
+
+    Ok(cell_count)
+}
+
+fn visit_h3_level_as_visualization_cells<B: StorageBackend, F>(
+    backend: &B,
+    level: u32,
+    mut visit_cell: F,
+) -> Result<usize, EncodingError>
+where
+    F: FnMut(H3VisualizationCell) -> Result<(), EncodingError>,
+{
     if backend.metadata().dggrs != DggrsUid::H3 {
         return Err(EncodingError::Storage(format!(
             "export requires H3 store, got {:?}",
@@ -193,9 +235,18 @@ pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
 
-    let mut rows = Vec::new();
+    let mut row_count = 0_usize;
+    let chunk_progress = ProgressBar::new(backend.metadata().chunk_ids.len() as u64);
+    let style = ProgressStyle::with_template(
+        "processing chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+    )
+    .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+    .progress_chars("=> ");
+    chunk_progress.set_style(style);
 
     for (chunk_index, chunk_id) in backend.metadata().chunk_ids.iter().enumerate() {
+        chunk_progress.set_message(format!("chunk {chunk_index} {chunk_id}"));
+
         let chunk_zone_id = ZoneId::from_str(chunk_id)
             .map_err(|e| EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}")))?;
 
@@ -229,14 +280,19 @@ pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
                 );
             }
 
-            rows.push(H3VisualizationCell {
+            visit_cell(H3VisualizationCell {
                 hex: zone.id.to_string(),
                 bands,
-            });
+            })?;
+            row_count += 1;
         }
+
+        chunk_progress.inc(1);
     }
 
-    Ok(rows)
+    chunk_progress.finish_with_message("processing chunks [done]");
+
+    Ok(row_count)
 }
 
 fn compute_chunk_depth(chunk_size: u64, aperture: u64) -> Result<i32, EncodingError> {
