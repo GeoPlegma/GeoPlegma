@@ -1,4 +1,5 @@
 use geoplegma::types::DggrsUid;
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -37,7 +38,15 @@ pub struct DatasetMetadata {
     pub levels: Vec<u32>,
 
     /// Compression method used for the cell attribute data.
-    pub compression: Option<String>,
+    pub compression: Option<Compression>,
+}
+
+/// Supported compression configuration for Zarr chunk payloads.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
+#[serde(tag = "algorithm", rename_all = "snake_case")]
+pub enum Compression {
+    Gzip,
+    Zstd,
 }
 
 /// Description of a single data attribute.

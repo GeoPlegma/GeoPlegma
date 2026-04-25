@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use geoplegma::types::{DggrsUid, Point, RefinementLevel};
 use gp_encoding::{
-    StorageBackend, ZarrBackend, convert_geotiff_file_to_backend,
-    format_value, query_value_for_point, write_h3_level_as_visualization_json,
+    convert_geotiff_file_to_backend, format_value, query_value_for_point,
+    write_h3_level_as_visualization_json, Compression, StorageBackend, ZarrBackend,
 };
 
 #[derive(Parser, Debug)]
@@ -41,6 +41,9 @@ struct ConvertGeotiffArgs {
     /// Output Zarr store path.
     #[arg(short, long, default_value = "./tmp/gp_encoding_geotiff_convert")]
     output: PathBuf,
+    /// Optional compression for Zarr chunks.
+    #[arg(long, value_enum)]
+    compression: Option<Compression>,
 }
 
 #[derive(Args, Debug)]
@@ -108,9 +111,13 @@ fn run_convert_geotiff(args: ConvertGeotiffArgs) -> Result<(), String> {
         })?;
     }
 
-    let backend =
-        convert_geotiff_file_to_backend::<ZarrBackend>(&args.input, &args.output, args.dggrs)
-            .map_err(|e| e.to_string())?;
+    let backend = convert_geotiff_file_to_backend::<ZarrBackend>(
+        &args.input,
+        &args.output,
+        args.dggrs,
+        args.compression,
+    )
+    .map_err(|e| e.to_string())?;
 
     println!("Conversion successful");
     println!("  Input:      {}", args.input.display());

@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use zarrs::array::{Array, ArrayBuilder, ArrayBytes};
+use zarrs::array::codec::api::BytesToBytesCodecTraits;
+use zarrs::array::codec::{GzipCodec, ZstdCodec};
 use zarrs::group::{Group, GroupBuilder};
 use zarrs_filesystem::FilesystemStore;
 
 use crate::error::EncodingError;
-use crate::models::{DataType, DatasetMetadata};
+use crate::models::{Compression, DataType, DatasetMetadata};
 use crate::storage::{LevelHandle, StorageBackend};
 
 /// Handle to a Zarr array that represents a single resolution level.
@@ -37,6 +39,27 @@ pub struct ZarrBackend {
 }
 
 impl ZarrBackend {
+    fn codecs_for_compression(
+        compression: Option<&Compression>,
+    ) -> Result<Option<Vec<Arc<dyn BytesToBytesCodecTraits>>>, EncodingError> {
+        let Some(config) = compression else {
+            return Ok(None);
+        };
+
+        match config {
+            Compression::Gzip => {
+                let codec: Arc<dyn BytesToBytesCodecTraits> = Arc::new(
+                    GzipCodec::new(6).map_err(|e| EncodingError::Zarr(e.to_string()))?,
+                );
+                Ok(Some(vec![codec]))
+            }
+            Compression::Zstd => {
+                let codec: Arc<dyn BytesToBytesCodecTraits> = Arc::new(ZstdCodec::new(3, false));
+                Ok(Some(vec![codec]))
+            }
+        }
+    }
+
     /// Convert our [`DataType`] to a zarrs data type string.
     fn to_zarr_dtype_str(dt: &DataType) -> &'static str {
         match dt {
@@ -177,14 +200,20 @@ impl StorageBackend for ZarrBackend {
         let dtype_str = self.primary_dtype_str();
         let chunk_size = self.metadata.chunk_size;
 
-        let array = ArrayBuilder::new(
+        let mut array_builder = ArrayBuilder::new(
             vec![num_cells],  // array shape
             vec![chunk_size], // regular chunk shape
             dtype_str,        // data type as string
             0u64,             // fill value
-        )
-        .build(self.store.clone(), &path)
-        .map_err(|e| EncodingError::Zarr(e.to_string()))?;
+        );
+
+        if let Some(codecs) = Self::codecs_for_compression(self.metadata.compression.as_ref())? {
+            array_builder.bytes_to_bytes_codecs(codecs);
+        }
+
+        let array = array_builder
+            .build(self.store.clone(), &path)
+            .map_err(|e| EncodingError::Zarr(e.to_string()))?;
 
         array
             .store_metadata()

@@ -11,7 +11,7 @@ use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDe
 use crate::AttributeSchema;
 use crate::common::CONFIG;
 use crate::error::EncodingError;
-use crate::models::{DataType, DatasetMetadata};
+use crate::models::{Compression, DataType, DatasetMetadata};
 use crate::storage::StorageBackend;
 
 trait NativeBytes {
@@ -295,6 +295,7 @@ pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
     output_path: &Path,
     dggrs: DggrsUid,
+    compression: Option<Compression>,
 ) -> Result<B, EncodingError>
 where
     B: StorageBackend,
@@ -443,7 +444,7 @@ where
             .map(|z| z.id.to_string())
             .collect::<Vec<_>>(),
         levels: vec![refinement_level.get() as u32],
-        compression: None,
+        compression,
     };
 
     let encoded_num_cells = (chunk_zones.zones.len() as u64)
