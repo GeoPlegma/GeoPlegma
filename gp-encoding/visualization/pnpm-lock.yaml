@@ -17,6 +17,9 @@ importers:
       '@deck.gl/layers':
         specifier: ^9.3.1
         version: 9.3.1(@deck.gl/core@9.3.1)(@loaders.gl/core@4.4.1)(@luma.gl/core@9.3.3)(@luma.gl/engine@9.3.3(@luma.gl/core@9.3.3)(@luma.gl/shadertools@9.3.3(@luma.gl/core@9.3.3)))
+      h3-js:
+        specifier: ^4.4.0
+        version: 4.4.0
     devDependencies:
       vite:
         specifier: ^8.0.9

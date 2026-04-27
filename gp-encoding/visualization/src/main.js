@@ -1,49 +1,89 @@
-import {Deck} from '@deck.gl/core';
+import {Deck, WebMercatorViewport, _GlobeView as GlobeView} from '@deck.gl/core';
 import {H3HexagonLayer} from '@deck.gl/geo-layers';
-import {PolygonLayer} from '@deck.gl/layers';
+import {GeoJsonLayer} from '@deck.gl/layers';
+import {cellToBoundary} from 'h3-js';
 
 const presets = {
   'large_raster': {
-    lon:  [4.326247, 4.469885],
-    lat:  [52.166899, 52.258604],
     elevation: 0,
     fillColor: d => [
       Math.round((d.band_2 / 11652) * 255) * 7,
       Math.round((d.band_1 / 11652) * 255) * 7,
       Math.round((d.band_0 / 11652) * 255) * 7
     ],
-    zoom: 11
   },
   'elevation': {
-    lon: [-9.238194, -9.086250],
-    lat: [38.679861, 38.796806],
     elevation: d => d.band_0 / 2,
     fillColor: d => [d.band_0, d.band_0, d.band_0],
-    zoom: 11
   },
-  'ne': {
-    lon: [-180, 180],
-    lat: [-90, 90],
+  'wildfires': {
     elevation: 0,
     fillColor: d => [d.band_0, d.band_1, d.band_2],
-    zoom: 1
+  },
+  'ne': {
+    elevation: 0,
+    fillColor: d => [d.band_0, d.band_1, d.band_2],
   }
 }
 
-const {lon, lat, elevation, fillColor, zoom} = presets['ne'];
+const {elevation, fillColor} = presets['wildfires'];
 
-const BBOX_POLYGON = [
-  [lon[0], lat[0]],
-  [lon[1], lat[0]],
-  [lon[1], lat[1]],
-  [lon[0], lat[1]],
-  [lon[0], lat[0]]
-];
+const H3_CELLS_URL = '/h3cells.json';
+const COUNTRIES_BORDERS_URL = '/countries.geojson';
+const VIEW_PADDING = 64;
+
+function getBoundsFromH3Cells(cells) {
+  const bounds = {
+    west: Number.POSITIVE_INFINITY,
+    south: Number.POSITIVE_INFINITY,
+    east: Number.NEGATIVE_INFINITY,
+    north: Number.NEGATIVE_INFINITY
+  };
+
+  for (const cell of cells) {
+    const boundary = cellToBoundary(cell.hex, true);
+
+    for (const [longitude, latitude] of boundary) {
+      bounds.west = Math.min(bounds.west, longitude);
+      bounds.south = Math.min(bounds.south, latitude);
+      bounds.east = Math.max(bounds.east, longitude);
+      bounds.north = Math.max(bounds.north, latitude);
+    }
+  }
+
+  if (!Number.isFinite(bounds.west)) {
+    return [[-180, -90], [180, 90]];
+  }
+
+  return [
+    [bounds.west, bounds.south],
+    [bounds.east, bounds.north]
+  ];
+}
+
+function getInitialViewState(bounds) {
+  const width = appContainer?.clientWidth || window.innerWidth;
+  const height = appContainer?.clientHeight || window.innerHeight;
+  const viewport = new WebMercatorViewport({width, height});
+  const {longitude, latitude, zoom} = viewport.fitBounds(bounds, {
+    padding: VIEW_PADDING,
+    maxZoom: 20
+  });
+
+  return {
+    longitude,
+    latitude,
+    zoom,
+    maxZoom: 20,
+    pitch: 30,
+    bearing: 0
+  };
+}
 
 
 const layer = new H3HexagonLayer({
   id: 'H3HexagonLayer',
-  data: '/h3cells.json',
+  data: [],
   elevationScale: 20,
   extruded: true,
   filled: true,
@@ -54,17 +94,14 @@ const layer = new H3HexagonLayer({
   pickable: true,
 });
 
-const boundingBoxLayer = new PolygonLayer({
-  id: 'BoundingBoxLayer',
-  data: [{polygon: BBOX_POLYGON}],
-  getPolygon: d => d.polygon,
+const countriesBordersLayer = new GeoJsonLayer({
+  id: 'CountriesBordersLayer',
+  data: COUNTRIES_BORDERS_URL,
   stroked: true,
-  filled: true,
-  lineWidthMinPixels: 3,
-  getLineColor: [230, 57, 70, 255],
-  getFillColor: [230, 57, 70, 35],
-  getLineWidth: 2,
-  pickable: true
+  filled: false,
+  lineWidthMinPixels: 1,
+  getLineColor: [120, 132, 145, 120],
+  pickable: false
 });
 
 const appContainer = document.getElementById('app');
@@ -75,22 +112,25 @@ if (appContainer) {
   });
 }
 
-new Deck({
-  parent: appContainer || document.body,
-  mapStyle: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
-  initialViewState: {
-    longitude: (lon[0] + lon[1]) / 2,
-    latitude: (lat[0] + lat[1]) / 2,
-    zoom: zoom,
-    maxZoom: 20,
-    pitch: 30,
-    bearing: 0
-  },
-  controller: true,
-  getTooltip: ({object}) => object && `${object.hex} band_0: ${object.band_0}`,
-  layers: [
-    layer, 
-    // boundingBoxLayer
-  ]
+async function bootstrap() {
+  const cells = await fetch(H3_CELLS_URL).then(response => response.json());
+  const initialViewState = getInitialViewState(getBoundsFromH3Cells(cells));
+
+  new Deck({
+    parent: appContainer || document.body,
+    views: new GlobeView({id: 'globe'}),
+    mapStyle: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    initialViewState,
+    controller: true,
+    getTooltip: ({object}) => object && `${object.hex}`,
+    layers: [
+      countriesBordersLayer,
+      layer.clone({data: cells})
+    ]
+  });
+}
+
+bootstrap().catch(error => {
+  console.error('Failed to initialise visualization', error);
 });
   
