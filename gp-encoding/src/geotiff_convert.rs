@@ -12,7 +12,7 @@ use crate::AttributeSchema;
 use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
-use crate::stats::{BandStatsCollector, ConversionReport};
+use crate::stats::{BandStatsCollector, ConversionReport, SourceRasterReport};
 use crate::storage::StorageBackend;
 
 trait NativeBytes {
@@ -299,18 +299,55 @@ fn choose_best_chunk_level_and_size(
     Ok((chunk_level, chunk_size))
 }
 
+pub fn compute_source_report(dataset: &Dataset) -> Result<SourceRasterReport, EncodingError> {
+    let (width, height) = dataset.raster_size();
+    let total_pixels = (width as u64) * (height as u64);
+    let band_count = dataset.raster_count();
+    let mut bands = Vec::with_capacity(band_count);
+
+    for band_idx in 1..=band_count {
+        let band = dataset.rasterband(band_idx)?;
+        let dtype_name = format!("{:?}", band.band_type().name());
+        let nodata = band.no_data_value();
+
+        let mut collector = BandStatsCollector::new((band_idx - 1) as u32, dtype_name);
+        collector.set_total_cells(total_pixels);
+
+        let raster = band.read_band_as::<f64>()?;
+        for &v in raster.data() {
+            let is_nodata = match nodata {
+                Some(nd) => v == nd || (v.is_nan() && nd.is_nan()),
+                None => false,
+            };
+            if !is_nodata && v.is_finite() {
+                collector.record_value(v);
+            }
+        }
+
+        bands.push(collector.finish());
+    }
+
+    Ok(SourceRasterReport {
+        width,
+        height,
+        total_pixels,
+        bands,
+    })
+}
+
 pub fn convert_geotiff_file_to_backend<B>(
     geotiff_path: &Path,
     output_path: &Path,
     dggrs: DggrsUid,
     compression: Option<Compression>,
-) -> Result<(B, ConversionReport), EncodingError>
+) -> Result<(B, SourceRasterReport, ConversionReport), EncodingError>
 where
     B: StorageBackend,
 {
     let grid = get(dggrs)?;
 
     let dataset = Dataset::open(geotiff_path)?;
+    let source_report = compute_source_report(&dataset)?;
 
     let bands = dataset
         .rasterbands()
@@ -635,9 +672,10 @@ where
     let report = ConversionReport {
         num_chunks: chunk_zones.zones.len() as u64,
         chunk_size,
+        chunk_level: chunk_level.get() as u32,
         refinement_level: refinement_level.get() as u32,
         bands: band_stats,
     };
 
-    Ok((backend, report))
+    Ok((backend, source_report, report))
 }

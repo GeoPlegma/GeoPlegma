@@ -111,19 +111,21 @@ fn run_convert_geotiff(args: ConvertGeotiffArgs) -> Result<(), String> {
         })?;
     }
 
-    let (backend, report) = convert_geotiff_file_to_backend::<ZarrBackend>(
-        &args.input,
-        &args.output,
-        args.dggrs,
-        args.compression,
-    )
-    .map_err(|e| e.to_string())?;
+    let (backend, source_report, conversion_report) =
+        convert_geotiff_file_to_backend::<ZarrBackend>(
+            &args.input,
+            &args.output,
+            args.dggrs,
+            args.compression,
+        )
+        .map_err(|e| e.to_string())?;
 
     println!("Conversion successful");
     println!("  Input:      {}", args.input.display());
     println!("  Output:     {}", args.output.display());
     println!("  Levels:     {:?}", backend.levels());
-    print!("{report}");
+    print!("{source_report}");
+    print!("{conversion_report}");
 
     Ok(())
 }

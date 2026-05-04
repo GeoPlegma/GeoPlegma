@@ -50,12 +50,20 @@ impl BandStats {
     }
 }
 
-/// Aggregated statistics for the full conversion.
 #[derive(Debug, Clone)]
 pub struct ConversionReport {
     pub num_chunks: u64,
     pub chunk_size: u64,
+    pub chunk_level: u32,
     pub refinement_level: u32,
+    pub bands: Vec<BandStats>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SourceRasterReport {
+    pub width: usize,
+    pub height: usize,
+    pub total_pixels: u64,
     pub bands: Vec<BandStats>,
 }
 
@@ -182,7 +190,57 @@ fn format_bucket_value(v: f64) -> String {
     }
 }
 
-// ── Display ──────────────────────────────────────────────────────────────
+fn write_band_stats(f: &mut fmt::Formatter<'_>, band: &BandStats) -> fmt::Result {
+    writeln!(f, "  ── Band {} ({}) ─────────────────────────────────", band.band_index, band.dtype_name)?;
+    writeln!(f)?;
+    writeln!(f, "    Total cells    : {:>12}", format_count(band.total_cells))?;
+    writeln!(
+        f,
+        "    Valued cells   : {:>12}  ({:.1}%)",
+        format_count(band.valued_cells),
+        band.valued_percentage()
+    )?;
+    writeln!(
+        f,
+        "    NoData cells   : {:>12}  ({:.1}%)",
+        format_count(band.fill_cells),
+        band.fill_percentage()
+    )?;
+    writeln!(f)?;
+
+    if band.valued_cells > 0 {
+        writeln!(f, "    Min            : {:>12}", format_stat_value(band.min))?;
+        writeln!(f, "    Max            : {:>12}", format_stat_value(band.max))?;
+        writeln!(f, "    Mean           : {:>12}", format_stat_value(band.mean()))?;
+        writeln!(f, "    Std dev        : {:>12}", format_stat_value(band.stddev()))?;
+        writeln!(f)?;
+    } else {
+        writeln!(f, "    (no valued cells)")?;
+        writeln!(f)?;
+    }
+
+    Ok(())
+}
+
+impl fmt::Display for SourceRasterReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "╔══════════════════════════════════════════════════════════╗")?;
+        writeln!(f, "║             Source GeoTIFF Statistics Report            ║")?;
+        writeln!(f, "╚══════════════════════════════════════════════════════════╝")?;
+        writeln!(f)?;
+        writeln!(f, "  Dimensions     : {} × {} px", self.width, self.height)?;
+        writeln!(f, "  Total pixels   : {}", format_count(self.total_pixels))?;
+        writeln!(f, "  Bands          : {}", self.bands.len())?;
+        writeln!(f)?;
+
+        for band in &self.bands {
+            write_band_stats(f, band)?;
+        }
+
+        Ok(())
+    }
+}
 
 impl fmt::Display for ConversionReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -192,67 +250,13 @@ impl fmt::Display for ConversionReport {
         writeln!(f, "╚══════════════════════════════════════════════════════════╝")?;
         writeln!(f)?;
         writeln!(f, "  Refinement level : {}", self.refinement_level)?;
+        writeln!(f, "  Chunk level      : {}", self.chunk_level)?;
         writeln!(f, "  Chunks           : {}", self.num_chunks)?;
         writeln!(f, "  Chunk size       : {} cells", self.chunk_size)?;
         writeln!(f)?;
 
         for band in &self.bands {
-            writeln!(f, "  ── Band {} ({}) ─────────────────────────────────", band.band_index, band.dtype_name)?;
-            writeln!(f)?;
-            writeln!(f, "    Total cells    : {:>12}", format_count(band.total_cells))?;
-            writeln!(
-                f,
-                "    Valued cells   : {:>12}  ({:.1}%)",
-                format_count(band.valued_cells),
-                band.valued_percentage()
-            )?;
-            writeln!(
-                f,
-                "    Empty cells     : {:>12}  ({:.1}%)",
-                format_count(band.fill_cells),
-                band.fill_percentage()
-            )?;
-            writeln!(f)?;
-
-            if band.valued_cells > 0 {
-                writeln!(f, "    Min            : {:>12}", format_stat_value(band.min))?;
-                writeln!(f, "    Max            : {:>12}", format_stat_value(band.max))?;
-                writeln!(f, "    Mean           : {:>12}", format_stat_value(band.mean()))?;
-                writeln!(f, "    Std dev        : {:>12}", format_stat_value(band.stddev()))?;
-                writeln!(f)?;
-
-                // if !band.histogram.is_empty() {
-                //     writeln!(f, "    Value distribution:")?;
-                //     let max_count = band.histogram.iter().map(|(_, c)| *c).max().unwrap_or(1);
-                //     let bar_max_width = 24;
-                //     for (label, count) in &band.histogram {
-                //         let bar_len = if max_count > 0 {
-                //             (*count as f64 / max_count as f64 * bar_max_width as f64).ceil()
-                //                 as usize
-                //         } else {
-                //             0
-                //         };
-                //         let bar: String = "█".repeat(bar_len);
-                //         let pct = if band.valued_cells > 0 {
-                //             *count as f64 / band.valued_cells as f64 * 100.0
-                //         } else {
-                //             0.0
-                //         };
-                //         writeln!(
-                //             f,
-                //             "      {:<22} {:>8} {:>5.1}%  {}",
-                //             label,
-                //             format_count(*count),
-                //             pct,
-                //             bar
-                //         )?;
-                //     }
-                //     writeln!(f)?;
-                // }
-            } else {
-                writeln!(f, "    (no valued cells)")?;
-                writeln!(f)?;
-            }
+            write_band_stats(f, band)?;
         }
 
         Ok(())
