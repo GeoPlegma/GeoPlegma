@@ -12,10 +12,12 @@ use crate::AttributeSchema;
 use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
+use crate::stats::{BandStatsCollector, ConversionReport};
 use crate::storage::StorageBackend;
 
 trait NativeBytes {
     fn to_native_bytes(self) -> Vec<u8>;
+    fn to_f64(self) -> f64;
 }
 
 macro_rules! impl_native_bytes {
@@ -24,6 +26,9 @@ macro_rules! impl_native_bytes {
             impl NativeBytes for $t {
                 fn to_native_bytes(self) -> Vec<u8> {
                     self.to_ne_bytes().to_vec()
+                }
+                fn to_f64(self) -> f64 {
+                    self as f64
                 }
             }
         )+
@@ -148,6 +153,7 @@ fn compute_chunk_bytes_from_data<T>(
     wgs84_to_src: &CoordTransform,
     chunk_child_centers: &[Vec<Point>],
     chunk_size: u64,
+    stats: &mut BandStatsCollector,
 ) -> Result<Vec<Vec<u8>>, EncodingError>
 where
     T: NativeBytes + Copy,
@@ -173,7 +179,9 @@ where
             if let Some(pixel_index) =
                 nearest_pixel_index_for_center(center, wgs84_to_src, gt, width, height)?
             {
-                let value_bytes = data[pixel_index].to_native_bytes();
+                let value = data[pixel_index];
+                stats.record_value(value.to_f64());
+                let value_bytes = value.to_native_bytes();
 
                 let start = in_chunk_index * value_size;
                 let end = start + value_size;
@@ -296,7 +304,7 @@ pub fn convert_geotiff_file_to_backend<B>(
     output_path: &Path,
     dggrs: DggrsUid,
     compression: Option<Compression>,
-) -> Result<B, EncodingError>
+) -> Result<(B, ConversionReport), EncodingError>
 where
     B: StorageBackend,
 {
@@ -355,6 +363,7 @@ where
     let src_srs = dataset.spatial_ref()?;
     let (bbox, pixel_width, pixel_height) = get_corners_and_pixel_size(&dataset)?;
     let refinement_level = get_closest_refinement_level(&grid, pixel_width, pixel_height)?;
+    // let refinement_level = RefinementLevel::new_const(get_closest_refinement_level(&grid, pixel_width, pixel_height)?.get() - 3);
 
     let data_type_size_bytes = metadata_bands
         .iter()
@@ -434,6 +443,11 @@ where
         .collect::<Result<_, EncodingError>>()?;
     chunk_progress.finish_with_message("processing chunk zones [done]");
 
+    let band_dtype_names: Vec<String> = metadata_bands
+        .iter()
+        .map(|b| format!("{:?}", b.dtype))
+        .collect();
+
     let metadata = DatasetMetadata {
         dggrs,
         attributes: metadata_bands,
@@ -456,8 +470,13 @@ where
     wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
     let wgs84_to_src = CoordTransform::new(&wgs84, &src_srs)?;
 
+    let mut band_stats = Vec::new();
+
     for (band_index, band_type) in bands.into_iter().enumerate() {
         let band = dataset.rasterband(band_index + 1)?;
+        let dtype_name = band_dtype_names[band_index].clone();
+        let mut collector = BandStatsCollector::new(band_index as u32, dtype_name);
+        collector.set_total_cells(encoded_num_cells);
 
         let chunk_bytes = match band_type {
             GdalDataType::UInt8 => {
@@ -470,6 +489,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::Int8 => {
@@ -482,6 +502,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::UInt16 => {
@@ -494,6 +515,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::Int16 => {
@@ -506,6 +528,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::UInt32 => {
@@ -518,6 +541,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::Int32 => {
@@ -530,6 +554,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::UInt64 => {
@@ -542,6 +567,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::Int64 => {
@@ -554,6 +580,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::Float32 => {
@@ -566,6 +593,7 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             GdalDataType::Float64 => {
@@ -578,12 +606,15 @@ where
                     &wgs84_to_src,
                     &chunk_child_centers,
                     chunk_size,
+                    &mut collector,
                 )
             }
             _ => Err(EncodingError::GeoTiff(format!(
                 "unsupported GDAL data type: {band_type:?}"
             ))),
         }?;
+
+        band_stats.push(collector.finish());
 
         backend.create_level(
             refinement_level.get() as u32,
@@ -601,5 +632,12 @@ where
         }
     }
 
-    Ok(backend)
+    let report = ConversionReport {
+        num_chunks: chunk_zones.zones.len() as u64,
+        chunk_size,
+        refinement_level: refinement_level.get() as u32,
+        bands: band_stats,
+    };
+
+    Ok((backend, report))
 }

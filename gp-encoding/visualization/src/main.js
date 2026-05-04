@@ -3,30 +3,15 @@ import {H3HexagonLayer} from '@deck.gl/geo-layers';
 import {GeoJsonLayer} from '@deck.gl/layers';
 import {cellToBoundary} from 'h3-js';
 
-const presets = {
-  'large_raster': {
-    elevation: 0,
-    fillColor: d => [
-      Math.round((d.band_2 / 11652) * 255) * 7,
-      Math.round((d.band_1 / 11652) * 255) * 7,
-      Math.round((d.band_0 / 11652) * 255) * 7
-    ],
-  },
-  'elevation': {
-    elevation: d => d.band_0 / 2,
-    fillColor: d => [d.band_0, d.band_0, d.band_0],
-  },
-  'wildfires': {
-    elevation: 0,
-    fillColor: d => [d.band_0, d.band_1, d.band_2],
-  },
-  'ne': {
-    elevation: 0,
-    fillColor: d => [d.band_0, d.band_1, d.band_2],
-  }
-}
+const BAND_KEY_PREFIX = 'band_';
 
-const {elevation, fillColor} = presets['wildfires'];
+function getBandCount(sample) {
+  if (!sample || typeof sample !== 'object') {
+    return 0;
+  }
+
+  return Object.keys(sample).filter(key => key.startsWith(BAND_KEY_PREFIX)).length;
+}
 
 const H3_CELLS_URL = '/h3cells.json';
 const COUNTRIES_BORDERS_URL = '/countries.geojson';
@@ -81,18 +66,25 @@ function getInitialViewState(bounds) {
 }
 
 
-const layer = new H3HexagonLayer({
-  id: 'H3HexagonLayer',
-  data: [],
-  elevationScale: 20,
-  extruded: true,
-  filled: true,
-  getElevation: elevation,
-  getFillColor: fillColor,
-  getHexagon: d => d.hex,
-  wireframe: false,
-  pickable: true,
-});
+function createH3Layer(cells) {
+  const bandCount = getBandCount(cells?.[0]);
+  const useElevation = bandCount === 1;
+
+  return new H3HexagonLayer({
+    id: 'H3HexagonLayer',
+    data: cells,
+    elevationScale: 20,
+    extruded: useElevation,
+    filled: true,
+    getElevation: useElevation ? d => d.band_0 / 2 : 0,
+    getFillColor: useElevation
+      ? d => [d.band_0, d.band_0, d.band_0]
+      : d => [d.band_0, d.band_1, d.band_2],
+    getHexagon: d => d.hex,
+    wireframe: false,
+    pickable: true,
+  });
+}
 
 const countriesBordersLayer = new GeoJsonLayer({
   id: 'CountriesBordersLayer',
@@ -116,6 +108,8 @@ async function bootstrap() {
   const cells = await fetch(H3_CELLS_URL).then(response => response.json());
   const initialViewState = getInitialViewState(getBoundsFromH3Cells(cells));
 
+  const h3Layer = createH3Layer(cells);
+
   new Deck({
     parent: appContainer || document.body,
     views: new GlobeView({id: 'globe'}),
@@ -125,7 +119,7 @@ async function bootstrap() {
     getTooltip: ({object}) => object && `${object.hex}`,
     layers: [
       countriesBordersLayer,
-      layer.clone({data: cells})
+      h3Layer
     ]
   });
 }

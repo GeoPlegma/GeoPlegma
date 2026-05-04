@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::storage::StorageBackend;
-use crate::value::decode_value_to_json;
+use crate::value::{decode_value_to_json, parse_fill_value_to_json};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct H3VisualizationCell {
@@ -235,6 +235,19 @@ where
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
 
+    let fill_values: Vec<Option<Value>> = backend
+        .metadata()
+        .attributes
+        .iter()
+        .map(|attr| {
+            if let Some(fill_value) = &attr.fill_value {
+                Ok(Some(parse_fill_value_to_json(&attr.dtype, fill_value)?))
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<_, EncodingError>>()?;
+
     let mut row_count = 0_usize;
     let chunk_progress = ProgressBar::new(backend.metadata().chunk_ids.len() as u64);
     let style = ProgressStyle::with_template(
@@ -260,6 +273,7 @@ where
 
         for (in_chunk_index, zone) in children.zones.iter().enumerate() {
             let mut bands = BTreeMap::new();
+            let mut has_non_fill = false;
 
             for band in 0..band_count {
                 let dtype = &backend.metadata().attributes[band as usize].dtype;
@@ -274,10 +288,18 @@ where
                     )));
                 }
 
-                bands.insert(
-                    format!("band_{band}"),
-                    decode_value_to_json(dtype, &chunk[start..end])?,
-                );
+                let value = decode_value_to_json(dtype, &chunk[start..end])?;
+                if let Some(fill_value) = &fill_values[band as usize] {
+                    if *fill_value == value {
+                        continue;
+                    }
+                }
+                bands.insert(format!("band_{band}"), value);
+                has_non_fill = true;
+            }
+
+            if !has_non_fill {
+                continue;
             }
 
             visit_cell(H3VisualizationCell {

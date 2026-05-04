@@ -3,6 +3,7 @@ pub mod error;
 pub mod geotiff_convert;
 pub mod models;
 pub mod query;
+pub mod stats;
 pub mod storage;
 pub mod value;
 pub mod zarr;

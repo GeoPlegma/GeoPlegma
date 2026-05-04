@@ -111,7 +111,7 @@ fn run_convert_geotiff(args: ConvertGeotiffArgs) -> Result<(), String> {
         })?;
     }
 
-    let backend = convert_geotiff_file_to_backend::<ZarrBackend>(
+    let (backend, report) = convert_geotiff_file_to_backend::<ZarrBackend>(
         &args.input,
         &args.output,
         args.dggrs,
@@ -123,6 +123,7 @@ fn run_convert_geotiff(args: ConvertGeotiffArgs) -> Result<(), String> {
     println!("  Input:      {}", args.input.display());
     println!("  Output:     {}", args.output.display());
     println!("  Levels:     {:?}", backend.levels());
+    print!("{report}");
 
     Ok(())
 }
