@@ -9,7 +9,7 @@
 
 use geo::Point;
 use gp_proj::projections::{
-    polyhedron::icosahedron::new,
+    polyhedron::{icosahedron, Orientation},
     projections::{traits::Projection, vgc::Vgc},
 };
 
@@ -33,7 +33,7 @@ pub fn main() -> () {
     ];
 
     let projection = Vgc;
-    let icosahedron = new();
+    let icosahedron = icosahedron::new(Orientation::DGGS_OPTIMAL);
 
     let coords = projection.geo_to_cartesian(points.to_vec(), Some(&icosahedron), None);
 
