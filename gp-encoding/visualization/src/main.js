@@ -17,6 +17,33 @@ const H3_CELLS_URL = '/h3cells.json';
 const COUNTRIES_BORDERS_URL = '/countries.geojson';
 const VIEW_PADDING = 64;
 
+const earthMaskLayer = new GeoJsonLayer({
+  id: 'EarthMaskLayer',
+  data: {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [-180, -90],
+            [-180, 90],
+            [180, 90],
+            [180, -90],
+            [-180, -90]
+          ]]
+        }
+      }
+    ]
+  },
+  stroked: false,
+  filled: true,
+  getFillColor: [255, 255, 255, 255],
+  pickable: false
+});
+
 function getBoundsFromH3Cells(cells) {
   const bounds = {
     west: Number.POSITIVE_INFINITY,
@@ -119,6 +146,7 @@ async function bootstrap() {
     getTooltip: ({object}) => object && `${object.hex}`,
     layers: [
       countriesBordersLayer,
+      earthMaskLayer,
       h3Layer
     ]
   });
