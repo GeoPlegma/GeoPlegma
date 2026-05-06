@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView, WebMercatorViewport } from '@deck.gl/core';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
@@ -106,7 +106,8 @@ const countriesBordersLayer = new GeoJsonLayer({
 
 function App() {
   const [storePath, setStorePath] = useState('./tmp/gp_encoding_geotiff_convert');
-  const [level, setLevel] = useState(2);
+  const [levels, setLevels] = useState<number[]>([]);
+  const [level, setLevel] = useState<number | null>(null);
   const [cells, setCells] = useState<any[]>([]);
   const [viewState, setViewState] = useState({
     longitude: 0,
@@ -117,13 +118,58 @@ function App() {
     bearing: 0
   });
   const [loading, setLoading] = useState(false);
+  const [loadingLevels, setLoadingLevels] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const resolveDefaultLevel = (availableLevels: number[]) => {
+    if (availableLevels.length === 0) {
+      return null;
+    }
+    const sortedLevels = [...availableLevels].sort((a, b) => a - b);
+    return sortedLevels[sortedLevels.length - 1];
+  };
+
+  const fetchLevels = async () => {
+    setLoadingLevels(true);
+    try {
+      const storeLevels: number[] = await invoke('get_h3_levels', { store: storePath });
+      const sortedLevels = [...storeLevels].sort((a, b) => a - b);
+      setLevels(sortedLevels);
+      setLevel((current) => {
+        if (current !== null && sortedLevels.includes(current)) {
+          return current;
+        }
+        return resolveDefaultLevel(sortedLevels);
+      });
+      return sortedLevels;
+    } catch (err: any) {
+      console.error(err);
+      setError(err.toString());
+      setLevels([]);
+      setLevel(null);
+      return [];
+    } finally {
+      setLoadingLevels(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLevels();
+  }, [storePath]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data: any[] = await invoke('get_h3_data', { store: storePath, level: Number(level) });
+      let resolvedLevel = level;
+      if (resolvedLevel === null) {
+        const availableLevels = await fetchLevels();
+        resolvedLevel = resolveDefaultLevel(availableLevels);
+      }
+      if (resolvedLevel === null) {
+        throw new Error('No levels found in the selected store');
+      }
+      const data: any[] = await invoke('get_h3_data', { store: storePath, level: resolvedLevel });
       setCells(data);
       if (data.length > 0) {
         const bounds = getBoundsFromH3Cells(data);
@@ -188,10 +234,10 @@ function App() {
         </div>
         <div className="input-group">
           <label>Level</label>
-          <input 
-            type="number" 
-            value={level} 
-            onChange={e => setLevel(parseInt(e.target.value) || 0)} 
+          <input
+            type="text"
+            value={loadingLevels ? 'Detecting...' : level ?? 'Unavailable'}
+            readOnly
           />
         </div>
         <button onClick={loadData} disabled={loading}>
