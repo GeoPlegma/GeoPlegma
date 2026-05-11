@@ -4,14 +4,16 @@ use std::str::FromStr;
 use geoplegma::get;
 use geoplegma::types::{DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId};
 use indicatif::{ProgressBar, ProgressStyle};
-use serde::ser::{SerializeSeq, Serializer};
 use serde::Serialize;
+use serde::ser::{SerializeSeq, Serializer};
 use serde_json::Value;
 
 use crate::common::CONFIG;
 use crate::error::EncodingError;
-use crate::storage::{compute_chunk_depth, StorageBackend};
-use crate::value::{decode_value_to_json, parse_fill_value_to_json};
+use crate::storage::{StorageBackend, compute_chunk_depth};
+use crate::value::{
+    decode_value_to_f64, decode_value_to_json, parse_fill_value_to_f64, parse_fill_value_to_json,
+};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct H3VisualizationCell {
@@ -168,6 +170,38 @@ pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
     Ok(rows)
 }
 
+pub fn export_h3_level_as_visualization_binary<B: StorageBackend>(
+    backend: &B,
+    level: u32,
+    bbox: Option<geoplegma::types::BoundingBox>,
+) -> Result<Vec<u8>, EncodingError> {
+    let band_count = backend.band_count();
+    let mut output = Vec::new();
+    output.extend_from_slice(&(band_count as u32).to_le_bytes());
+    output.extend_from_slice(&0_u32.to_le_bytes());
+
+    let mut cell_count = 0_u32;
+    visit_h3_level_as_visualization_cells_f64(backend, level, bbox, |hex, values| {
+        let hex_bytes = hex.as_bytes();
+        let hex_len = u16::try_from(hex_bytes.len()).map_err(|_| {
+            EncodingError::Storage(format!(
+                "hex id is too long for binary payload: length {}",
+                hex_bytes.len()
+            ))
+        })?;
+        output.extend_from_slice(&hex_len.to_le_bytes());
+        output.extend_from_slice(hex_bytes);
+        for value in values {
+            output.extend_from_slice(&value.to_le_bytes());
+        }
+        cell_count = cell_count.saturating_add(1);
+        Ok(())
+    })?;
+
+    output[4..8].copy_from_slice(&cell_count.to_le_bytes());
+    Ok(output)
+}
+
 pub fn write_h3_level_as_visualization_json<B: StorageBackend, W: std::io::Write>(
     backend: &B,
     level: u32,
@@ -307,6 +341,156 @@ where
                 hex: zone.id.to_string(),
                 bands,
             })?;
+            row_count += 1;
+        }
+
+        chunk_progress.inc(1);
+    }
+
+    chunk_progress.finish_with_message("processing chunks [done]");
+
+    Ok(row_count)
+}
+
+fn visit_h3_level_as_visualization_cells_f64<B: StorageBackend, F>(
+    backend: &B,
+    level: u32,
+    bbox: Option<geoplegma::types::BoundingBox>,
+    mut visit_cell: F,
+) -> Result<usize, EncodingError>
+where
+    F: FnMut(String, Vec<f64>) -> Result<(), EncodingError>,
+{
+    if backend.metadata().dggrs != DggrsUid::H3 {
+        return Err(EncodingError::Storage(format!(
+            "export requires H3 store, got {:?}",
+            backend.metadata().dggrs
+        )));
+    }
+
+    let band_count = backend.band_count();
+    if band_count == 0 {
+        return Err(EncodingError::Storage(
+            "dataset metadata must define at least one band".into(),
+        ));
+    }
+
+    let chunk_size = backend.metadata().chunk_size;
+    let chunk_ids = backend.chunk_ids_for_level(level)?;
+    let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
+    let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
+    let target_level = RefinementLevel::new(
+        i32::try_from(level)
+            .map_err(|_| EncodingError::Storage(format!("level {level} cannot fit i32")))?,
+    )?;
+
+    if target_level.get() < chunk_depth {
+        return Err(EncodingError::Storage(format!(
+            "level {} is below derived chunk depth {}",
+            target_level.get(),
+            chunk_depth
+        )));
+    }
+
+    let chunk_level = RefinementLevel::new(target_level.get() - chunk_depth)?;
+    let relative_depth = RelativeDepth::new(target_level.get() - chunk_level.get())?;
+    let grid = get(backend.metadata().dggrs)
+        .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
+
+    let fill_values: Vec<Option<f64>> = backend
+        .metadata()
+        .attributes
+        .iter()
+        .map(|attr| {
+            if let Some(fill_value) = &attr.fill_value {
+                Ok(Some(parse_fill_value_to_f64(&attr.dtype, fill_value)?))
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<_, EncodingError>>()?;
+
+    let mut row_count = 0_usize;
+
+    let mut chunk_ids_to_process = chunk_ids;
+    if let Some(bounds) = bbox {
+        let chunk_zones = grid
+            .zones_from_bbox(chunk_level, Some(bounds), Some(CONFIG))
+            .map_err(|e| EncodingError::Grid(e.to_string()))?;
+        let valid_chunk_ids: std::collections::HashSet<String> = chunk_zones
+            .zones
+            .into_iter()
+            .map(|z| z.id.to_string())
+            .collect();
+        chunk_ids_to_process.retain(|id| valid_chunk_ids.contains(id));
+    }
+
+    let chunk_progress = ProgressBar::new(chunk_ids_to_process.len() as u64);
+    let style = ProgressStyle::with_template(
+        "processing chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+    )
+    .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+    .progress_chars("=> ");
+    chunk_progress.set_style(style);
+
+    for (chunk_index, chunk_id) in chunk_ids_to_process.iter().enumerate() {
+        chunk_progress.set_message(format!("chunk {chunk_index} {chunk_id}"));
+
+        let chunk_zone_id = ZoneId::from_str(chunk_id)
+            .map_err(|e| EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}")))?;
+
+        let children = grid
+            .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+            .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+        let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
+            .map(|band| backend.read_chunk(level, band, chunk_index as u64))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        for (in_chunk_index, zone) in children.zones.iter().enumerate() {
+            if let (Some(bounds), Some(center)) = (bbox, zone.center.as_ref()) {
+                if center.lon < bounds.min_lon
+                    || center.lon > bounds.max_lon
+                    || center.lat < bounds.min_lat
+                    || center.lat > bounds.max_lat
+                {
+                    continue;
+                }
+            }
+
+            let mut values = vec![f64::NAN; band_count as usize];
+            let mut has_non_fill = false;
+
+            for band in 0..band_count {
+                let dtype = &backend.metadata().attributes[band as usize].dtype;
+                let value_size = dtype.byte_size();
+                let start = in_chunk_index * value_size;
+                let end = start + value_size;
+                let chunk = &chunks_for_bands[band as usize];
+
+                if chunk.len() < end {
+                    return Err(EncodingError::Storage(format!(
+                        "chunk {chunk_index} at level {level} is too small for child index {in_chunk_index} and band {band}"
+                    )));
+                }
+
+                let value = decode_value_to_f64(dtype, &chunk[start..end])?;
+                if fill_values[band as usize]
+                    .as_ref()
+                    .is_some_and(|fill_value| *fill_value == value)
+                {
+                    continue;
+                }
+
+                values[band as usize] = value;
+                has_non_fill = true;
+            }
+
+            if !has_non_fill {
+                continue;
+            }
+
+            visit_cell(zone.id.to_string(), values)?;
             row_count += 1;
         }
 

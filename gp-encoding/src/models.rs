@@ -1,5 +1,5 @@
-use geoplegma::types::DggrsUid;
 use clap::ValueEnum;
+use geoplegma::types::DggrsUid;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

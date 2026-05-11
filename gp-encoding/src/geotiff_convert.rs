@@ -3,10 +3,10 @@ use std::path::Path;
 use gdal::raster::GdalDataType;
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
 use gdal::{Dataset, GeoTransformEx};
-use indicatif::{ProgressBar, ProgressStyle};
 use geoplegma::api::DggrsApiConfig;
 use geoplegma::get;
 use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth};
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::AttributeSchema;
 use crate::common::CONFIG;

@@ -1,71 +1,64 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView, WebMercatorViewport } from '@deck.gl/core';
 import { H3HexagonLayer } from '@deck.gl/geo-layers';
 import { GeoJsonLayer } from '@deck.gl/layers';
-import { cellToBoundary } from 'h3-js';
+
 import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 
 const BAND_KEY_PREFIX = 'band_';
+const textDecoder = new TextDecoder();
 
-function getBandCount(sample: any) {
-  if (!sample || typeof sample !== 'object') {
-    return 0;
+function asUint8Array(payload: unknown): Uint8Array {
+  if (payload instanceof Uint8Array) {
+    return payload;
   }
-  return Object.keys(sample).filter(key => key.startsWith(BAND_KEY_PREFIX)).length;
+  if (payload instanceof ArrayBuffer) {
+    return new Uint8Array(payload);
+  }
+  if (Array.isArray(payload)) {
+    return Uint8Array.from(payload);
+  }
+  throw new Error('Unexpected binary payload from backend');
+}
+
+function decodeH3Binary(payload: unknown) {
+  const bytes = asUint8Array(payload);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = 0;
+  const bandCount = view.getUint32(offset, true);
+  offset += 4;
+  const cellCount = view.getUint32(offset, true);
+  offset += 4;
+
+  const cells = new Array(cellCount);
+  for (let index = 0; index < cellCount; index += 1) {
+    const hexLength = view.getUint16(offset, true);
+    offset += 2;
+    const hexBytes = bytes.subarray(offset, offset + hexLength);
+    offset += hexLength;
+    const hex = textDecoder.decode(hexBytes);
+    const cell: Record<string, any> = { hex };
+
+    for (let band = 0; band < bandCount; band += 1) {
+      const value = view.getFloat64(offset, true);
+      offset += 8;
+      if (Number.isFinite(value)) {
+        cell[`${BAND_KEY_PREFIX}${band}`] = value;
+      }
+    }
+
+    cells[index] = cell;
+  }
+
+  return { bandCount, cells };
 }
 
 const COUNTRIES_BORDERS_URL = '/countries.geojson';
-const VIEW_PADDING = 64;
 
-function getBoundsFromH3Cells(cells: any[]) {
-  const bounds = {
-    west: Number.POSITIVE_INFINITY,
-    south: Number.POSITIVE_INFINITY,
-    east: Number.NEGATIVE_INFINITY,
-    north: Number.NEGATIVE_INFINITY
-  };
 
-  for (const cell of cells) {
-    const boundary = cellToBoundary(cell.hex, true);
 
-    for (const [longitude, latitude] of boundary) {
-      bounds.west = Math.min(bounds.west, longitude);
-      bounds.south = Math.min(bounds.south, latitude);
-      bounds.east = Math.max(bounds.east, longitude);
-      bounds.north = Math.max(bounds.north, latitude);
-    }
-  }
-
-  if (!Number.isFinite(bounds.west)) {
-    return [[-180, -90], [180, 90]];
-  }
-
-  return [
-    [bounds.west, bounds.south],
-    [bounds.east, bounds.north]
-  ];
-}
-
-function getInitialViewState(bounds: number[][]) {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const viewport = new WebMercatorViewport({ width, height });
-  const { longitude, latitude, zoom } = viewport.fitBounds(bounds as any, {
-    padding: VIEW_PADDING,
-    maxZoom: 20
-  });
-
-  return {
-    longitude,
-    latitude,
-    zoom,
-    maxZoom: 20,
-    pitch: 30,
-    bearing: 0
-  };
-}
 
 const earthMaskLayer = new GeoJsonLayer({
   id: 'EarthMaskLayer',
@@ -109,6 +102,8 @@ function App() {
   const [levels, setLevels] = useState<number[]>([]);
   const [level, setLevel] = useState<number | null>(null);
   const [cells, setCells] = useState<any[]>([]);
+  const timeoutRef = useRef<number | null>(null);
+  const [bandCount, setBandCount] = useState(0);
   const [viewState, setViewState] = useState({
     longitude: 0,
     latitude: 0,
@@ -117,8 +112,6 @@ function App() {
     pitch: 30,
     bearing: 0
   });
-  const [loading, setLoading] = useState(false);
-  const [loadingLevels, setLoadingLevels] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const resolveDefaultLevel = (availableLevels: number[]) => {
@@ -130,7 +123,6 @@ function App() {
   };
 
   const fetchLevels = async () => {
-    setLoadingLevels(true);
     try {
       const storeLevels: number[] = await invoke('get_h3_levels', { store: storePath });
       const sortedLevels = [...storeLevels].sort((a, b) => a - b);
@@ -148,8 +140,6 @@ function App() {
       setLevels([]);
       setLevel(null);
       return [];
-    } finally {
-      setLoadingLevels(false);
     }
   };
 
@@ -157,37 +147,62 @@ function App() {
     fetchLevels();
   }, [storePath]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const resolveLevelForZoom = (zoom: number, availableLevels: number[]) => {
+    if (availableLevels.length === 0) return null;
+    const target = Math.max(0, Math.floor(zoom));
+    let best = availableLevels[0];
+    for (const lvl of availableLevels) {
+      if (lvl <= target) {
+        best = lvl;
+      }
+    }
+    return best;
+  };
+
+  const loadDataForCurrentView = async () => {
+    if (levels.length === 0) return;
     setError(null);
     try {
-      let resolvedLevel = level;
-      if (resolvedLevel === null) {
-        const availableLevels = await fetchLevels();
-        resolvedLevel = resolveDefaultLevel(availableLevels);
-      }
+      const resolvedLevel = resolveLevelForZoom(viewState.zoom, levels);
       if (resolvedLevel === null) {
         throw new Error('No levels found in the selected store');
       }
-      const data: any[] = await invoke('get_h3_data', { store: storePath, level: resolvedLevel });
-      setCells(data);
-      if (data.length > 0) {
-        const bounds = getBoundsFromH3Cells(data);
-        setViewState(getInitialViewState(bounds));
-      }
+
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const viewport = new WebMercatorViewport({ ...viewState, width, height });
+      const bounds = viewport.getBounds();
+
+      const payload = await invoke('get_h3_data_binary', { 
+        store: storePath, 
+        level: resolvedLevel,
+        bbox: [bounds[0], bounds[1], bounds[2], bounds[3]]
+      });
+      const { cells: decodedCells, bandCount: decodedBandCount } = decodeH3Binary(payload);
+      setCells(decodedCells);
+      setBandCount(decodedBandCount);
+      setLevel(resolvedLevel);
     } catch (err: any) {
       console.error(err);
       setError(err.toString());
-    } finally {
-      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (storePath && levels.length > 0) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = window.setTimeout(() => {
+        loadDataForCurrentView();
+      }, 500);
+    }
+  }, [viewState, levels, storePath]);
 
   const layers = useMemo(() => {
     const layerList: any[] = [countriesBordersLayer, earthMaskLayer];
 
     if (cells.length > 0) {
-      const bandCount = getBandCount(cells[0]);
       const useElevation = bandCount === 1;
 
       const h3Layer = new H3HexagonLayer({
@@ -216,6 +231,7 @@ function App() {
       <DeckGL
         views={new GlobeView({ id: 'globe' })}
         initialViewState={viewState}
+        onViewStateChange={({ viewState }: any) => setViewState(viewState as any)}
         controller={true}
         layers={layers}
         getTooltip={({ object }: any) => object && `${object.hex}`}
@@ -233,25 +249,13 @@ function App() {
           />
         </div>
         <div className="input-group">
-          <label>Level</label>
-          <select
-            value={level ?? ''}
-            onChange={(e) => setLevel(e.target.value === '' ? null : Number(e.target.value))}
-            disabled={loadingLevels || levels.length === 0}
-          >
-            <option value="" disabled>
-              {loadingLevels ? 'Detecting...' : levels.length === 0 ? 'Unavailable' : 'Select level'}
-            </option>
-            {levels.map((lvl) => (
-              <option key={lvl} value={lvl}>
-                {lvl}
-              </option>
-            ))}
-          </select>
+          <label>Level (Auto)</label>
+          <input 
+            type="text" 
+            value={level !== null ? level : ''} 
+            disabled 
+          />
         </div>
-        <button onClick={loadData} disabled={loading}>
-          {loading ? 'Loading...' : 'Load Data'}
-        </button>
         {error && <div className="error">{error}</div>}
       </div>
     </div>

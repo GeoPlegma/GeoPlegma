@@ -191,9 +191,17 @@ fn format_bucket_value(v: f64) -> String {
 }
 
 fn write_band_stats(f: &mut fmt::Formatter<'_>, band: &BandStats) -> fmt::Result {
-    writeln!(f, "  ── Band {} ({}) ─────────────────────────────────", band.band_index, band.dtype_name)?;
+    writeln!(
+        f,
+        "  ── Band {} ({}) ─────────────────────────────────",
+        band.band_index, band.dtype_name
+    )?;
     writeln!(f)?;
-    writeln!(f, "    Total cells    : {:>12}", format_count(band.total_cells))?;
+    writeln!(
+        f,
+        "    Total cells    : {:>12}",
+        format_count(band.total_cells)
+    )?;
     writeln!(
         f,
         "    Valued cells   : {:>12}  ({:.1}%)",
@@ -209,10 +217,26 @@ fn write_band_stats(f: &mut fmt::Formatter<'_>, band: &BandStats) -> fmt::Result
     writeln!(f)?;
 
     if band.valued_cells > 0 {
-        writeln!(f, "    Min            : {:>12}", format_stat_value(band.min))?;
-        writeln!(f, "    Max            : {:>12}", format_stat_value(band.max))?;
-        writeln!(f, "    Mean           : {:>12}", format_stat_value(band.mean()))?;
-        writeln!(f, "    Std dev        : {:>12}", format_stat_value(band.stddev()))?;
+        writeln!(
+            f,
+            "    Min            : {:>12}",
+            format_stat_value(band.min)
+        )?;
+        writeln!(
+            f,
+            "    Max            : {:>12}",
+            format_stat_value(band.max)
+        )?;
+        writeln!(
+            f,
+            "    Mean           : {:>12}",
+            format_stat_value(band.mean())
+        )?;
+        writeln!(
+            f,
+            "    Std dev        : {:>12}",
+            format_stat_value(band.stddev())
+        )?;
         writeln!(f)?;
     } else {
         writeln!(f, "    (no valued cells)")?;
@@ -225,9 +249,18 @@ fn write_band_stats(f: &mut fmt::Formatter<'_>, band: &BandStats) -> fmt::Result
 impl fmt::Display for SourceRasterReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f)?;
-        writeln!(f, "╔══════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║             Source GeoTIFF Statistics Report            ║")?;
-        writeln!(f, "╚══════════════════════════════════════════════════════════╝")?;
+        writeln!(
+            f,
+            "╔══════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║             Source GeoTIFF Statistics Report            ║"
+        )?;
+        writeln!(
+            f,
+            "╚══════════════════════════════════════════════════════════╝"
+        )?;
         writeln!(f)?;
         writeln!(f, "  Dimensions     : {} × {} px", self.width, self.height)?;
         writeln!(f, "  Total pixels   : {}", format_count(self.total_pixels))?;
@@ -245,9 +278,18 @@ impl fmt::Display for SourceRasterReport {
 impl fmt::Display for ConversionReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f)?;
-        writeln!(f, "╔══════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║              Conversion Statistics Report               ║")?;
-        writeln!(f, "╚══════════════════════════════════════════════════════════╝")?;
+        writeln!(
+            f,
+            "╔══════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║              Conversion Statistics Report               ║"
+        )?;
+        writeln!(
+            f,
+            "╚══════════════════════════════════════════════════════════╝"
+        )?;
         writeln!(f)?;
         writeln!(f, "  Refinement level : {}", self.refinement_level)?;
         writeln!(f, "  Chunk level      : {}", self.chunk_level)?;

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use geoplegma::types::{DggrsUid, Point, RefinementLevel};
 use gp_encoding::{
-    convert_geotiff_file_to_backend, format_value, query_value_for_point,
-    Compression, StorageBackend, ZarrBackend,
+    Compression, StorageBackend, ZarrBackend, convert_geotiff_file_to_backend, format_value,
+    query_value_for_point,
 };
 
 #[derive(Parser, Debug)]
@@ -221,4 +221,3 @@ fn run_add_level(args: AddLevelArgs) -> Result<(), String> {
 
     Ok(())
 }
-

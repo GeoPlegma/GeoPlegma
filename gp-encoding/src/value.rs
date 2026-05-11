@@ -64,23 +64,24 @@ pub fn decode_value_to_f64(dtype: &DataType, bytes: &[u8]) -> Result<f64, Encodi
 pub fn parse_fill_value_to_f64(dtype: &DataType, fill_value: &str) -> Result<f64, EncodingError> {
     let trimmed = fill_value.trim();
     match dtype {
-        DataType::Float32 | DataType::Float64 => trimmed.parse::<f64>().map_err(|e| {
-            EncodingError::Storage(format!("invalid fill value '{fill_value}': {e}"))
-        }),
-        DataType::Int8 => parse_i64_in_range(trimmed, i8::MIN as i64, i8::MAX as i64)
-            .map(|value| value as f64),
-        DataType::Int16 => parse_i64_in_range(trimmed, i16::MIN as i64, i16::MAX as i64)
-            .map(|value| value as f64),
-        DataType::Int32 => parse_i64_in_range(trimmed, i32::MIN as i64, i32::MAX as i64)
-            .map(|value| value as f64),
-        DataType::Int64 => parse_i64_in_range(trimmed, i64::MIN, i64::MAX)
-            .map(|value| value as f64),
-        DataType::UInt8 => parse_u64_in_range(trimmed, u8::MAX as u64)
-            .map(|value| value as f64),
-        DataType::UInt16 => parse_u64_in_range(trimmed, u16::MAX as u64)
-            .map(|value| value as f64),
-        DataType::UInt32 => parse_u64_in_range(trimmed, u32::MAX as u64)
-            .map(|value| value as f64),
+        DataType::Float32 | DataType::Float64 => trimmed
+            .parse::<f64>()
+            .map_err(|e| EncodingError::Storage(format!("invalid fill value '{fill_value}': {e}"))),
+        DataType::Int8 => {
+            parse_i64_in_range(trimmed, i8::MIN as i64, i8::MAX as i64).map(|value| value as f64)
+        }
+        DataType::Int16 => {
+            parse_i64_in_range(trimmed, i16::MIN as i64, i16::MAX as i64).map(|value| value as f64)
+        }
+        DataType::Int32 => {
+            parse_i64_in_range(trimmed, i32::MIN as i64, i32::MAX as i64).map(|value| value as f64)
+        }
+        DataType::Int64 => {
+            parse_i64_in_range(trimmed, i64::MIN, i64::MAX).map(|value| value as f64)
+        }
+        DataType::UInt8 => parse_u64_in_range(trimmed, u8::MAX as u64).map(|value| value as f64),
+        DataType::UInt16 => parse_u64_in_range(trimmed, u16::MAX as u64).map(|value| value as f64),
+        DataType::UInt32 => parse_u64_in_range(trimmed, u32::MAX as u64).map(|value| value as f64),
         DataType::UInt64 => parse_u64_in_range(trimmed, u64::MAX).map(|value| value as f64),
     }
 }
@@ -99,7 +100,9 @@ pub fn encode_value_from_f64(dtype: &DataType, value: f64) -> Result<Vec<u8>, En
             .to_ne_bytes()
             .to_vec(),
         DataType::Int64 => clamp_i64(value, i64::MIN, i64::MAX).to_ne_bytes().to_vec(),
-        DataType::UInt8 => (clamp_u64(value, u8::MAX as u64) as u8).to_ne_bytes().to_vec(),
+        DataType::UInt8 => (clamp_u64(value, u8::MAX as u64) as u8)
+            .to_ne_bytes()
+            .to_vec(),
         DataType::UInt16 => (clamp_u64(value, u16::MAX as u64) as u16)
             .to_ne_bytes()
             .to_vec(),
@@ -111,7 +114,10 @@ pub fn encode_value_from_f64(dtype: &DataType, value: f64) -> Result<Vec<u8>, En
     Ok(bytes)
 }
 
-pub fn parse_fill_value_to_json(dtype: &DataType, fill_value: &str) -> Result<Value, EncodingError> {
+pub fn parse_fill_value_to_json(
+    dtype: &DataType,
+    fill_value: &str,
+) -> Result<Value, EncodingError> {
     let trimmed = fill_value.trim();
     match dtype {
         DataType::Float32 | DataType::Float64 => {
@@ -119,7 +125,9 @@ pub fn parse_fill_value_to_json(dtype: &DataType, fill_value: &str) -> Result<Va
                 EncodingError::Storage(format!("invalid fill value '{fill_value}': {e}"))
             })?;
             Number::from_f64(value).map(Value::Number).ok_or_else(|| {
-                EncodingError::Storage(format!("cannot represent fill value {value} as JSON number"))
+                EncodingError::Storage(format!(
+                    "cannot represent fill value {value} as JSON number"
+                ))
             })
         }
         DataType::Int8 => parse_i64_in_range(trimmed, i8::MIN as i64, i8::MAX as i64)
@@ -128,16 +136,21 @@ pub fn parse_fill_value_to_json(dtype: &DataType, fill_value: &str) -> Result<Va
             .map(|value| Value::Number(value.into())),
         DataType::Int32 => parse_i64_in_range(trimmed, i32::MIN as i64, i32::MAX as i64)
             .map(|value| Value::Number(value.into())),
-        DataType::Int64 => parse_i64_in_range(trimmed, i64::MIN, i64::MAX)
-            .map(|value| Value::Number(value.into())),
-        DataType::UInt8 => parse_u64_in_range(trimmed, u8::MAX as u64)
-            .map(|value| Value::Number(value.into())),
-        DataType::UInt16 => parse_u64_in_range(trimmed, u16::MAX as u64)
-            .map(|value| Value::Number(value.into())),
-        DataType::UInt32 => parse_u64_in_range(trimmed, u32::MAX as u64)
-            .map(|value| Value::Number(value.into())),
-        DataType::UInt64 => parse_u64_in_range(trimmed, u64::MAX)
-            .map(|value| Value::Number(value.into())),
+        DataType::Int64 => {
+            parse_i64_in_range(trimmed, i64::MIN, i64::MAX).map(|value| Value::Number(value.into()))
+        }
+        DataType::UInt8 => {
+            parse_u64_in_range(trimmed, u8::MAX as u64).map(|value| Value::Number(value.into()))
+        }
+        DataType::UInt16 => {
+            parse_u64_in_range(trimmed, u16::MAX as u64).map(|value| Value::Number(value.into()))
+        }
+        DataType::UInt32 => {
+            parse_u64_in_range(trimmed, u32::MAX as u64).map(|value| Value::Number(value.into()))
+        }
+        DataType::UInt64 => {
+            parse_u64_in_range(trimmed, u64::MAX).map(|value| Value::Number(value.into()))
+        }
     }
 }
 

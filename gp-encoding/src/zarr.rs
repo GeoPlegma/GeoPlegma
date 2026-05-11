@@ -1,20 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use geoplegma::get;
 use geoplegma::types::{RefinementLevel, RelativeDepth, ZoneId};
-use zarrs::array::{Array, ArrayBuilder, ArrayBytes};
 use zarrs::array::codec::api::BytesToBytesCodecTraits;
 use zarrs::array::codec::{GzipCodec, ZstdCodec};
+use zarrs::array::{Array, ArrayBuilder, ArrayBytes};
 use zarrs::group::{Group, GroupBuilder};
 use zarrs_filesystem::FilesystemStore;
 
 use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
-use crate::storage::{compute_chunk_depth, LevelHandle, StorageBackend};
+use crate::storage::{LevelHandle, StorageBackend, compute_chunk_depth};
 use crate::value::{decode_value_to_f64, encode_value_from_f64, parse_fill_value_to_f64};
 use serde_json::json;
 
@@ -54,9 +54,8 @@ impl ZarrBackend {
 
         match config {
             Compression::Gzip => {
-                let codec: Arc<dyn BytesToBytesCodecTraits> = Arc::new(
-                    GzipCodec::new(6).map_err(|e| EncodingError::Zarr(e.to_string()))?,
-                );
+                let codec: Arc<dyn BytesToBytesCodecTraits> =
+                    Arc::new(GzipCodec::new(6).map_err(|e| EncodingError::Zarr(e.to_string()))?);
                 Ok(Some(vec![codec]))
             }
             Compression::Zstd => {
@@ -173,8 +172,8 @@ impl ZarrBackend {
         level: u32,
     ) -> Result<Vec<String>, EncodingError> {
         let group_path = Self::level_group_path(level);
-        let group =
-            Group::open(store.clone(), &group_path).map_err(|e| EncodingError::Zarr(e.to_string()))?;
+        let group = Group::open(store.clone(), &group_path)
+            .map_err(|e| EncodingError::Zarr(e.to_string()))?;
 
         let attrs = group.attributes();
         let value = attrs.get("chunk_ids").ok_or_else(|| {
@@ -215,12 +214,10 @@ impl ZarrBackend {
             ));
         }
 
-        let source_level_i32 = i32::try_from(source_level).map_err(|_| {
-            EncodingError::Storage(format!("level {source_level} cannot fit i32"))
-        })?;
-        let target_level_i32 = i32::try_from(target_level).map_err(|_| {
-            EncodingError::Storage(format!("level {target_level} cannot fit i32"))
-        })?;
+        let source_level_i32 = i32::try_from(source_level)
+            .map_err(|_| EncodingError::Storage(format!("level {source_level} cannot fit i32")))?;
+        let target_level_i32 = i32::try_from(target_level)
+            .map_err(|_| EncodingError::Storage(format!("level {target_level} cannot fit i32")))?;
 
         let aperture = u64::from(self.metadata.dggrs.spec().aperture);
         let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
@@ -283,7 +280,8 @@ impl ZarrBackend {
         let band_count = self.band_count() as usize;
 
         let mut cell_index_map: HashMap<String, (usize, usize)> = HashMap::new();
-        let mut accumulators: Vec<Vec<BandAccumulator>> = Vec::with_capacity(target_chunk_ids.len());
+        let mut accumulators: Vec<Vec<BandAccumulator>> =
+            Vec::with_capacity(target_chunk_ids.len());
 
         for (chunk_index, chunk_id) in target_chunk_ids.iter().enumerate() {
             let chunk_zone_id = ZoneId::from_str(chunk_id).map_err(|e| {
@@ -314,7 +312,8 @@ impl ZarrBackend {
             accumulators.push(band_accumulators);
         }
 
-        let source_relative_depth = RelativeDepth::new(source_level_i32 - source_chunk_level.get())?;
+        let source_relative_depth =
+            RelativeDepth::new(source_level_i32 - source_chunk_level.get())?;
         let level_steps = source_level_i32 - target_level_i32;
         let fill_values: Vec<Option<f64>> = self
             .metadata
