@@ -9,7 +9,7 @@
 
 use geo::Point;
 use gp_proj::projections::{
-    polyhedron::{icosahedron, Orientation},
+    polyhedron::{Orientation, icosahedron},
     projections::{traits::Projection, vgc::Vgc},
 };
 
@@ -47,7 +47,6 @@ pub fn main() -> () {
             p.coords.y
         );
     }
-
     let distortion = projection.compute_distortion(38.68499, -9.49420, &icosahedron);
     println!("h: {} (expected: 0.7580403)", distortion.h);
     println!("k: {} (expected: 1.333174)", distortion.k);
@@ -57,3 +56,6 @@ pub fn main() -> () {
     );
     println!("Areal scale: {} (expected: ~1.0)", distortion.areal_scale);
 }
+
+
+
