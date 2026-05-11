@@ -34,6 +34,10 @@ pub fn main() -> () {
 
     let projection = Vgc;
     let icosahedron = icosahedron::new(Orientation::DGGS_OPTIMAL);
+    
+    for (i, p) in icosahedron.vertices().iter().enumerate() {
+        println!("{:?}", (p.x, p.y, p.z));
+    }
 
     let coords = projection.geo_to_cartesian(points.to_vec(), Some(&icosahedron), None);
 
