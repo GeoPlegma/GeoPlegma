@@ -234,11 +234,20 @@ function App() {
         </div>
         <div className="input-group">
           <label>Level</label>
-          <input
-            type="text"
-            value={loadingLevels ? 'Detecting...' : level ?? 'Unavailable'}
-            readOnly
-          />
+          <select
+            value={level ?? ''}
+            onChange={(e) => setLevel(e.target.value === '' ? null : Number(e.target.value))}
+            disabled={loadingLevels || levels.length === 0}
+          >
+            <option value="" disabled>
+              {loadingLevels ? 'Detecting...' : levels.length === 0 ? 'Unavailable' : 'Select level'}
+            </option>
+            {levels.map((lvl) => (
+              <option key={lvl} value={lvl}>
+                {lvl}
+              </option>
+            ))}
+          </select>
         </div>
         <button onClick={loadData} disabled={loading}>
           {loading ? 'Loading...' : 'Load Data'}

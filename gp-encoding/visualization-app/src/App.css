@@ -38,7 +38,8 @@ body {
   color: #ccc;
 }
 
-.input-group input {
+.input-group input,
+.input-group select {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid #444;
@@ -46,6 +47,32 @@ body {
   color: #fff;
   border-radius: 4px;
   box-sizing: border-box;
+}
+
+.input-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #bbb 50%),
+    linear-gradient(135deg, #bbb 50%, transparent 50%),
+    linear-gradient(#222, #222);
+  background-position:
+    calc(100% - 18px) calc(50% + 2px),
+    calc(100% - 12px) calc(50% + 2px),
+    calc(100% - 2.5rem) 50%;
+  background-size: 6px 6px, 6px 6px, 1px 60%;
+  background-repeat: no-repeat;
+  padding-right: 2.5rem;
+}
+
+.input-group select option {
+  background: #222;
+  color: #fff;
+}
+
+.input-group select:disabled {
+  color: #777;
 }
 
 button {
