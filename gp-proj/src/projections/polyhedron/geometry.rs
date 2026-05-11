@@ -39,3 +39,25 @@ pub struct ArcLengths {
     pub bp: f64,
     pub cp: f64,
 }
+
+/// Orientation of a polyhedron on the unit sphere, expressed as the geographic
+/// position (in degrees) where vertex 0 is placed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Orientation {
+    pub lat_deg: f64,
+    pub lon_deg: f64,
+}
+
+impl Orientation {
+    pub fn new(lat_deg: f64, lon_deg: f64) -> Self {
+        Self { lat_deg, lon_deg }
+    }
+
+    /// Vertex 0 at the geographic north pole — the canonical mathematical orientation.
+    pub const POLAR: Self = Self { lat_deg: 90.0, lon_deg: 0.0 };
+
+    /// DGGS-optimal orientation: vertex 0 at 58.397145907431°N 11.20°E (over the ocean).
+    /// Avoids placing singularities over populated land and minimises distortion for
+    /// land-based queries.
+    pub const DGGS_OPTIMAL: Self = Self { lat_deg: 58.397145907431, lon_deg: 11.20 };
+}
