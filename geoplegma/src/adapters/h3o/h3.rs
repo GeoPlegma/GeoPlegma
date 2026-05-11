@@ -12,8 +12,8 @@ use crate::adapters::h3o::h3o::H3oAdapter;
 use crate::api::{DggrsApi, DggrsApiConfig};
 use crate::error::DggrsError;
 use crate::error::h3o::H3oError;
-use crate::types::{DggrsUid, RefinementLevel, RelativeDepth, ZoneId, Zones};
-use geo::{Point, Rect};
+use crate::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth, ZoneId, Zones};
+use geo::{Rect, coord};
 use h3o::geom::{ContainmentMode, TilerBuilder};
 use h3o::{CellIndex, LatLng};
 use std::str::FromStr;
@@ -45,7 +45,7 @@ impl DggrsApi for H3Impl {
     fn zones_from_bbox(
         &self,
         refinement_level: RefinementLevel,
-        bbox: Option<Rect<f64>>,
+        bbox: Option<BoundingBox>,
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
@@ -57,7 +57,11 @@ impl DggrsApi for H3Impl {
 
         if let Some(b) = bbox {
             // NOTE: adapt resolution dynamically based on bbox size & depth
-            let _ = tiler.add(b.to_polygon());
+            let rect = Rect::new(
+                coord! { x: b.min_lon, y: b.min_lat },
+                coord! { x: b.max_lon, y: b.max_lat },
+            );
+            let _ = tiler.add(rect.to_polygon());
             h3o_zones = tiler.into_coverage().collect::<Vec<_>>();
         } else {
             if refinement_level > self.max_refinement_level()? {
@@ -81,7 +85,7 @@ impl DggrsApi for H3Impl {
         config: Option<DggrsApiConfig>,
     ) -> Result<Zones, DggrsError> {
         let cfg = config.unwrap_or_default();
-        let coord = LatLng::new(point.x(), point.y()).expect("valid coord");
+        let coord = LatLng::new(point.lat, point.lon).expect("valid coord");
 
         let h3o_zone = coord.to_cell(refinement_level_to_h3_resolution(refinement_level)?);
 
