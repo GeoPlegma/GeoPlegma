@@ -180,13 +180,13 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
 
     for level in levels {
         let num_chunks = backend.num_chunks(level).map_err(|e| e.to_string())?;
-        let chunk_ids = backend
+        let (_, chunk_ids) = backend
             .chunk_ids_for_level(level)
-            .map_err(|e| e.to_string())?
-            .len();
+            .map_err(|e| e.to_string())?;
+        let chunk_ids_len = chunk_ids.len();
         println!("\nLevel {level}");
         println!("  Logical chunk count: {num_chunks}");
-        println!("  Stored chunk IDs   : {chunk_ids}");
+        println!("  Stored chunk IDs   : {chunk_ids_len}");
 
         for band in 0..band_count {
             let dtype = &metadata.attributes[band as usize].dtype;

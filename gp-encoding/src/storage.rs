@@ -18,6 +18,7 @@ pub trait StorageBackend: Sized + Send + Sync {
         level: u32,
         band: u32,
         num_cells: u64,
+        chunk_size: u64,
     ) -> Result<Self::Level, EncodingError>;
 
     fn levels(&self) -> Vec<u32>;
@@ -36,36 +37,13 @@ pub trait StorageBackend: Sized + Send + Sync {
 
     fn num_chunks(&self, level: u32) -> Result<u64, EncodingError>;
 
-    fn chunk_ids_for_level(&self, level: u32) -> Result<Vec<String>, EncodingError>;
+    fn chunk_ids_for_level(&self, level: u32) -> Result<(u32, Vec<String>), EncodingError>;
 
     fn set_level_chunk_ids(
         &mut self,
         level: u32,
+        chunk_level: u32,
         chunk_ids: Vec<String>,
     ) -> Result<(), EncodingError>;
 }
 
-pub fn compute_chunk_depth(chunk_size: u64, aperture: u64) -> Result<i32, EncodingError> {
-    if aperture <= 1 {
-        return Err(EncodingError::Storage(format!(
-            "invalid DGGS aperture {aperture} for chunk resolution"
-        )));
-    }
-
-    let mut depth_i32 = 0_i32;
-    let mut size_check = 1_u64;
-    while size_check < chunk_size {
-        size_check = size_check.checked_mul(aperture).ok_or_else(|| {
-            EncodingError::Storage("chunk_size power computation overflow".into())
-        })?;
-        depth_i32 += 1;
-    }
-
-    if size_check != chunk_size {
-        return Err(EncodingError::Storage(format!(
-            "chunk_size {chunk_size} is not a power of aperture {aperture}"
-        )));
-    }
-
-    Ok(depth_i32)
-}

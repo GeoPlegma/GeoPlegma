@@ -5,16 +5,17 @@ use std::sync::Arc;
 
 use geoplegma::get;
 use geoplegma::types::{RefinementLevel, RelativeDepth, ZoneId};
+use indicatif::{ProgressBar, ProgressStyle};
 use zarrs::array::codec::api::BytesToBytesCodecTraits;
 use zarrs::array::codec::{GzipCodec, ZstdCodec};
 use zarrs::array::{Array, ArrayBuilder, ArrayBytes};
 use zarrs::group::{Group, GroupBuilder};
 use zarrs_filesystem::FilesystemStore;
 
-use crate::common::CONFIG;
+use crate::common::ID_ONLY_CONFIG;
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
-use crate::storage::{LevelHandle, StorageBackend, compute_chunk_depth};
+use crate::storage::{LevelHandle, StorageBackend};
 use crate::value::{decode_value_to_f64, encode_value_from_f64, parse_fill_value_to_f64};
 use serde_json::json;
 
@@ -149,9 +150,11 @@ impl ZarrBackend {
     fn write_level_chunk_ids(
         store: &Arc<FilesystemStore>,
         level: u32,
+        chunk_level: u32,
         chunk_ids: &[String],
     ) -> Result<(), EncodingError> {
         let mut attributes = serde_json::Map::new();
+        attributes.insert("chunk_level".to_string(), json!(chunk_level));
         attributes.insert("chunk_ids".to_string(), json!(chunk_ids));
 
         let group_path = Self::level_group_path(level);
@@ -170,18 +173,24 @@ impl ZarrBackend {
     fn read_level_chunk_ids(
         store: &Arc<FilesystemStore>,
         level: u32,
-    ) -> Result<Vec<String>, EncodingError> {
+    ) -> Result<(u32, Vec<String>), EncodingError> {
         let group_path = Self::level_group_path(level);
         let group = Group::open(store.clone(), &group_path)
             .map_err(|e| EncodingError::Zarr(e.to_string()))?;
 
         let attrs = group.attributes();
+        
+        let level_val = attrs.get("chunk_level").ok_or_else(|| {
+            EncodingError::Zarr(format!("missing 'chunk_level' attribute for level {level}"))
+        })?;
+        let chunk_level: u32 = serde_json::from_value(level_val.clone())?;
+
         let value = attrs.get("chunk_ids").ok_or_else(|| {
             EncodingError::Zarr(format!("missing 'chunk_ids' attribute for level {level}"))
         })?;
 
         let chunk_ids: Vec<String> = serde_json::from_value(value.clone())?;
-        Ok(chunk_ids)
+        Ok((chunk_level, chunk_ids))
     }
 
     pub fn add_level_from_existing(
@@ -219,25 +228,24 @@ impl ZarrBackend {
         let target_level_i32 = i32::try_from(target_level)
             .map_err(|_| EncodingError::Storage(format!("level {target_level} cannot fit i32")))?;
 
+        let (source_chunk_level_u32, source_chunk_ids) = Self::read_level_chunk_ids(&self.store, source_level)?;
+        let source_chunk_level = RefinementLevel::new(source_chunk_level_u32 as i32)?;
+        
+        let grid = get(self.metadata.dggrs)
+            .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
+
+        let min_chunk_level = grid.min_refinement_level().map_err(|e| EncodingError::Grid(e.to_string()))?;
+        let max_relative_depth_allowed = grid.max_relative_depth().map_err(|e| EncodingError::Grid(e.to_string()))?;
         let aperture = u64::from(self.metadata.dggrs.spec().aperture);
-        let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
+        let data_type_size_bytes = self.metadata.attributes.first().map(|a| a.dtype.byte_size()).unwrap_or(1);
 
-        if source_level_i32 < chunk_depth || target_level_i32 < chunk_depth {
-            return Err(EncodingError::Storage(format!(
-                "levels must be >= chunk depth {chunk_depth}"
-            )));
-        }
-
-        let source_chunk_level = RefinementLevel::new(source_level_i32 - chunk_depth)?;
-        let target_chunk_level = RefinementLevel::new(target_level_i32 - chunk_depth)?;
-
-        if target_chunk_level.get() > source_chunk_level.get() {
-            return Err(EncodingError::Storage(
-                "target chunk level cannot be finer than source chunk level".into(),
-            ));
-        }
-
-        let source_chunk_ids = Self::read_level_chunk_ids(&self.store, source_level)?;
+        let (target_chunk_level, chunk_size) = crate::geotiff_convert::choose_best_chunk_level_and_size(
+            RefinementLevel::new(target_level_i32)?,
+            min_chunk_level,
+            max_relative_depth_allowed,
+            aperture,
+            data_type_size_bytes,
+        )?;
 
         if source_chunk_ids.is_empty() {
             return Err(EncodingError::Storage(
@@ -245,11 +253,16 @@ impl ZarrBackend {
             ));
         }
 
-        let grid = get(self.metadata.dggrs)
-            .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
-
         let chunk_level_steps = source_chunk_level.get() - target_chunk_level.get();
         let mut target_chunk_set = BTreeSet::new();
+
+        let map_progress = ProgressBar::new(source_chunk_ids.len() as u64);
+        let map_style = ProgressStyle::with_template(
+            "mapping chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+        )
+        .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+        .progress_chars("=> ");
+        map_progress.set_style(map_style);
 
         for chunk_id in source_chunk_ids.iter() {
             let mut zone_id = ZoneId::from_str(chunk_id.as_str()).map_err(|e| {
@@ -258,7 +271,7 @@ impl ZarrBackend {
 
             for _ in 0..chunk_level_steps {
                 let parent = grid
-                    .primary_parent_from_zone(zone_id, Some(CONFIG))
+                    .primary_parent_from_zone(zone_id, Some(ID_ONLY_CONFIG))
                     .map_err(|e| EncodingError::Grid(e.to_string()))?;
                 let parent_zone = parent.zones.first().ok_or_else(|| {
                     EncodingError::Grid("primary_parent_from_zone returned no zones".into())
@@ -267,7 +280,9 @@ impl ZarrBackend {
             }
 
             target_chunk_set.insert(zone_id.to_string());
+            map_progress.inc(1);
         }
+        map_progress.finish_with_message("mapping chunks [done]");
 
         let target_chunk_ids: Vec<String> = target_chunk_set.into_iter().collect();
         if target_chunk_ids.is_empty() {
@@ -279,9 +294,17 @@ impl ZarrBackend {
         let relative_depth = RelativeDepth::new(target_level_i32 - target_chunk_level.get())?;
         let band_count = self.band_count() as usize;
 
-        let mut cell_index_map: HashMap<String, (usize, usize)> = HashMap::new();
+        let mut cell_index_map: HashMap<ZoneId, (usize, usize)> = HashMap::new();
         let mut accumulators: Vec<Vec<BandAccumulator>> =
             Vec::with_capacity(target_chunk_ids.len());
+
+        let init_progress = ProgressBar::new(target_chunk_ids.len() as u64);
+        let init_style = ProgressStyle::with_template(
+            "initializing target chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+        )
+        .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+        .progress_chars("=> ");
+        init_progress.set_style(init_style);
 
         for (chunk_index, chunk_id) in target_chunk_ids.iter().enumerate() {
             let chunk_zone_id = ZoneId::from_str(chunk_id).map_err(|e| {
@@ -289,7 +312,7 @@ impl ZarrBackend {
             })?;
 
             let children = grid
-                .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+                .zones_from_parent(relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
                 .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
             if children.zones.len() > chunk_size as usize {
@@ -306,11 +329,13 @@ impl ZarrBackend {
             }
 
             for (cell_index, zone) in children.zones.iter().enumerate() {
-                cell_index_map.insert(zone.id.to_string(), (chunk_index, cell_index));
+                cell_index_map.insert(zone.id.clone(), (chunk_index, cell_index));
             }
 
             accumulators.push(band_accumulators);
+            init_progress.inc(1);
         }
+        init_progress.finish_with_message("initializing target chunks [done]");
 
         let source_relative_depth =
             RelativeDepth::new(source_level_i32 - source_chunk_level.get())?;
@@ -327,13 +352,21 @@ impl ZarrBackend {
             })
             .collect::<Result<_, EncodingError>>()?;
 
+        let read_progress = ProgressBar::new(source_chunk_ids.len() as u64);
+        let read_style = ProgressStyle::with_template(
+            "reading source chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+        )
+        .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+        .progress_chars("=> ");
+        read_progress.set_style(read_style);
+
         for (chunk_index, chunk_id) in source_chunk_ids.iter().enumerate() {
             let chunk_zone_id = ZoneId::from_str(chunk_id.as_str()).map_err(|e| {
                 EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
             })?;
 
             let children = grid
-                .zones_from_parent(source_relative_depth, chunk_zone_id, Some(CONFIG))
+                .zones_from_parent(source_relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
                 .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
             let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
@@ -344,7 +377,7 @@ impl ZarrBackend {
                 let mut target_zone_id = zone.id.clone();
                 for _ in 0..level_steps {
                     let parent = grid
-                        .primary_parent_from_zone(target_zone_id, Some(CONFIG))
+                        .primary_parent_from_zone(target_zone_id, Some(ID_ONLY_CONFIG))
                         .map_err(|e| EncodingError::Grid(e.to_string()))?;
                     let parent_zone = parent.zones.first().ok_or_else(|| {
                         EncodingError::Grid("primary_parent_from_zone returned no zones".into())
@@ -352,9 +385,8 @@ impl ZarrBackend {
                     target_zone_id = parent_zone.id.clone();
                 }
 
-                let target_key = target_zone_id.to_string();
                 let Some((target_chunk_index, target_cell_index)) =
-                    cell_index_map.get(&target_key).copied()
+                    cell_index_map.get(&target_zone_id).copied()
                 else {
                     continue;
                 };
@@ -379,16 +411,18 @@ impl ZarrBackend {
                     accumulators[target_chunk_index][band].record(target_cell_index, value);
                 }
             }
+            read_progress.inc(1);
         }
+        read_progress.finish_with_message("reading source chunks [done]");
 
-        self.set_level_chunk_ids(target_level, target_chunk_ids.clone())?;
+        self.set_level_chunk_ids(target_level, target_chunk_level.get() as u32, target_chunk_ids.clone())?;
 
         let encoded_num_cells = (target_chunk_ids.len() as u64)
             .checked_mul(chunk_size)
             .ok_or_else(|| EncodingError::Storage("encoded cell count overflow".into()))?;
 
         for band in 0..band_count {
-            self.create_level(target_level, band as u32, encoded_num_cells)?;
+            self.create_level(target_level, band as u32, encoded_num_cells, chunk_size)?;
         }
 
         let fill_bytes: Vec<Vec<u8>> = self
@@ -403,6 +437,14 @@ impl ZarrBackend {
                 encode_value_from_f64(&attr.dtype, fill_value)
             })
             .collect::<Result<_, EncodingError>>()?;
+
+        let write_progress = ProgressBar::new(accumulators.len() as u64);
+        let write_style = ProgressStyle::with_template(
+            "writing target chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+        )
+        .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
+        .progress_chars("=> ");
+        write_progress.set_style(write_style);
 
         for (chunk_index, band_accumulators) in accumulators.iter().enumerate() {
             for (band, accumulator) in band_accumulators.iter().enumerate() {
@@ -420,7 +462,9 @@ impl ZarrBackend {
 
                 self.write_chunk(target_level, band as u32, chunk_index as u64, &bytes)?;
             }
+            write_progress.inc(1);
         }
+        write_progress.finish_with_message("writing target chunks [done]");
 
         self.metadata.levels.push(target_level);
         self.metadata.levels.sort_unstable();
@@ -516,10 +560,10 @@ impl StorageBackend for ZarrBackend {
         level: u32,
         band: u32,
         num_cells: u64,
+        chunk_size: u64,
     ) -> Result<ZarrLevel, EncodingError> {
         let path = Self::level_path(level, band);
         let dtype_str = self.primary_dtype_str();
-        let chunk_size = self.metadata.chunk_size;
 
         let mut array_builder = ArrayBuilder::new(
             vec![num_cells],  // array shape
@@ -594,19 +638,26 @@ impl StorageBackend for ZarrBackend {
             .level_map
             .get(&level)
             .ok_or_else(|| EncodingError::Zarr(format!("level {level} not found")))?;
-        let chunk_size = self.metadata.chunk_size;
+        
+        // Read chunk size from the first band's array metadata
+        let array = self.open_array(level, 0)?;
+        let chunk_size = array.chunk_shape(&[0])
+            .map_err(|e| EncodingError::Zarr(e.to_string()))?[0]
+            .get();
+        
         Ok(num_cells.div_ceil(chunk_size))
     }
 
-    fn chunk_ids_for_level(&self, level: u32) -> Result<Vec<String>, EncodingError> {
+    fn chunk_ids_for_level(&self, level: u32) -> Result<(u32, Vec<String>), EncodingError> {
         Self::read_level_chunk_ids(&self.store, level)
     }
 
     fn set_level_chunk_ids(
         &mut self,
         level: u32,
+        chunk_level: u32,
         chunk_ids: Vec<String>,
     ) -> Result<(), EncodingError> {
-        Self::write_level_chunk_ids(&self.store, level, &chunk_ids)
+        Self::write_level_chunk_ids(&self.store, level, chunk_level, &chunk_ids)
     }
 }

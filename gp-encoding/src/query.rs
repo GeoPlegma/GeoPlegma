@@ -8,9 +8,9 @@ use serde::Serialize;
 use serde::ser::{SerializeSeq, Serializer};
 use serde_json::Value;
 
-use crate::common::CONFIG;
+use crate::common::{CONFIG, ID_ONLY_CONFIG};
 use crate::error::EncodingError;
-use crate::storage::{StorageBackend, compute_chunk_depth};
+use crate::storage::StorageBackend;
 use crate::value::{
     decode_value_to_f64, decode_value_to_json, parse_fill_value_to_f64, parse_fill_value_to_json,
 };
@@ -36,7 +36,7 @@ pub fn query_value_for_point<B: StorageBackend>(
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
 
     let zones = grid
-        .zone_from_point(refinement_level, point, Some(CONFIG))
+        .zone_from_point(refinement_level, point, Some(ID_ONLY_CONFIG))
         .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
     let zone = zones
@@ -69,7 +69,7 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
     band: u32,
     zone_id: &ZoneId,
 ) -> Result<Vec<u8>, EncodingError> {
-    let chunk_ids = backend.chunk_ids_for_level(level)?;
+    let (chunk_level_u32, chunk_ids) = backend.chunk_ids_for_level(level)?;
     let cell_index = zone_id.to_string();
     let value_size = backend
         .metadata()
@@ -80,16 +80,6 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
             EncodingError::Storage("dataset metadata must define at least one attribute".into())
         })?;
 
-    let chunk_size = backend.metadata().chunk_size;
-    if chunk_size == 0 {
-        return Err(EncodingError::Storage(
-            "dataset metadata chunk_size must be greater than zero".into(),
-        ));
-    }
-
-    let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
-    let depth_i32 = compute_chunk_depth(chunk_size, aperture)?;
-
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
 
@@ -97,20 +87,21 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
         EncodingError::Grid(format!("level {level} cannot be represented as i32"))
     })?)?;
 
-    if refinement_level.get() < depth_i32 {
+    let chunk_level = RefinementLevel::new(chunk_level_u32 as i32)?;
+    let depth_i32 = refinement_level.get() - chunk_level.get();
+
+    if depth_i32 < 0 {
         return Err(EncodingError::Storage(format!(
-            "level {} is below derived chunk depth {}",
+            "level {} is below stored chunk level {}",
             refinement_level.get(),
-            depth_i32
+            chunk_level.get()
         )));
     }
-
-    let chunk_level = RefinementLevel::new(refinement_level.get() - depth_i32)?;
 
     let mut chunk_zone_id = zone_id.clone();
     for _ in 0..depth_i32 {
         let parent = grid
-            .primary_parent_from_zone(chunk_zone_id.clone(), Some(CONFIG))
+            .primary_parent_from_zone(chunk_zone_id.clone(), Some(ID_ONLY_CONFIG))
             .map_err(|e| EncodingError::Grid(e.to_string()))?;
         let parent_zone = parent.zones.first().ok_or_else(|| {
             EncodingError::Grid("primary_parent_from_zone returned no zones".into())
@@ -131,7 +122,7 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
 
     let relative_depth = RelativeDepth::new(refinement_level.get() - chunk_level.get())?;
     let children = grid
-        .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+        .zones_from_parent(relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
         .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
     let in_chunk_index = children
@@ -247,24 +238,21 @@ where
         ));
     }
 
-    let chunk_size = backend.metadata().chunk_size;
-    let chunk_ids = backend.chunk_ids_for_level(level)?;
-    let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
-    let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
+    let (chunk_level_u32, chunk_ids) = backend.chunk_ids_for_level(level)?;
     let target_level = RefinementLevel::new(
         i32::try_from(level)
             .map_err(|_| EncodingError::Storage(format!("level {level} cannot fit i32")))?,
     )?;
 
-    if target_level.get() < chunk_depth {
+    let chunk_level = RefinementLevel::new(chunk_level_u32 as i32)?;
+    if target_level.get() < chunk_level.get() {
         return Err(EncodingError::Storage(format!(
-            "level {} is below derived chunk depth {}",
+            "level {} is below stored chunk level {}",
             target_level.get(),
-            chunk_depth
+            chunk_level.get()
         )));
     }
 
-    let chunk_level = RefinementLevel::new(target_level.get() - chunk_depth)?;
     let relative_depth = RelativeDepth::new(target_level.get() - chunk_level.get())?;
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
@@ -298,7 +286,7 @@ where
             .map_err(|e| EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}")))?;
 
         let children = grid
-            .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+            .zones_from_parent(relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
             .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
         let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
@@ -375,24 +363,21 @@ where
         ));
     }
 
-    let chunk_size = backend.metadata().chunk_size;
-    let chunk_ids = backend.chunk_ids_for_level(level)?;
-    let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
-    let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
+    let (chunk_level_u32, chunk_ids) = backend.chunk_ids_for_level(level)?;
     let target_level = RefinementLevel::new(
         i32::try_from(level)
             .map_err(|_| EncodingError::Storage(format!("level {level} cannot fit i32")))?,
     )?;
 
-    if target_level.get() < chunk_depth {
+    let chunk_level = RefinementLevel::new(chunk_level_u32 as i32)?;
+    if target_level.get() < chunk_level.get() {
         return Err(EncodingError::Storage(format!(
-            "level {} is below derived chunk depth {}",
+            "level {} is below stored chunk level {}",
             target_level.get(),
-            chunk_depth
+            chunk_level.get()
         )));
     }
 
-    let chunk_level = RefinementLevel::new(target_level.get() - chunk_depth)?;
     let relative_depth = RelativeDepth::new(target_level.get() - chunk_level.get())?;
     let grid = get(backend.metadata().dggrs)
         .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
@@ -510,7 +495,7 @@ mod tests {
     use geoplegma::get;
     use geoplegma::types::{DggrsUid, RefinementLevel, RelativeDepth};
 
-    use crate::common::CONFIG;
+    use crate::common::ID_ONLY_CONFIG;
     use crate::models::{AttributeSchema, DataType, DatasetMetadata};
     use crate::query::query_value_by_cell_index;
     use crate::storage::StorageBackend;
@@ -538,7 +523,7 @@ mod tests {
         let chunk_size = u64::from(dggrs.spec().aperture);
 
         let chunk_zones = grid
-            .zones_from_bbox(chunk_level, None, Some(CONFIG))
+            .zones_from_bbox(chunk_level, None, Some(ID_ONLY_CONFIG))
             .expect("chunk zones");
         assert!(
             chunk_zones.zones.len() >= 2,
@@ -549,10 +534,10 @@ mod tests {
         let chunk1 = chunk_zones.zones[1].id.clone();
 
         let children0 = grid
-            .zones_from_parent(RelativeDepth::new_const(1), chunk0.clone(), Some(CONFIG))
+            .zones_from_parent(RelativeDepth::new_const(1), chunk0.clone(), Some(ID_ONLY_CONFIG))
             .expect("children for chunk0");
         let children1 = grid
-            .zones_from_parent(RelativeDepth::new_const(1), chunk1.clone(), Some(CONFIG))
+            .zones_from_parent(RelativeDepth::new_const(1), chunk1.clone(), Some(ID_ONLY_CONFIG))
             .expect("children for chunk1");
 
         assert!(
@@ -580,11 +565,12 @@ mod tests {
         backend
             .set_level_chunk_ids(
                 refinement_level.get() as u32,
+                chunk_level.get() as u32,
                 vec![chunk0.to_string(), chunk1.to_string()],
             )
             .expect("set chunk ids");
         backend
-            .create_level(refinement_level.get() as u32, 0, 2 * chunk_size)
+            .create_level(refinement_level.get() as u32, 0, 2 * chunk_size, chunk_size)
             .expect("create level");
 
         let mut chunk0_values = vec![0_u16; chunk_size as usize];

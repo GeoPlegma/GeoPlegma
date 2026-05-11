@@ -238,7 +238,7 @@ fn get_closest_refinement_level(
     best_level.ok_or_else(|| EncodingError::Grid("no valid refinement level found".into()))
 }
 
-fn choose_best_chunk_level_and_size(
+pub fn choose_best_chunk_level_and_size(
     refinement_level: RefinementLevel,
     min_chunk_level: RefinementLevel,
     max_relative_depth_allowed: RelativeDepth,
@@ -503,7 +503,7 @@ where
         .checked_mul(chunk_size)
         .ok_or_else(|| EncodingError::Storage("encoded cell count overflow".into()))?;
     let mut backend = B::create(output_path, metadata)?;
-    backend.set_level_chunk_ids(refinement_level.get() as u32, chunk_ids.clone())?;
+    backend.set_level_chunk_ids(refinement_level.get() as u32, chunk_level.get() as u32, chunk_ids.clone())?;
 
     let mut wgs84 = SpatialRef::from_epsg(4326)?;
     wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
@@ -659,6 +659,7 @@ where
             refinement_level.get() as u32,
             band_index as u32,
             encoded_num_cells,
+            chunk_size,
         )?;
 
         for (chunk_index, bytes) in chunk_bytes.iter().enumerate() {
