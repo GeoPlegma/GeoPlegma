@@ -1,15 +1,27 @@
 #[tauri::command]
-fn get_h3_data(store: String, level: u32) -> Result<Vec<gp_encoding::query::H3VisualizationCell>, String> {
-    use gp_encoding::{ZarrBackend, StorageBackend};
-    let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
-    gp_encoding::query::export_h3_level_as_visualization_json(&backend, level).map_err(|e| e.to_string())
+async fn get_h3_data(
+    store: String,
+    level: u32,
+) -> Result<Vec<gp_encoding::query::H3VisualizationCell>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use gp_encoding::{ZarrBackend, StorageBackend};
+        let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
+        gp_encoding::query::export_h3_level_as_visualization_json(&backend, level)
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn get_h3_levels(store: String) -> Result<Vec<u32>, String> {
-    use gp_encoding::{ZarrBackend, StorageBackend};
-    let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
-    Ok(backend.levels())
+async fn get_h3_levels(store: String) -> Result<Vec<u32>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use gp_encoding::{ZarrBackend, StorageBackend};
+        let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
+        Ok(backend.levels())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
