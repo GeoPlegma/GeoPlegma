@@ -485,15 +485,16 @@ where
         .map(|b| format!("{:?}", b.dtype))
         .collect();
 
+    let chunk_ids = chunk_zones
+        .zones
+        .iter()
+        .map(|z| z.id.to_string())
+        .collect::<Vec<_>>();
+
     let metadata = DatasetMetadata {
         dggrs,
         attributes: metadata_bands,
         chunk_size,
-        chunk_ids: chunk_zones
-            .zones
-            .iter()
-            .map(|z| z.id.to_string())
-            .collect::<Vec<_>>(),
         levels: vec![refinement_level.get() as u32],
         compression,
     };
@@ -502,6 +503,7 @@ where
         .checked_mul(chunk_size)
         .ok_or_else(|| EncodingError::Storage("encoded cell count overflow".into()))?;
     let mut backend = B::create(output_path, metadata)?;
+    backend.set_level_chunk_ids(refinement_level.get() as u32, chunk_ids.clone())?;
 
     let mut wgs84 = SpatialRef::from_epsg(4326)?;
     wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);

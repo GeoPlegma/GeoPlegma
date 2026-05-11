@@ -22,6 +22,8 @@ struct Cli {
 enum Commands {
     /// Convert a GeoTIFF file into a Zarr-backed encoded dataset.
     ConvertGeotiff(ConvertGeotiffArgs),
+    /// Add a coarser resolution level by aggregating an existing level.
+    AddLevel(AddLevelArgs),
     /// Query a value at geographic coordinates.
     Query(QueryArgs),
     /// Print summary statistics for an encoded Zarr store.
@@ -70,11 +72,25 @@ struct StatsArgs {
     store: PathBuf,
 }
 
+#[derive(Args, Debug)]
+struct AddLevelArgs {
+    /// Zarr store path.
+    #[arg(short, long)]
+    store: PathBuf,
+    /// Source level to aggregate from (defaults to the highest level in the store).
+    #[arg(long)]
+    source_level: Option<u8>,
+    /// Target level to create (must be lower than the source level).
+    #[arg(long)]
+    target_level: u8,
+}
+
 fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
         Commands::ConvertGeotiff(args) => run_convert_geotiff(args),
+        Commands::AddLevel(args) => run_add_level(args),
         Commands::Query(args) => run_query(args),
         Commands::Stats(args) => run_stats(args),
     };
@@ -156,17 +172,21 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
     println!("Store:       {}", args.store.display());
     println!("DGGRS:       {}", metadata.dggrs);
     println!("Chunk size:  {}", metadata.chunk_size);
-    println!("Chunks:      {}", metadata.chunk_ids.len());
-    println!("Bands:       {}", metadata.attributes.len());
     println!("Levels:      {:?}", backend.levels());
+    println!("Bands:       {}", metadata.attributes.len());
 
     let levels = backend.levels();
     let band_count = backend.band_count();
 
     for level in levels {
         let num_chunks = backend.num_chunks(level).map_err(|e| e.to_string())?;
+        let chunk_ids = backend
+            .chunk_ids_for_level(level)
+            .map_err(|e| e.to_string())?
+            .len();
         println!("\nLevel {level}");
         println!("  Logical chunk count: {num_chunks}");
+        println!("  Stored chunk IDs   : {chunk_ids}");
 
         for band in 0..band_count {
             let dtype = &metadata.attributes[band as usize].dtype;
@@ -174,6 +194,30 @@ fn run_stats(args: StatsArgs) -> Result<(), String> {
             println!("  Band {band} ({dtype:?})");
         }
     }
+
+    Ok(())
+}
+
+fn run_add_level(args: AddLevelArgs) -> Result<(), String> {
+    let mut backend = ZarrBackend::open(&args.store).map_err(|e| e.to_string())?;
+    let source_level = if let Some(source) = args.source_level {
+        source as u32
+    } else {
+        backend
+            .levels()
+            .into_iter()
+            .max()
+            .ok_or_else(|| "store has no levels".to_string())?
+    };
+
+    backend
+        .add_level_from_existing(source_level, args.target_level as u32)
+        .map_err(|e| e.to_string())?;
+
+    println!(
+        "Added level {} from source level {}",
+        args.target_level, source_level
+    );
 
     Ok(())
 }

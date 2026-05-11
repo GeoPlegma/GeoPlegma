@@ -46,6 +46,71 @@ pub fn decode_value_to_json(dtype: &DataType, bytes: &[u8]) -> Result<Value, Enc
     }
 }
 
+pub fn decode_value_to_f64(dtype: &DataType, bytes: &[u8]) -> Result<f64, EncodingError> {
+    match dtype {
+        DataType::Float32 => Ok(f32::from_ne_bytes(parse_fixed::<4>(bytes)?) as f64),
+        DataType::Float64 => Ok(f64::from_ne_bytes(parse_fixed::<8>(bytes)?)),
+        DataType::Int8 => Ok(i8::from_ne_bytes(parse_fixed::<1>(bytes)?) as f64),
+        DataType::Int16 => Ok(i16::from_ne_bytes(parse_fixed::<2>(bytes)?) as f64),
+        DataType::Int32 => Ok(i32::from_ne_bytes(parse_fixed::<4>(bytes)?) as f64),
+        DataType::Int64 => Ok(i64::from_ne_bytes(parse_fixed::<8>(bytes)?) as f64),
+        DataType::UInt8 => Ok(u8::from_ne_bytes(parse_fixed::<1>(bytes)?) as f64),
+        DataType::UInt16 => Ok(u16::from_ne_bytes(parse_fixed::<2>(bytes)?) as f64),
+        DataType::UInt32 => Ok(u32::from_ne_bytes(parse_fixed::<4>(bytes)?) as f64),
+        DataType::UInt64 => Ok(u64::from_ne_bytes(parse_fixed::<8>(bytes)?) as f64),
+    }
+}
+
+pub fn parse_fill_value_to_f64(dtype: &DataType, fill_value: &str) -> Result<f64, EncodingError> {
+    let trimmed = fill_value.trim();
+    match dtype {
+        DataType::Float32 | DataType::Float64 => trimmed.parse::<f64>().map_err(|e| {
+            EncodingError::Storage(format!("invalid fill value '{fill_value}': {e}"))
+        }),
+        DataType::Int8 => parse_i64_in_range(trimmed, i8::MIN as i64, i8::MAX as i64)
+            .map(|value| value as f64),
+        DataType::Int16 => parse_i64_in_range(trimmed, i16::MIN as i64, i16::MAX as i64)
+            .map(|value| value as f64),
+        DataType::Int32 => parse_i64_in_range(trimmed, i32::MIN as i64, i32::MAX as i64)
+            .map(|value| value as f64),
+        DataType::Int64 => parse_i64_in_range(trimmed, i64::MIN, i64::MAX)
+            .map(|value| value as f64),
+        DataType::UInt8 => parse_u64_in_range(trimmed, u8::MAX as u64)
+            .map(|value| value as f64),
+        DataType::UInt16 => parse_u64_in_range(trimmed, u16::MAX as u64)
+            .map(|value| value as f64),
+        DataType::UInt32 => parse_u64_in_range(trimmed, u32::MAX as u64)
+            .map(|value| value as f64),
+        DataType::UInt64 => parse_u64_in_range(trimmed, u64::MAX).map(|value| value as f64),
+    }
+}
+
+pub fn encode_value_from_f64(dtype: &DataType, value: f64) -> Result<Vec<u8>, EncodingError> {
+    let bytes = match dtype {
+        DataType::Float32 => (value as f32).to_ne_bytes().to_vec(),
+        DataType::Float64 => value.to_ne_bytes().to_vec(),
+        DataType::Int8 => (clamp_i64(value, i8::MIN as i64, i8::MAX as i64) as i8)
+            .to_ne_bytes()
+            .to_vec(),
+        DataType::Int16 => (clamp_i64(value, i16::MIN as i64, i16::MAX as i64) as i16)
+            .to_ne_bytes()
+            .to_vec(),
+        DataType::Int32 => (clamp_i64(value, i32::MIN as i64, i32::MAX as i64) as i32)
+            .to_ne_bytes()
+            .to_vec(),
+        DataType::Int64 => clamp_i64(value, i64::MIN, i64::MAX).to_ne_bytes().to_vec(),
+        DataType::UInt8 => (clamp_u64(value, u8::MAX as u64) as u8).to_ne_bytes().to_vec(),
+        DataType::UInt16 => (clamp_u64(value, u16::MAX as u64) as u16)
+            .to_ne_bytes()
+            .to_vec(),
+        DataType::UInt32 => (clamp_u64(value, u32::MAX as u64) as u32)
+            .to_ne_bytes()
+            .to_vec(),
+        DataType::UInt64 => clamp_u64(value, u64::MAX).to_ne_bytes().to_vec(),
+    };
+    Ok(bytes)
+}
+
 pub fn parse_fill_value_to_json(dtype: &DataType, fill_value: &str) -> Result<Value, EncodingError> {
     let trimmed = fill_value.trim();
     match dtype {
@@ -137,4 +202,22 @@ fn parse_u64_in_range(value: &str, max: u64) -> Result<u64, EncodingError> {
         )));
     }
     Ok(parsed)
+}
+
+fn clamp_i64(value: f64, min: i64, max: i64) -> i64 {
+    if !value.is_finite() {
+        return 0;
+    }
+    let rounded = value.round();
+    let clamped = rounded.max(min as f64).min(max as f64);
+    clamped as i64
+}
+
+fn clamp_u64(value: f64, max: u64) -> u64 {
+    if !value.is_finite() {
+        return 0;
+    }
+    let rounded = value.round();
+    let clamped = rounded.max(0.0).min(max as f64);
+    clamped as u64
 }

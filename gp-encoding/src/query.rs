@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::common::CONFIG;
 use crate::error::EncodingError;
-use crate::storage::StorageBackend;
+use crate::storage::{compute_chunk_depth, StorageBackend};
 use crate::value::{decode_value_to_json, parse_fill_value_to_json};
 
 #[derive(Debug, Clone, Serialize)]
@@ -67,6 +67,7 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
     band: u32,
     zone_id: &ZoneId,
 ) -> Result<Vec<u8>, EncodingError> {
+    let chunk_ids = backend.chunk_ids_for_level(level)?;
     let cell_index = zone_id.to_string();
     let value_size = backend
         .metadata()
@@ -117,9 +118,7 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
 
     let chunk_id = chunk_zone_id.to_string();
 
-    let chunk_index = backend
-        .metadata()
-        .chunk_ids
+    let chunk_index = chunk_ids
         .iter()
         .position(|id| id == &chunk_id)
         .ok_or_else(|| {
@@ -215,6 +214,7 @@ where
     }
 
     let chunk_size = backend.metadata().chunk_size;
+    let chunk_ids = backend.chunk_ids_for_level(level)?;
     let aperture = u64::from(backend.metadata().dggrs.spec().aperture);
     let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
     let target_level = RefinementLevel::new(
@@ -249,7 +249,7 @@ where
         .collect::<Result<_, EncodingError>>()?;
 
     let mut row_count = 0_usize;
-    let chunk_progress = ProgressBar::new(backend.metadata().chunk_ids.len() as u64);
+    let chunk_progress = ProgressBar::new(chunk_ids.len() as u64);
     let style = ProgressStyle::with_template(
         "processing chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
     )
@@ -257,7 +257,7 @@ where
     .progress_chars("=> ");
     chunk_progress.set_style(style);
 
-    for (chunk_index, chunk_id) in backend.metadata().chunk_ids.iter().enumerate() {
+    for (chunk_index, chunk_id) in chunk_ids.iter().enumerate() {
         chunk_progress.set_message(format!("chunk {chunk_index} {chunk_id}"));
 
         let chunk_zone_id = ZoneId::from_str(chunk_id)
@@ -289,10 +289,11 @@ where
                 }
 
                 let value = decode_value_to_json(dtype, &chunk[start..end])?;
-                if let Some(fill_value) = &fill_values[band as usize] {
-                    if *fill_value == value {
-                        continue;
-                    }
+                if fill_values[band as usize]
+                    .as_ref()
+                    .is_some_and(|fill_value| *fill_value == value)
+                {
+                    continue;
                 }
                 bands.insert(format!("band_{band}"), value);
                 has_non_fill = true;
@@ -315,31 +316,6 @@ where
     chunk_progress.finish_with_message("processing chunks [done]");
 
     Ok(row_count)
-}
-
-fn compute_chunk_depth(chunk_size: u64, aperture: u64) -> Result<i32, EncodingError> {
-    if aperture <= 1 {
-        return Err(EncodingError::Storage(format!(
-            "invalid DGGS aperture {aperture} for chunk resolution"
-        )));
-    }
-
-    let mut depth_i32 = 0_i32;
-    let mut size_check = 1_u64;
-    while size_check < chunk_size {
-        size_check = size_check.checked_mul(aperture).ok_or_else(|| {
-            EncodingError::Storage("chunk_size power computation overflow".into())
-        })?;
-        depth_i32 += 1;
-    }
-
-    if size_check != chunk_size {
-        return Err(EncodingError::Storage(format!(
-            "chunk_size {chunk_size} is not a power of aperture {aperture}"
-        )));
-    }
-
-    Ok(depth_i32)
 }
 
 #[cfg(test)]
@@ -412,12 +388,17 @@ mod tests {
                 fill_value: None,
             }],
             chunk_size,
-            chunk_ids: vec![chunk0.to_string(), chunk1.to_string()],
             levels: vec![refinement_level.get() as u32],
             compression: None,
         };
 
         let mut backend = ZarrBackend::create(&store_path, metadata).expect("create zarr");
+        backend
+            .set_level_chunk_ids(
+                refinement_level.get() as u32,
+                vec![chunk0.to_string(), chunk1.to_string()],
+            )
+            .expect("set chunk ids");
         backend
             .create_level(refinement_level.get() as u32, 0, 2 * chunk_size)
             .expect("create level");

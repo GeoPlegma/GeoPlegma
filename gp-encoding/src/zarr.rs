@@ -1,16 +1,22 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::str::FromStr;
 
+use geoplegma::get;
+use geoplegma::types::{RefinementLevel, RelativeDepth, ZoneId};
 use zarrs::array::{Array, ArrayBuilder, ArrayBytes};
 use zarrs::array::codec::api::BytesToBytesCodecTraits;
 use zarrs::array::codec::{GzipCodec, ZstdCodec};
 use zarrs::group::{Group, GroupBuilder};
 use zarrs_filesystem::FilesystemStore;
 
+use crate::common::CONFIG;
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
-use crate::storage::{LevelHandle, StorageBackend};
+use crate::storage::{compute_chunk_depth, LevelHandle, StorageBackend};
+use crate::value::{decode_value_to_f64, encode_value_from_f64, parse_fill_value_to_f64};
+use serde_json::json;
 
 /// Handle to a Zarr array that represents a single resolution level.
 pub struct ZarrLevel {
@@ -93,6 +99,10 @@ impl ZarrBackend {
         format!("/level_{level}/band_{band}")
     }
 
+    fn level_group_path(level: u32) -> String {
+        format!("/level_{level}")
+    }
+
     /// Open a Zarr array for a given resolution level.
     fn open_array(&self, level: u32, band: u32) -> Result<Array<FilesystemStore>, EncodingError> {
         let path = Self::level_path(level, band);
@@ -135,6 +145,318 @@ impl ZarrBackend {
 
         let metadata: DatasetMetadata = serde_json::from_value(meta_value.clone())?;
         Ok(metadata)
+    }
+
+    fn write_level_chunk_ids(
+        store: &Arc<FilesystemStore>,
+        level: u32,
+        chunk_ids: &[String],
+    ) -> Result<(), EncodingError> {
+        let mut attributes = serde_json::Map::new();
+        attributes.insert("chunk_ids".to_string(), json!(chunk_ids));
+
+        let group_path = Self::level_group_path(level);
+        let group = GroupBuilder::new()
+            .attributes(attributes)
+            .build(store.clone(), &group_path)
+            .map_err(|e| EncodingError::Zarr(e.to_string()))?;
+
+        group
+            .store_metadata()
+            .map_err(|e| EncodingError::Zarr(e.to_string()))?;
+
+        Ok(())
+    }
+
+    fn read_level_chunk_ids(
+        store: &Arc<FilesystemStore>,
+        level: u32,
+    ) -> Result<Vec<String>, EncodingError> {
+        let group_path = Self::level_group_path(level);
+        let group =
+            Group::open(store.clone(), &group_path).map_err(|e| EncodingError::Zarr(e.to_string()))?;
+
+        let attrs = group.attributes();
+        let value = attrs.get("chunk_ids").ok_or_else(|| {
+            EncodingError::Zarr(format!("missing 'chunk_ids' attribute for level {level}"))
+        })?;
+
+        let chunk_ids: Vec<String> = serde_json::from_value(value.clone())?;
+        Ok(chunk_ids)
+    }
+
+    pub fn add_level_from_existing(
+        &mut self,
+        source_level: u32,
+        target_level: u32,
+    ) -> Result<(), EncodingError> {
+        if source_level == target_level {
+            return Err(EncodingError::Storage(
+                "source and target levels must differ".into(),
+            ));
+        }
+
+        if target_level > source_level {
+            return Err(EncodingError::Storage(
+                "target level must be lower than source level".into(),
+            ));
+        }
+
+        if self.metadata.levels.contains(&target_level) {
+            return Err(EncodingError::Storage(format!(
+                "level {target_level} already exists in the store"
+            )));
+        }
+
+        let chunk_size = self.metadata.chunk_size;
+        if chunk_size == 0 {
+            return Err(EncodingError::Storage(
+                "dataset metadata chunk_size must be greater than zero".into(),
+            ));
+        }
+
+        let source_level_i32 = i32::try_from(source_level).map_err(|_| {
+            EncodingError::Storage(format!("level {source_level} cannot fit i32"))
+        })?;
+        let target_level_i32 = i32::try_from(target_level).map_err(|_| {
+            EncodingError::Storage(format!("level {target_level} cannot fit i32"))
+        })?;
+
+        let aperture = u64::from(self.metadata.dggrs.spec().aperture);
+        let chunk_depth = compute_chunk_depth(chunk_size, aperture)?;
+
+        if source_level_i32 < chunk_depth || target_level_i32 < chunk_depth {
+            return Err(EncodingError::Storage(format!(
+                "levels must be >= chunk depth {chunk_depth}"
+            )));
+        }
+
+        let source_chunk_level = RefinementLevel::new(source_level_i32 - chunk_depth)?;
+        let target_chunk_level = RefinementLevel::new(target_level_i32 - chunk_depth)?;
+
+        if target_chunk_level.get() > source_chunk_level.get() {
+            return Err(EncodingError::Storage(
+                "target chunk level cannot be finer than source chunk level".into(),
+            ));
+        }
+
+        let source_chunk_ids = Self::read_level_chunk_ids(&self.store, source_level)?;
+
+        if source_chunk_ids.is_empty() {
+            return Err(EncodingError::Storage(
+                "source level has no chunk IDs".into(),
+            ));
+        }
+
+        let grid = get(self.metadata.dggrs)
+            .map_err(|e| EncodingError::Grid(format!("failed to resolve DGGS: {e}")))?;
+
+        let chunk_level_steps = source_chunk_level.get() - target_chunk_level.get();
+        let mut target_chunk_set = BTreeSet::new();
+
+        for chunk_id in source_chunk_ids.iter() {
+            let mut zone_id = ZoneId::from_str(chunk_id.as_str()).map_err(|e| {
+                EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
+            })?;
+
+            for _ in 0..chunk_level_steps {
+                let parent = grid
+                    .primary_parent_from_zone(zone_id, Some(CONFIG))
+                    .map_err(|e| EncodingError::Grid(e.to_string()))?;
+                let parent_zone = parent.zones.first().ok_or_else(|| {
+                    EncodingError::Grid("primary_parent_from_zone returned no zones".into())
+                })?;
+                zone_id = parent_zone.id.clone();
+            }
+
+            target_chunk_set.insert(zone_id.to_string());
+        }
+
+        let target_chunk_ids: Vec<String> = target_chunk_set.into_iter().collect();
+        if target_chunk_ids.is_empty() {
+            return Err(EncodingError::Storage(
+                "target level has no chunk IDs".into(),
+            ));
+        }
+
+        let relative_depth = RelativeDepth::new(target_level_i32 - target_chunk_level.get())?;
+        let band_count = self.band_count() as usize;
+
+        let mut cell_index_map: HashMap<String, (usize, usize)> = HashMap::new();
+        let mut accumulators: Vec<Vec<BandAccumulator>> = Vec::with_capacity(target_chunk_ids.len());
+
+        for (chunk_index, chunk_id) in target_chunk_ids.iter().enumerate() {
+            let chunk_zone_id = ZoneId::from_str(chunk_id).map_err(|e| {
+                EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
+            })?;
+
+            let children = grid
+                .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+                .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+            if children.zones.len() > chunk_size as usize {
+                return Err(EncodingError::Storage(format!(
+                    "chunk {chunk_id} has {} children but chunk_size is {}",
+                    children.zones.len(),
+                    chunk_size
+                )));
+            }
+
+            let mut band_accumulators = Vec::with_capacity(band_count);
+            for _ in 0..band_count {
+                band_accumulators.push(BandAccumulator::new(chunk_size as usize));
+            }
+
+            for (cell_index, zone) in children.zones.iter().enumerate() {
+                cell_index_map.insert(zone.id.to_string(), (chunk_index, cell_index));
+            }
+
+            accumulators.push(band_accumulators);
+        }
+
+        let source_relative_depth = RelativeDepth::new(source_level_i32 - source_chunk_level.get())?;
+        let level_steps = source_level_i32 - target_level_i32;
+        let fill_values: Vec<Option<f64>> = self
+            .metadata
+            .attributes
+            .iter()
+            .map(|attr| {
+                attr.fill_value
+                    .as_ref()
+                    .map(|value| parse_fill_value_to_f64(&attr.dtype, value))
+                    .transpose()
+            })
+            .collect::<Result<_, EncodingError>>()?;
+
+        for (chunk_index, chunk_id) in source_chunk_ids.iter().enumerate() {
+            let chunk_zone_id = ZoneId::from_str(chunk_id.as_str()).map_err(|e| {
+                EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
+            })?;
+
+            let children = grid
+                .zones_from_parent(source_relative_depth, chunk_zone_id, Some(CONFIG))
+                .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+            let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
+                .map(|band| self.read_chunk(source_level, band as u32, chunk_index as u64))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            for (in_chunk_index, zone) in children.zones.iter().enumerate() {
+                let mut target_zone_id = zone.id.clone();
+                for _ in 0..level_steps {
+                    let parent = grid
+                        .primary_parent_from_zone(target_zone_id, Some(CONFIG))
+                        .map_err(|e| EncodingError::Grid(e.to_string()))?;
+                    let parent_zone = parent.zones.first().ok_or_else(|| {
+                        EncodingError::Grid("primary_parent_from_zone returned no zones".into())
+                    })?;
+                    target_zone_id = parent_zone.id.clone();
+                }
+
+                let target_key = target_zone_id.to_string();
+                let Some((target_chunk_index, target_cell_index)) =
+                    cell_index_map.get(&target_key).copied()
+                else {
+                    continue;
+                };
+
+                for band in 0..band_count {
+                    let dtype = &self.metadata.attributes[band].dtype;
+                    let value_size = dtype.byte_size();
+                    let chunk = &chunks_for_bands[band];
+                    let start = in_chunk_index * value_size;
+                    let end = start + value_size;
+                    if chunk.len() < end {
+                        return Err(EncodingError::Storage(format!(
+                            "chunk {chunk_index} at level {source_level} is too small for child index {in_chunk_index}"
+                        )));
+                    }
+
+                    let value = decode_value_to_f64(dtype, &chunk[start..end])?;
+                    if fill_values[band].is_some_and(|fill_value| fill_value == value) {
+                        continue;
+                    }
+
+                    accumulators[target_chunk_index][band].record(target_cell_index, value);
+                }
+            }
+        }
+
+        self.set_level_chunk_ids(target_level, target_chunk_ids.clone())?;
+
+        let encoded_num_cells = (target_chunk_ids.len() as u64)
+            .checked_mul(chunk_size)
+            .ok_or_else(|| EncodingError::Storage("encoded cell count overflow".into()))?;
+
+        for band in 0..band_count {
+            self.create_level(target_level, band as u32, encoded_num_cells)?;
+        }
+
+        let fill_bytes: Vec<Vec<u8>> = self
+            .metadata
+            .attributes
+            .iter()
+            .map(|attr| {
+                let fill_value = match &attr.fill_value {
+                    Some(value) => parse_fill_value_to_f64(&attr.dtype, value)?,
+                    None => 0.0,
+                };
+                encode_value_from_f64(&attr.dtype, fill_value)
+            })
+            .collect::<Result<_, EncodingError>>()?;
+
+        for (chunk_index, band_accumulators) in accumulators.iter().enumerate() {
+            for (band, accumulator) in band_accumulators.iter().enumerate() {
+                let dtype = &self.metadata.attributes[band].dtype;
+                let mut bytes = Vec::with_capacity(chunk_size as usize * dtype.byte_size());
+
+                for cell_index in 0..chunk_size as usize {
+                    let value_bytes = if let Some(value) = accumulator.average(cell_index) {
+                        encode_value_from_f64(dtype, value)?
+                    } else {
+                        fill_bytes[band].clone()
+                    };
+                    bytes.extend_from_slice(&value_bytes);
+                }
+
+                self.write_chunk(target_level, band as u32, chunk_index as u64, &bytes)?;
+            }
+        }
+
+        self.metadata.levels.push(target_level);
+        self.metadata.levels.sort_unstable();
+
+        Self::write_metadata(&self.store, &self.metadata)?;
+
+        Ok(())
+    }
+}
+
+struct BandAccumulator {
+    sums: Vec<f64>,
+    counts: Vec<u64>,
+}
+
+impl BandAccumulator {
+    fn new(size: usize) -> Self {
+        Self {
+            sums: vec![0.0; size],
+            counts: vec![0; size],
+        }
+    }
+
+    fn record(&mut self, index: usize, value: f64) {
+        self.sums[index] += value;
+        self.counts[index] += 1;
+    }
+
+    fn average(&self, index: usize) -> Option<f64> {
+        let count = self.counts[index];
+        if count == 0 {
+            None
+        } else {
+            Some(self.sums[index] / count as f64)
+        }
     }
 }
 
@@ -275,5 +597,17 @@ impl StorageBackend for ZarrBackend {
             .ok_or_else(|| EncodingError::Zarr(format!("level {level} not found")))?;
         let chunk_size = self.metadata.chunk_size;
         Ok(num_cells.div_ceil(chunk_size))
+    }
+
+    fn chunk_ids_for_level(&self, level: u32) -> Result<Vec<String>, EncodingError> {
+        Self::read_level_chunk_ids(&self.store, level)
+    }
+
+    fn set_level_chunk_ids(
+        &mut self,
+        level: u32,
+        chunk_ids: Vec<String>,
+    ) -> Result<(), EncodingError> {
+        Self::write_level_chunk_ids(&self.store, level, &chunk_ids)
     }
 }

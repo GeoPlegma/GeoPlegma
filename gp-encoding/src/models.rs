@@ -31,9 +31,6 @@ pub struct DatasetMetadata {
     /// Chunk size: number of cells per chunk along the linearized SFC axis.
     pub chunk_size: u64,
 
-    /// IDs of the chunks stored in this dataset.
-    pub chunk_ids: Vec<String>,
-
     /// Resolution levels stored in this dataset.
     pub levels: Vec<u32>,
 
