@@ -106,8 +106,12 @@ impl ZarrBackend {
     /// Open a Zarr array for a given resolution level.
     fn open_array(&self, level: u32, band: u32) -> Result<Array<FilesystemStore>, EncodingError> {
         let path = Self::level_path(level, band);
-        let array = Array::open(self.store.clone(), &path)
-            .map_err(|e| EncodingError::Zarr(e.to_string()))?;
+        let array = Array::open(self.store.clone(), &path).map_err(|e| {
+            EncodingError::Zarr(format!(
+                "failed to open array {path} in store {}: {e}",
+                self._root.display()
+            ))
+        })?;
         Ok(array)
     }
 
@@ -525,6 +529,18 @@ impl StorageBackend for ZarrBackend {
     }
 
     fn open(path: &Path) -> Result<Self, EncodingError> {
+        if !path.exists() {
+            return Err(EncodingError::Storage(format!(
+                "store path does not exist: {}",
+                path.display()
+            )));
+        }
+        if !path.is_dir() {
+            return Err(EncodingError::Storage(format!(
+                "store path is not a directory: {}",
+                path.display()
+            )));
+        }
         let store =
             Arc::new(FilesystemStore::new(path).map_err(|e| EncodingError::Zarr(e.to_string()))?);
 

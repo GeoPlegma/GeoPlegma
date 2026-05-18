@@ -344,6 +344,18 @@ pub fn convert_geotiff_file_to_backend<B>(
 where
     B: StorageBackend,
 {
+    if !geotiff_path.exists() {
+        return Err(EncodingError::GeoTiff(format!(
+            "input GeoTIFF does not exist: {}",
+            geotiff_path.display()
+        )));
+    }
+    if !geotiff_path.is_file() {
+        return Err(EncodingError::GeoTiff(format!(
+            "input GeoTIFF is not a file: {}",
+            geotiff_path.display()
+        )));
+    }
     let grid = get(dggrs)?;
 
     let dataset = Dataset::open(geotiff_path)?;
