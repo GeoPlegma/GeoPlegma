@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde::ser::{SerializeSeq, Serializer};
 use serde_json::Value;
 
-use crate::common::{CONFIG, ID_ONLY_CONFIG};
+use crate::common::{CENTER_CONFIG, ID_ONLY_CONFIG};
 use crate::error::EncodingError;
 use crate::storage::StorageBackend;
 use crate::value::{
@@ -397,17 +397,23 @@ where
 
     let mut row_count = 0_usize;
 
-    let mut chunk_ids_to_process = chunk_ids;
-    if let Some(bounds) = bbox {
+    let mut chunk_ids_to_process: Vec<(usize, String)> = chunk_ids
+        .into_iter()
+        .enumerate()
+        .collect();
+    
+    let effective_bbox = if level <= 2 { None } else { bbox };
+
+    if let Some(bounds) = effective_bbox {
         let chunk_zones = grid
-            .zones_from_bbox(chunk_level, Some(bounds), Some(CONFIG))
+            .zones_from_bbox(chunk_level, Some(bounds), Some(ID_ONLY_CONFIG))
             .map_err(|e| EncodingError::Grid(e.to_string()))?;
         let valid_chunk_ids: std::collections::HashSet<String> = chunk_zones
             .zones
             .into_iter()
             .map(|z| z.id.to_string())
             .collect();
-        chunk_ids_to_process.retain(|id| valid_chunk_ids.contains(id));
+        chunk_ids_to_process.retain(|(_, id)| valid_chunk_ids.contains(id));
     }
 
     let chunk_progress = ProgressBar::new(chunk_ids_to_process.len() as u64);
@@ -418,14 +424,16 @@ where
     .progress_chars("=> ");
     chunk_progress.set_style(style);
 
-    for (chunk_index, chunk_id) in chunk_ids_to_process.iter().enumerate() {
-        chunk_progress.set_message(format!("chunk {chunk_index} {chunk_id}"));
+    let config = if effective_bbox.is_some() { CENTER_CONFIG } else { ID_ONLY_CONFIG };
 
-        let chunk_zone_id = ZoneId::from_str(chunk_id)
+    for (progress_index, (chunk_index, chunk_id)) in chunk_ids_to_process.into_iter().enumerate() {
+        chunk_progress.set_message(format!("chunk {progress_index} {chunk_id}"));
+
+        let chunk_zone_id = ZoneId::from_str(&chunk_id)
             .map_err(|e| EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}")))?;
 
         let children = grid
-            .zones_from_parent(relative_depth, chunk_zone_id, Some(CONFIG))
+            .zones_from_parent(relative_depth, chunk_zone_id, Some(config))
             .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
         let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
@@ -433,7 +441,7 @@ where
             .collect::<Result<Vec<_>, _>>()?;
 
         for (in_chunk_index, zone) in children.zones.iter().enumerate() {
-            if let (Some(bounds), Some(center)) = (bbox, zone.center.as_ref()) {
+            if let (Some(bounds), Some(center)) = (effective_bbox, zone.center.as_ref()) {
                 if center.lon < bounds.min_lon
                     || center.lon > bounds.max_lon
                     || center.lat < bounds.min_lat
