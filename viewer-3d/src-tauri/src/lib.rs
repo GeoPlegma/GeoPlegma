@@ -1,12 +1,12 @@
 #[tauri::command]
-async fn get_h3_data(
+async fn get_data(
     store: String,
     level: u32,
-) -> Result<Vec<gp_encoding::query::H3VisualizationCell>, String> {
+) -> Result<Vec<gp_encoding::query::VisualizationCell>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use gp_encoding::{ZarrBackend, StorageBackend};
         let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
-        gp_encoding::query::export_h3_level_as_visualization_json(&backend, level)
+        gp_encoding::query::export_level_as_visualization_json(&backend, level)
             .map_err(|e| e.to_string())
     })
     .await
@@ -14,12 +14,12 @@ async fn get_h3_data(
 }
 
 #[tauri::command]
-async fn get_h3_data_binary(store: String, level: u32, bbox: Option<Vec<f64>>) -> Result<tauri::ipc::Response, String> {
+async fn get_data_binary(store: String, level: u32, bbox: Option<Vec<f64>>) -> Result<tauri::ipc::Response, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use gp_encoding::{StorageBackend, ZarrBackend, BoundingBox};
         let bbox = bbox.map(|b| BoundingBox::new(b[0], b[1], b[2], b[3]));
         let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
-        gp_encoding::query::export_h3_level_as_visualization_binary(&backend, level, bbox)
+        gp_encoding::query::export_level_as_visualization_binary(&backend, level, bbox)
             .map(tauri::ipc::Response::new)
             .map_err(|e| e.to_string())
     })
@@ -28,7 +28,7 @@ async fn get_h3_data_binary(store: String, level: u32, bbox: Option<Vec<f64>>) -
 }
 
 #[tauri::command]
-async fn get_h3_levels(store: String) -> Result<Vec<u32>, String> {
+async fn get_levels(store: String) -> Result<Vec<u32>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         use gp_encoding::{ZarrBackend, StorageBackend};
         let backend = ZarrBackend::open(std::path::Path::new(&store)).map_err(|e| e.to_string())?;
@@ -43,9 +43,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            get_h3_data,
-            get_h3_data_binary,
-            get_h3_levels
+            get_data,
+            get_data_binary,
+            get_levels
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

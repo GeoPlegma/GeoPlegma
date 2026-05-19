@@ -16,8 +16,8 @@ use crate::value::{
 };
 
 #[derive(Debug, Clone, Serialize)]
-pub struct H3VisualizationCell {
-    pub hex: String,
+pub struct VisualizationCell {
+    pub polygon: Vec<[f64; 2]>,
     #[serde(flatten)]
     pub bands: BTreeMap<String, Value>,
 }
@@ -148,12 +148,12 @@ pub fn query_value_by_cell_index<B: StorageBackend>(
     Ok(chunk[start..end].to_vec())
 }
 
-pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
+pub fn export_level_as_visualization_json<B: StorageBackend>(
     backend: &B,
     level: u32,
-) -> Result<Vec<H3VisualizationCell>, EncodingError> {
+) -> Result<Vec<VisualizationCell>, EncodingError> {
     let mut rows = Vec::new();
-    visit_h3_level_as_visualization_cells(backend, level, |cell| {
+    visit_level_as_visualization_cells(backend, level, |cell| {
         rows.push(cell);
         Ok(())
     })?;
@@ -161,7 +161,7 @@ pub fn export_h3_level_as_visualization_json<B: StorageBackend>(
     Ok(rows)
 }
 
-pub fn export_h3_level_as_visualization_binary<B: StorageBackend>(
+pub fn export_level_as_visualization_binary<B: StorageBackend>(
     backend: &B,
     level: u32,
     bbox: Option<geoplegma::types::BoundingBox>,
@@ -172,16 +172,18 @@ pub fn export_h3_level_as_visualization_binary<B: StorageBackend>(
     output.extend_from_slice(&0_u32.to_le_bytes());
 
     let mut cell_count = 0_u32;
-    visit_h3_level_as_visualization_cells_f64(backend, level, bbox, |hex, values| {
-        let hex_bytes = hex.as_bytes();
-        let hex_len = u16::try_from(hex_bytes.len()).map_err(|_| {
+    visit_level_as_visualization_cells_f64(backend, level, bbox, |region, values| {
+        let coords_count = u16::try_from(region.exterior.len()).map_err(|_| {
             EncodingError::Storage(format!(
-                "hex id is too long for binary payload: length {}",
-                hex_bytes.len()
+                "too many vertices in region: {}",
+                region.exterior.len()
             ))
         })?;
-        output.extend_from_slice(&hex_len.to_le_bytes());
-        output.extend_from_slice(hex_bytes);
+        output.extend_from_slice(&coords_count.to_le_bytes());
+        for pt in region.exterior {
+            output.extend_from_slice(&pt.lon.to_le_bytes());
+            output.extend_from_slice(&pt.lat.to_le_bytes());
+        }
         for value in values {
             output.extend_from_slice(&value.to_le_bytes());
         }
@@ -193,7 +195,7 @@ pub fn export_h3_level_as_visualization_binary<B: StorageBackend>(
     Ok(output)
 }
 
-pub fn write_h3_level_as_visualization_json<B: StorageBackend, W: std::io::Write>(
+pub fn write_level_as_visualization_json<B: StorageBackend, W: std::io::Write>(
     backend: &B,
     level: u32,
     writer: W,
@@ -203,7 +205,7 @@ pub fn write_h3_level_as_visualization_json<B: StorageBackend, W: std::io::Write
         .serialize_seq(None)
         .map_err(|e: serde_json::Error| EncodingError::Storage(e.to_string()))?;
 
-    let cell_count = visit_h3_level_as_visualization_cells(backend, level, |cell| {
+    let cell_count = visit_level_as_visualization_cells(backend, level, |cell| {
         sequence
             .serialize_element(&cell)
             .map_err(|e: serde_json::Error| EncodingError::Storage(e.to_string()))
@@ -216,20 +218,14 @@ pub fn write_h3_level_as_visualization_json<B: StorageBackend, W: std::io::Write
     Ok(cell_count)
 }
 
-fn visit_h3_level_as_visualization_cells<B: StorageBackend, F>(
+fn visit_level_as_visualization_cells<B: StorageBackend, F>(
     backend: &B,
     level: u32,
     mut visit_cell: F,
 ) -> Result<usize, EncodingError>
 where
-    F: FnMut(H3VisualizationCell) -> Result<(), EncodingError>,
+    F: FnMut(VisualizationCell) -> Result<(), EncodingError>,
 {
-    if backend.metadata().dggrs != DggrsUid::H3 {
-        return Err(EncodingError::Storage(format!(
-            "export requires H3 store, got {:?}",
-            backend.metadata().dggrs
-        )));
-    }
 
     let band_count = backend.band_count();
     if band_count == 0 {
@@ -285,8 +281,11 @@ where
         let chunk_zone_id = ZoneId::from_str(chunk_id)
             .map_err(|e| EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}")))?;
 
+        let mut config = ID_ONLY_CONFIG;
+        config.region = true;
+
         let children = grid
-            .zones_from_parent(relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
+            .zones_from_parent(relative_depth, chunk_zone_id, Some(config))
             .map_err(|e| EncodingError::Grid(e.to_string()))?;
 
         let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
@@ -325,8 +324,9 @@ where
                 continue;
             }
 
-            visit_cell(H3VisualizationCell {
-                hex: zone.id.to_string(),
+            let region = zone.region.as_ref().ok_or_else(|| EncodingError::Storage("zone missing region".into()))?;
+            visit_cell(VisualizationCell {
+                polygon: region.exterior.iter().map(|p| [p.lon, p.lat]).collect(),
                 bands,
             })?;
             row_count += 1;
@@ -340,21 +340,15 @@ where
     Ok(row_count)
 }
 
-fn visit_h3_level_as_visualization_cells_f64<B: StorageBackend, F>(
+fn visit_level_as_visualization_cells_f64<B: StorageBackend, F>(
     backend: &B,
     level: u32,
     bbox: Option<geoplegma::types::BoundingBox>,
     mut visit_cell: F,
 ) -> Result<usize, EncodingError>
 where
-    F: FnMut(String, Vec<f64>) -> Result<(), EncodingError>,
+    F: FnMut(geoplegma::types::Region, Vec<f64>) -> Result<(), EncodingError>,
 {
-    if backend.metadata().dggrs != DggrsUid::H3 {
-        return Err(EncodingError::Storage(format!(
-            "export requires H3 store, got {:?}",
-            backend.metadata().dggrs
-        )));
-    }
 
     let band_count = backend.band_count();
     if band_count == 0 {
@@ -424,7 +418,8 @@ where
     .progress_chars("=> ");
     chunk_progress.set_style(style);
 
-    let config = if effective_bbox.is_some() { CENTER_CONFIG } else { ID_ONLY_CONFIG };
+    let mut config = if effective_bbox.is_some() { CENTER_CONFIG } else { ID_ONLY_CONFIG };
+    config.region = true;
 
     for (progress_index, (chunk_index, chunk_id)) in chunk_ids_to_process.into_iter().enumerate() {
         chunk_progress.set_message(format!("chunk {progress_index} {chunk_id}"));
@@ -483,7 +478,8 @@ where
                 continue;
             }
 
-            visit_cell(zone.id.to_string(), values)?;
+            let region = zone.region.clone().ok_or_else(|| EncodingError::Storage("zone missing region".into()))?;
+            visit_cell(region, values)?;
             row_count += 1;
         }
 

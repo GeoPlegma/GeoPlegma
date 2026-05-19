@@ -1,14 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import DeckGL from '@deck.gl/react';
 import { _GlobeView as GlobeView, WebMercatorViewport } from '@deck.gl/core';
-import { H3HexagonLayer } from '@deck.gl/geo-layers';
-import { GeoJsonLayer } from '@deck.gl/layers';
+import { SolidPolygonLayer, GeoJsonLayer } from '@deck.gl/layers';
 
 import { invoke } from '@tauri-apps/api/core';
 import './App.css';
 
 const BAND_KEY_PREFIX = 'band_';
-const textDecoder = new TextDecoder();
 
 function asUint8Array(payload: unknown): Uint8Array {
   if (payload instanceof Uint8Array) {
@@ -23,7 +21,7 @@ function asUint8Array(payload: unknown): Uint8Array {
   throw new Error('Unexpected binary payload from backend');
 }
 
-function decodeH3Binary(payload: unknown) {
+function decodeBinary(payload: unknown) {
   const bytes = asUint8Array(payload);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   let offset = 0;
@@ -34,12 +32,17 @@ function decodeH3Binary(payload: unknown) {
 
   const cells = new Array(cellCount);
   for (let index = 0; index < cellCount; index += 1) {
-    const hexLength = view.getUint16(offset, true);
+    const vertexCount = view.getUint16(offset, true);
     offset += 2;
-    const hexBytes = bytes.subarray(offset, offset + hexLength);
-    offset += hexLength;
-    const hex = textDecoder.decode(hexBytes);
-    const cell: Record<string, any> = { hex };
+    const polygon = new Array(vertexCount);
+    for (let v = 0; v < vertexCount; v++) {
+      const lon = view.getFloat64(offset, true);
+      offset += 8;
+      const lat = view.getFloat64(offset, true);
+      offset += 8;
+      polygon[v] = [lon, lat];
+    }
+    const cell: Record<string, any> = { polygon };
 
     for (let band = 0; band < bandCount; band += 1) {
       const value = view.getFloat64(offset, true);
@@ -125,7 +128,7 @@ function App() {
 
   const fetchLevels = async () => {
     try {
-      const storeLevels: number[] = await invoke('get_h3_levels', { store: storePath });
+      const storeLevels: number[] = await invoke('get_levels', { store: storePath });
       const sortedLevels = [...storeLevels].sort((a, b) => a - b);
       setLevels(sortedLevels);
       setLevel((current) => {
@@ -175,12 +178,12 @@ function App() {
       const viewport = new WebMercatorViewport({ ...viewState, width, height });
       const bounds = viewport.getBounds();
 
-      const payload = await invoke('get_h3_data_binary', { 
+      const payload = await invoke('get_data_binary', { 
         store: storePath, 
         level: resolvedLevel,
         bbox: [bounds[0], bounds[1], bounds[2], bounds[3]]
       });
-      const { cells: decodedCells, bandCount: decodedBandCount } = decodeH3Binary(payload);
+      const { cells: decodedCells, bandCount: decodedBandCount } = decodeBinary(payload);
       setCells(decodedCells);
       setBandCount(decodedBandCount);
       setLevel(resolvedLevel);
@@ -209,8 +212,8 @@ function App() {
     if (cells.length > 0) {
       const useElevation = bandCount === 1;
 
-      const h3Layer = new H3HexagonLayer({
-        id: 'H3HexagonLayer',
+      const polygonLayer = new SolidPolygonLayer({
+        id: 'SolidPolygonLayer',
         data: cells,
         elevationScale: 20,
         extruded: useElevation,
@@ -219,12 +222,12 @@ function App() {
         getFillColor: useElevation
           ? (d: any) => [d.band_0, d.band_0, d.band_0]
           : (d: any) => [d.band_0, d.band_1, d.band_2],
-        getHexagon: (d: any) => d.hex,
+        getPolygon: (d: any) => d.polygon,
         wireframe: false,
         pickable: true,
       });
 
-      layerList.push(h3Layer);
+      layerList.push(polygonLayer);
     }
 
     return layerList;

@@ -294,7 +294,7 @@ pub fn choose_best_chunk_level_and_size(
     let chunk_size = u64::try_from(best_chunk_cells)
         .map_err(|_| EncodingError::Storage("chunk size does not fit into u64".into()))?;
 
-    let chunk_size = chunk_size * 1.05 as u64;
+    let chunk_size = (chunk_size as f64 * 1.05) as u64;
 
     Ok((chunk_level, chunk_size))
 }
