@@ -29,11 +29,7 @@ pub struct ZarrLevel {
 
 impl LevelHandle for ZarrLevel {}
 
-// ─────────────────────────── Zarr Backend ───────────────────────────
-
-/// A [`StorageBackend`] implementation that persists DGGS data in the
-/// [Zarr v3](https://zarr-specs.readthedocs.io/en/latest/v3/core/v3.0.html)
-/// format.
+/// A [`StorageBackend`] implementation that persists DGGS data in Zarr.
 pub struct ZarrBackend {
     /// Root path of the Zarr store on disk.
     _root: PathBuf,
@@ -41,7 +37,7 @@ pub struct ZarrBackend {
     store: Arc<FilesystemStore>,
     /// Dataset metadata.
     metadata: DatasetMetadata,
-    /// Created resolution levels (level → num_cells).
+    /// Maps created resolution levels to num_cells.
     level_map: BTreeMap<u32, u64>,
 }
 
@@ -66,7 +62,6 @@ impl ZarrBackend {
         }
     }
 
-    /// Convert our [`DataType`] to a zarrs data type string.
     fn to_zarr_dtype_str(dt: &DataType) -> &'static str {
         match dt {
             DataType::Float32 => "float32",
@@ -82,10 +77,6 @@ impl ZarrBackend {
         }
     }
 
-    /// Determine the primary Zarr data type string from the attribute schema.
-    ///
-    /// For now we use the first attribute; multi-attribute datasets can be
-    /// extended to use structured types or separate arrays.
     fn primary_dtype_str(&self) -> &'static str {
         self.metadata
             .attributes
@@ -94,7 +85,6 @@ impl ZarrBackend {
             .unwrap_or("uint64")
     }
 
-    /// Build the Zarr array path for a level (e.g. `"/level_3"`).
     fn level_path(level: u32, band: u32) -> String {
         format!("/level_{level}/band_{band}")
     }
@@ -115,7 +105,6 @@ impl ZarrBackend {
         Ok(array)
     }
 
-    /// Persist the [`DatasetMetadata`] as JSON attributes on the root group.
     fn write_metadata(
         store: &Arc<FilesystemStore>,
         metadata: &DatasetMetadata,
@@ -136,7 +125,6 @@ impl ZarrBackend {
         Ok(())
     }
 
-    /// Read [`DatasetMetadata`] from the root group attributes.
     fn read_metadata(store: &Arc<FilesystemStore>) -> Result<DatasetMetadata, EncodingError> {
         let group =
             Group::open(store.clone(), "/").map_err(|e| EncodingError::Zarr(e.to_string()))?;
@@ -511,13 +499,11 @@ impl StorageBackend for ZarrBackend {
     type Level = ZarrLevel;
 
     fn create(path: &Path, metadata: DatasetMetadata) -> Result<Self, EncodingError> {
-        // Ensure the directory exists.
         std::fs::create_dir_all(path)?;
 
         let store =
             Arc::new(FilesystemStore::new(path).map_err(|e| EncodingError::Zarr(e.to_string()))?);
 
-        // Write root group + metadata.
         Self::write_metadata(&store, &metadata)?;
 
         Ok(Self {
@@ -582,10 +568,10 @@ impl StorageBackend for ZarrBackend {
         let dtype_str = self.primary_dtype_str();
 
         let mut array_builder = ArrayBuilder::new(
-            vec![num_cells],  // array shape
-            vec![chunk_size], // regular chunk shape
-            dtype_str,        // data type as string
-            0u64,             // fill value
+            vec![num_cells],
+            vec![chunk_size],
+            dtype_str,
+            0u64,
         );
 
         if let Some(codecs) = Self::codecs_for_compression(self.metadata.compression.as_ref())? {

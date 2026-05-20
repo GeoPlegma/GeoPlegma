@@ -444,7 +444,6 @@ where
     let src_srs = dataset.spatial_ref()?;
     let (bbox, pixel_width, pixel_height) = get_corners_and_pixel_size(&dataset)?;
     let refinement_level = get_closest_refinement_level(&grid, pixel_width, pixel_height)?;
-    // let refinement_level = RefinementLevel::new_const(get_closest_refinement_level(&grid, pixel_width, pixel_height)?.get() - 3);
 
     let data_type_size_bytes = metadata_bands
         .iter()
@@ -564,137 +563,33 @@ where
         let mut collector = BandStatsCollector::new(band_index as u32, dtype_name);
         collector.set_total_cells(encoded_num_cells);
 
+        macro_rules! process_band_data {
+            ($t:ty) => {{
+                let raster = band.read_band_as::<$t>()?;
+                compute_chunk_bytes_from_data(
+                    raster.data(),
+                    width,
+                    height,
+                    gt,
+                    &src_srs_wkt,
+                    &chunk_child_centers,
+                    chunk_size,
+                    &mut collector,
+                )
+            }};
+        }
+
         let chunk_bytes = match band_type {
-            GdalDataType::UInt8 => {
-                let raster = band.read_band_as::<u8>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::Int8 => {
-                let raster = band.read_band_as::<i8>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::UInt16 => {
-                let raster = band.read_band_as::<u16>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::Int16 => {
-                let raster = band.read_band_as::<i16>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::UInt32 => {
-                let raster = band.read_band_as::<u32>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::Int32 => {
-                let raster = band.read_band_as::<i32>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::UInt64 => {
-                let raster = band.read_band_as::<u64>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::Int64 => {
-                let raster = band.read_band_as::<i64>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::Float32 => {
-                let raster = band.read_band_as::<f32>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
-            GdalDataType::Float64 => {
-                let raster = band.read_band_as::<f64>()?;
-                compute_chunk_bytes_from_data(
-                    raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
-                    chunk_size,
-                    &mut collector,
-                )
-            }
+            GdalDataType::UInt8 => process_band_data!(u8),
+            GdalDataType::Int8 => process_band_data!(i8),
+            GdalDataType::UInt16 => process_band_data!(u16),
+            GdalDataType::Int16 => process_band_data!(i16),
+            GdalDataType::UInt32 => process_band_data!(u32),
+            GdalDataType::Int32 => process_band_data!(i32),
+            GdalDataType::UInt64 => process_band_data!(u64),
+            GdalDataType::Int64 => process_band_data!(i64),
+            GdalDataType::Float32 => process_band_data!(f32),
+            GdalDataType::Float64 => process_band_data!(f64),
             _ => Err(EncodingError::GeoTiff(format!(
                 "unsupported GDAL data type: {band_type:?}"
             ))),

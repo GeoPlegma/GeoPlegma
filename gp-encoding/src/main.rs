@@ -44,6 +44,9 @@ struct ConvertGeotiffArgs {
     /// Optional compression for Zarr chunks.
     #[arg(long, value_enum)]
     compression: Option<Compression>,
+    /// Print conversion statistics after a successful conversion.
+    #[arg(long)]
+    report: bool,
 }
 
 #[derive(Args, Debug)]
@@ -124,8 +127,11 @@ fn run_convert_geotiff(args: ConvertGeotiffArgs) -> Result<(), String> {
     println!("  Input:      {}", args.input.display());
     println!("  Output:     {}", args.output.display());
     println!("  Levels:     {:?}", backend.levels());
-    print!("{source_report}");
-    print!("{conversion_report}");
+
+    if args.report {
+        print!("{source_report}");
+        print!("{conversion_report}");
+    }
 
     Ok(())
 }
