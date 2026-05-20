@@ -111,6 +111,19 @@ impl BandStatsCollector {
         self.total_cells = total;
     }
 
+    pub fn merge(&mut self, other: &BandStatsCollector) {
+        self.valued_cells += other.valued_cells;
+        if other.min < self.min {
+            self.min = other.min;
+        }
+        if other.max > self.max {
+            self.max = other.max;
+        }
+        self.sum += other.sum;
+        self.sum_sq += other.sum_sq;
+        self.values.extend_from_slice(&other.values);
+    }
+
     pub fn finish(self) -> BandStats {
         let histogram = if self.values.is_empty() {
             Vec::new()

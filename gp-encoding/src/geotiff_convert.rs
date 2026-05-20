@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use gdal::raster::GdalDataType;
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
@@ -7,6 +8,7 @@ use geoplegma::api::DggrsApiConfig;
 use geoplegma::get;
 use geoplegma::types::{BoundingBox, DggrsUid, Point, RefinementLevel, RelativeDepth};
 use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 
 use crate::AttributeSchema;
 use crate::common::CONFIG;
@@ -150,13 +152,13 @@ fn compute_chunk_bytes_from_data<T>(
     width: usize,
     height: usize,
     gt: [f64; 6],
-    wgs84_to_src: &CoordTransform,
+    src_srs_wkt: &str,
     chunk_child_centers: &[Vec<Point>],
     chunk_size: u64,
     stats: &mut BandStatsCollector,
 ) -> Result<Vec<Vec<u8>>, EncodingError>
 where
-    T: NativeBytes + Copy,
+    T: NativeBytes + Copy + Send + Sync,
 {
     let expected_pixels = width
         .checked_mul(height)
@@ -170,25 +172,55 @@ where
     }
 
     let value_size = std::mem::size_of::<T>();
+
+    let results: Vec<Result<(Vec<u8>, BandStatsCollector), EncodingError>> = chunk_child_centers
+        .par_iter()
+        .enumerate()
+        .map_init(
+            || -> Result<CoordTransform, EncodingError> {
+                let mut wgs84 = SpatialRef::from_epsg(4326)?;
+                wgs84.set_axis_mapping_strategy(
+                    gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder,
+                );
+                let src_srs = SpatialRef::from_wkt(src_srs_wkt)?;
+                Ok(CoordTransform::new(&wgs84, &src_srs)?)
+            },
+            |transform_result, (_chunk_idx, child_centers)| {
+                let wgs84_to_src = match transform_result {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Err(EncodingError::GeoTiff(format!(
+                            "failed to create CoordTransform: {e}"
+                        )))
+                    }
+                };
+
+                let mut local_stats = BandStatsCollector::new(0, String::new());
+                let mut bytes = vec![0_u8; chunk_size as usize * value_size];
+
+                for (in_chunk_index, center) in child_centers.iter().enumerate() {
+                    if let Some(pixel_index) =
+                        nearest_pixel_index_for_center(center, wgs84_to_src, gt, width, height)?
+                    {
+                        let value = data[pixel_index];
+                        local_stats.record_value(value.to_f64());
+                        let value_bytes = value.to_native_bytes();
+
+                        let start = in_chunk_index * value_size;
+                        let end = start + value_size;
+                        bytes[start..end].copy_from_slice(&value_bytes);
+                    }
+                }
+
+                Ok((bytes, local_stats))
+            },
+        )
+        .collect();
+
     let mut all_chunks = Vec::with_capacity(chunk_child_centers.len());
-
-    for child_centers in chunk_child_centers {
-        let mut bytes = vec![0_u8; chunk_size as usize * value_size];
-
-        for (in_chunk_index, center) in child_centers.iter().enumerate() {
-            if let Some(pixel_index) =
-                nearest_pixel_index_for_center(center, wgs84_to_src, gt, width, height)?
-            {
-                let value = data[pixel_index];
-                stats.record_value(value.to_f64());
-                let value_bytes = value.to_native_bytes();
-
-                let start = in_chunk_index * value_size;
-                let end = start + value_size;
-                bytes[start..end].copy_from_slice(&value_bytes);
-            }
-        }
-
+    for result in results {
+        let (bytes, local_stats) = result?;
+        stats.merge(&local_stats);
         all_chunks.push(bytes);
     }
 
@@ -460,9 +492,10 @@ where
     .progress_chars("=> ");
     chunk_progress.set_style(style);
 
+    let progress_counter = AtomicU64::new(0);
     let chunk_child_centers: Vec<Vec<Point>> = chunk_zones
         .zones
-        .iter()
+        .par_iter()
         .map(|chunk_zone| {
             let children =
                 grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(center_config))?;
@@ -475,7 +508,7 @@ where
                 )));
             }
 
-            children
+            let result = children
                 .zones
                 .iter()
                 .map(|child| {
@@ -486,8 +519,12 @@ where
                         ))
                     })
                 })
-                .collect::<Result<Vec<_>, EncodingError>>()
-                .inspect(|_| chunk_progress.inc(1))
+                .collect::<Result<Vec<_>, EncodingError>>();
+
+            let done = progress_counter.fetch_add(1, Ordering::Relaxed) + 1;
+            chunk_progress.set_position(done);
+
+            result
         })
         .collect::<Result<_, EncodingError>>()?;
     chunk_progress.finish_with_message("processing chunk zones [done]");
@@ -517,9 +554,7 @@ where
     let mut backend = B::create(output_path, metadata)?;
     backend.set_level_chunk_ids(refinement_level.get() as u32, chunk_level.get() as u32, chunk_ids.clone())?;
 
-    let mut wgs84 = SpatialRef::from_epsg(4326)?;
-    wgs84.set_axis_mapping_strategy(gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder);
-    let wgs84_to_src = CoordTransform::new(&wgs84, &src_srs)?;
+    let src_srs_wkt = src_srs.to_wkt()?;
 
     let mut band_stats = Vec::new();
 
@@ -537,7 +572,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -550,7 +585,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -563,7 +598,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -576,7 +611,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -589,7 +624,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -602,7 +637,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -615,7 +650,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -628,7 +663,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -641,7 +676,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -654,7 +689,7 @@ where
                     width,
                     height,
                     gt,
-                    &wgs84_to_src,
+                    &src_srs_wkt,
                     &chunk_child_centers,
                     chunk_size,
                     &mut collector,
@@ -674,14 +709,17 @@ where
             chunk_size,
         )?;
 
-        for (chunk_index, bytes) in chunk_bytes.iter().enumerate() {
-            backend.write_chunk(
-                refinement_level.get() as u32,
-                band_index as u32,
-                chunk_index as u64,
-                bytes,
-            )?;
-        }
+        chunk_bytes
+            .par_iter()
+            .enumerate()
+            .try_for_each(|(chunk_index, bytes)| {
+                backend.write_chunk(
+                    refinement_level.get() as u32,
+                    band_index as u32,
+                    chunk_index as u64,
+                    bytes,
+                )
+            })?;
     }
 
     let report = ConversionReport {
