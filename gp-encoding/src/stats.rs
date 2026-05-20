@@ -76,7 +76,6 @@ pub struct BandStatsCollector {
     max: f64,
     sum: f64,
     sum_sq: f64,
-    values: Vec<f64>,
 }
 
 impl BandStatsCollector {
@@ -90,7 +89,6 @@ impl BandStatsCollector {
             max: f64::NEG_INFINITY,
             sum: 0.0,
             sum_sq: 0.0,
-            values: Vec::new(),
         }
     }
 
@@ -104,7 +102,6 @@ impl BandStatsCollector {
         }
         self.sum += value;
         self.sum_sq += value * value;
-        self.values.push(value);
     }
 
     pub fn set_total_cells(&mut self, total: u64) {
@@ -121,16 +118,9 @@ impl BandStatsCollector {
         }
         self.sum += other.sum;
         self.sum_sq += other.sum_sq;
-        self.values.extend_from_slice(&other.values);
     }
 
     pub fn finish(self) -> BandStats {
-        let histogram = if self.values.is_empty() {
-            Vec::new()
-        } else {
-            build_histogram(&self.values, self.min, self.max)
-        };
-
         BandStats {
             band_index: self.band_index,
             dtype_name: self.dtype_name,
@@ -149,57 +139,8 @@ impl BandStatsCollector {
             },
             sum: self.sum,
             sum_sq: self.sum_sq,
-            histogram,
+            histogram: Vec::new(),
         }
-    }
-}
-
-const HISTOGRAM_BUCKETS: usize = 10;
-
-fn build_histogram(values: &[f64], min: f64, max: f64) -> Vec<(String, u64)> {
-    if values.is_empty() {
-        return Vec::new();
-    }
-
-    // If all values are the same, return a single bucket.
-    if (max - min).abs() < f64::EPSILON {
-        return vec![(format_bucket_value(min), values.len() as u64)];
-    }
-
-    let num_buckets = HISTOGRAM_BUCKETS;
-    let range = max - min;
-    let bucket_width = range / num_buckets as f64;
-
-    let mut counts = vec![0u64; num_buckets];
-
-    for &v in values {
-        let idx = ((v - min) / bucket_width) as usize;
-        // Clamp the last value into the final bucket.
-        let idx = idx.min(num_buckets - 1);
-        counts[idx] += 1;
-    }
-
-    counts
-        .iter()
-        .enumerate()
-        .map(|(i, &count)| {
-            let lo = min + (i as f64) * bucket_width;
-            let hi = lo + bucket_width;
-            let label = if i == num_buckets - 1 {
-                format!("[{}, {}]", format_bucket_value(lo), format_bucket_value(hi))
-            } else {
-                format!("[{}, {})", format_bucket_value(lo), format_bucket_value(hi))
-            };
-            (label, count)
-        })
-        .collect()
-}
-
-fn format_bucket_value(v: f64) -> String {
-    if v.fract() == 0.0 && v.abs() < 1e15 {
-        format!("{:.0}", v)
-    } else {
-        format!("{:.4}", v)
     }
 }
 

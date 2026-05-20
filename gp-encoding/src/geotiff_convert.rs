@@ -149,77 +149,39 @@ fn nearest_pixel_index_for_center(
 
 fn compute_chunk_bytes_from_data<T>(
     data: &[T],
-    width: usize,
-    height: usize,
-    gt: [f64; 6],
-    src_srs_wkt: &str,
-    chunk_child_centers: &[Vec<Point>],
+    chunk_pixel_indices: &[Vec<Option<usize>>],
     chunk_size: u64,
     stats: &mut BandStatsCollector,
 ) -> Result<Vec<Vec<u8>>, EncodingError>
 where
     T: NativeBytes + Copy + Send + Sync,
 {
-    let expected_pixels = width
-        .checked_mul(height)
-        .ok_or_else(|| EncodingError::GeoTiff("raster pixel count overflow".into()))?;
-    if data.len() != expected_pixels {
-        return Err(EncodingError::GeoTiff(format!(
-            "raster data length {} does not match expected pixel count {}",
-            data.len(),
-            expected_pixels
-        )));
-    }
-
     let value_size = std::mem::size_of::<T>();
 
-    let results: Vec<Result<(Vec<u8>, BandStatsCollector), EncodingError>> = chunk_child_centers
+    let results: Vec<(Vec<u8>, BandStatsCollector)> = chunk_pixel_indices
         .par_iter()
-        .enumerate()
-        .map_init(
-            || -> Result<CoordTransform, EncodingError> {
-                let mut wgs84 = SpatialRef::from_epsg(4326)?;
-                wgs84.set_axis_mapping_strategy(
-                    gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder,
-                );
-                let src_srs = SpatialRef::from_wkt(src_srs_wkt)?;
-                Ok(CoordTransform::new(&wgs84, &src_srs)?)
-            },
-            |transform_result, (_chunk_idx, child_centers)| {
-                let wgs84_to_src = match transform_result {
-                    Ok(t) => t,
-                    Err(e) => {
-                        return Err(EncodingError::GeoTiff(format!(
-                            "failed to create CoordTransform: {e}"
-                        )))
-                    }
-                };
+        .map(|pixel_indices| {
+            let mut local_stats = BandStatsCollector::new(0, String::new());
+            let mut bytes = vec![0_u8; chunk_size as usize * value_size];
 
-                let mut local_stats = BandStatsCollector::new(0, String::new());
-                let mut bytes = vec![0_u8; chunk_size as usize * value_size];
+            for (in_chunk_index, &pixel_index_opt) in pixel_indices.iter().enumerate() {
+                if let Some(pixel_index) = pixel_index_opt {
+                    let value = data[pixel_index];
+                    local_stats.record_value(value.to_f64());
+                    let value_bytes = value.to_native_bytes();
 
-                for (in_chunk_index, center) in child_centers.iter().enumerate() {
-                    if let Some(pixel_index) =
-                        nearest_pixel_index_for_center(center, wgs84_to_src, gt, width, height)?
-                    {
-                        let value = data[pixel_index];
-                        local_stats.record_value(value.to_f64());
-                        let value_bytes = value.to_native_bytes();
-
-                        let start = in_chunk_index * value_size;
-                        let end = start + value_size;
-                        bytes[start..end].copy_from_slice(&value_bytes);
-                    }
+                    let start = in_chunk_index * value_size;
+                    let end = start + value_size;
+                    bytes[start..end].copy_from_slice(&value_bytes);
                 }
+            }
 
-                Ok((bytes, local_stats))
-            },
-        )
+            (bytes, local_stats)
+        })
         .collect();
 
-    let mut all_chunks = Vec::with_capacity(chunk_child_centers.len());
-    for result in results {
-        let (bytes, local_stats) = result?;
+    let mut all_chunks = Vec::with_capacity(chunk_pixel_indices.len());
+    for (bytes, local_stats) in results {
         stats.merge(&local_stats);
         all_chunks.push(bytes);
     }
@@ -555,6 +517,37 @@ where
 
     let src_srs_wkt = src_srs.to_wkt()?;
 
+    let chunk_pixel_indices: Vec<Vec<Option<usize>>> = chunk_child_centers
+        .par_iter()
+        .map_init(
+            || -> Result<CoordTransform, EncodingError> {
+                let mut wgs84 = SpatialRef::from_epsg(4326)?;
+                wgs84.set_axis_mapping_strategy(
+                    gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder,
+                );
+                let src_srs = SpatialRef::from_wkt(&src_srs_wkt)?;
+                Ok(CoordTransform::new(&wgs84, &src_srs)?)
+            },
+            |transform_result, child_centers| {
+                let wgs84_to_src = match transform_result {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Err(EncodingError::GeoTiff(format!(
+                            "failed to create CoordTransform: {e}"
+                        )))
+                    }
+                };
+
+                let mut indices = Vec::with_capacity(child_centers.len());
+                for center in child_centers {
+                    let idx = nearest_pixel_index_for_center(center, wgs84_to_src, gt, width, height)?;
+                    indices.push(idx);
+                }
+                Ok(indices)
+            },
+        )
+        .collect::<Result<_, EncodingError>>()?;
+
     let mut band_stats = Vec::new();
 
     for (band_index, band_type) in bands.into_iter().enumerate() {
@@ -566,13 +559,16 @@ where
         macro_rules! process_band_data {
             ($t:ty) => {{
                 let raster = band.read_band_as::<$t>()?;
+                if raster.data().len() != width * height {
+                    return Err(EncodingError::GeoTiff(format!(
+                        "raster data length {} does not match expected pixel count {}",
+                        raster.data().len(),
+                        width * height
+                    )));
+                }
                 compute_chunk_bytes_from_data(
                     raster.data(),
-                    width,
-                    height,
-                    gt,
-                    &src_srs_wkt,
-                    &chunk_child_centers,
+                    &chunk_pixel_indices,
                     chunk_size,
                     &mut collector,
                 )
