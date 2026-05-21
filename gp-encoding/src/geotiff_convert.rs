@@ -525,7 +525,10 @@ where
                 wgs84.set_axis_mapping_strategy(
                     gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder,
                 );
-                let src_srs = SpatialRef::from_wkt(&src_srs_wkt)?;
+                let mut src_srs = SpatialRef::from_wkt(&src_srs_wkt)?;
+                src_srs.set_axis_mapping_strategy(
+                    gdal::spatial_ref::AxisMappingStrategy::TraditionalGisOrder,
+                );
                 Ok(CoordTransform::new(&wgs84, &src_srs)?)
             },
             |transform_result, child_centers| {
