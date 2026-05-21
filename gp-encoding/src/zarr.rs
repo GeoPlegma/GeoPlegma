@@ -1,9 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
 use geoplegma::get;
+use rayon::prelude::*;
 use geoplegma::types::{RefinementLevel, RelativeDepth, ZoneId};
 use indicatif::{ProgressBar, ProgressStyle};
 use zarrs::array::codec::api::BytesToBytesCodecTraits;
@@ -246,7 +247,6 @@ impl ZarrBackend {
         }
 
         let chunk_level_steps = source_chunk_level.get() - target_chunk_level.get();
-        let mut target_chunk_set = BTreeSet::new();
 
         let map_progress = ProgressBar::new(source_chunk_ids.len() as u64);
         let map_style = ProgressStyle::with_template(
@@ -256,27 +256,39 @@ impl ZarrBackend {
         .progress_chars("=> ");
         map_progress.set_style(map_style);
 
-        for chunk_id in source_chunk_ids.iter() {
-            let mut zone_id = ZoneId::from_str(chunk_id.as_str()).map_err(|e| {
-                EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
-            })?;
-
-            for _ in 0..chunk_level_steps {
-                let parent = grid
-                    .primary_parent_from_zone(zone_id, Some(ID_ONLY_CONFIG))
-                    .map_err(|e| EncodingError::Grid(e.to_string()))?;
-                let parent_zone = parent.zones.first().ok_or_else(|| {
-                    EncodingError::Grid("primary_parent_from_zone returned no zones".into())
+        // Map source chunks to target chunks in parallel
+        let mapped_chunks: Vec<(String, (usize, String))> = source_chunk_ids
+            .par_iter()
+            .enumerate()
+            .map(|(source_chunk_index, source_chunk_id)| {
+                let mut zone_id = ZoneId::from_str(source_chunk_id.as_str()).map_err(|e| {
+                    EncodingError::Storage(format!("invalid chunk id '{source_chunk_id}': {e}"))
                 })?;
-                zone_id = parent_zone.id.clone();
-            }
 
-            target_chunk_set.insert(zone_id.to_string());
-            map_progress.inc(1);
-        }
+                for _ in 0..chunk_level_steps {
+                    let parent = grid
+                        .primary_parent_from_zone(zone_id, Some(ID_ONLY_CONFIG))
+                        .map_err(|e| EncodingError::Grid(e.to_string()))?;
+                    let parent_zone = parent.zones.first().ok_or_else(|| {
+                        EncodingError::Grid("primary_parent_from_zone returned no zones".into())
+                    })?;
+                    zone_id = parent_zone.id.clone();
+                }
+
+                map_progress.inc(1);
+                Ok((zone_id.to_string(), (source_chunk_index, source_chunk_id.clone())))
+            })
+            .collect::<Result<Vec<_>, EncodingError>>()?;
         map_progress.finish_with_message("mapping chunks [done]");
 
-        let target_chunk_ids: Vec<String> = target_chunk_set.into_iter().collect();
+        let mut target_to_sources: HashMap<String, Vec<(usize, String)>> = HashMap::new();
+        for (target_chunk_id, source_info) in mapped_chunks {
+            target_to_sources.entry(target_chunk_id).or_default().push(source_info);
+        }
+
+        let mut target_chunk_ids: Vec<String> = target_to_sources.keys().cloned().collect();
+        target_chunk_ids.sort();
+
         if target_chunk_ids.is_empty() {
             return Err(EncodingError::Storage(
                 "target level has no chunk IDs".into(),
@@ -285,49 +297,6 @@ impl ZarrBackend {
 
         let relative_depth = RelativeDepth::new(target_level_i32 - target_chunk_level.get())?;
         let band_count = self.band_count() as usize;
-
-        let mut cell_index_map: HashMap<ZoneId, (usize, usize)> = HashMap::new();
-        let mut accumulators: Vec<Vec<BandAccumulator>> =
-            Vec::with_capacity(target_chunk_ids.len());
-
-        let init_progress = ProgressBar::new(target_chunk_ids.len() as u64);
-        let init_style = ProgressStyle::with_template(
-            "initializing target chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
-        )
-        .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
-        .progress_chars("=> ");
-        init_progress.set_style(init_style);
-
-        for (chunk_index, chunk_id) in target_chunk_ids.iter().enumerate() {
-            let chunk_zone_id = ZoneId::from_str(chunk_id).map_err(|e| {
-                EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
-            })?;
-
-            let children = grid
-                .zones_from_parent(relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
-                .map_err(|e| EncodingError::Grid(e.to_string()))?;
-
-            if children.zones.len() > chunk_size as usize {
-                return Err(EncodingError::Storage(format!(
-                    "chunk {chunk_id} has {} children but chunk_size is {}",
-                    children.zones.len(),
-                    chunk_size
-                )));
-            }
-
-            let mut band_accumulators = Vec::with_capacity(band_count);
-            for _ in 0..band_count {
-                band_accumulators.push(BandAccumulator::new(chunk_size as usize));
-            }
-
-            for (cell_index, zone) in children.zones.iter().enumerate() {
-                cell_index_map.insert(zone.id.clone(), (chunk_index, cell_index));
-            }
-
-            accumulators.push(band_accumulators);
-            init_progress.inc(1);
-        }
-        init_progress.finish_with_message("initializing target chunks [done]");
 
         let source_relative_depth =
             RelativeDepth::new(source_level_i32 - source_chunk_level.get())?;
@@ -343,69 +312,6 @@ impl ZarrBackend {
                     .transpose()
             })
             .collect::<Result<_, EncodingError>>()?;
-
-        let read_progress = ProgressBar::new(source_chunk_ids.len() as u64);
-        let read_style = ProgressStyle::with_template(
-            "reading source chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
-        )
-        .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
-        .progress_chars("=> ");
-        read_progress.set_style(read_style);
-
-        for (chunk_index, chunk_id) in source_chunk_ids.iter().enumerate() {
-            let chunk_zone_id = ZoneId::from_str(chunk_id.as_str()).map_err(|e| {
-                EncodingError::Storage(format!("invalid chunk id '{chunk_id}': {e}"))
-            })?;
-
-            let children = grid
-                .zones_from_parent(source_relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
-                .map_err(|e| EncodingError::Grid(e.to_string()))?;
-
-            let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
-                .map(|band| self.read_chunk(source_level, band as u32, chunk_index as u64))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            for (in_chunk_index, zone) in children.zones.iter().enumerate() {
-                let mut target_zone_id = zone.id.clone();
-                for _ in 0..level_steps {
-                    let parent = grid
-                        .primary_parent_from_zone(target_zone_id, Some(ID_ONLY_CONFIG))
-                        .map_err(|e| EncodingError::Grid(e.to_string()))?;
-                    let parent_zone = parent.zones.first().ok_or_else(|| {
-                        EncodingError::Grid("primary_parent_from_zone returned no zones".into())
-                    })?;
-                    target_zone_id = parent_zone.id.clone();
-                }
-
-                let Some((target_chunk_index, target_cell_index)) =
-                    cell_index_map.get(&target_zone_id).copied()
-                else {
-                    continue;
-                };
-
-                for band in 0..band_count {
-                    let dtype = &self.metadata.attributes[band].dtype;
-                    let value_size = dtype.byte_size();
-                    let chunk = &chunks_for_bands[band];
-                    let start = in_chunk_index * value_size;
-                    let end = start + value_size;
-                    if chunk.len() < end {
-                        return Err(EncodingError::Storage(format!(
-                            "chunk {chunk_index} at level {source_level} is too small for child index {in_chunk_index}"
-                        )));
-                    }
-
-                    let value = decode_value_to_f64(dtype, &chunk[start..end])?;
-                    if fill_values[band].is_some_and(|fill_value| fill_value == value) {
-                        continue;
-                    }
-
-                    accumulators[target_chunk_index][band].record(target_cell_index, value);
-                }
-            }
-            read_progress.inc(1);
-        }
-        read_progress.finish_with_message("reading source chunks [done]");
 
         self.set_level_chunk_ids(target_level, target_chunk_level.get() as u32, target_chunk_ids.clone())?;
 
@@ -430,33 +336,115 @@ impl ZarrBackend {
             })
             .collect::<Result<_, EncodingError>>()?;
 
-        let write_progress = ProgressBar::new(accumulators.len() as u64);
-        let write_style = ProgressStyle::with_template(
-            "writing target chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
+        let process_progress = ProgressBar::new(target_chunk_ids.len() as u64);
+        let process_style = ProgressStyle::with_template(
+            "processing and writing target chunks [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)",
         )
         .map_err(|e| EncodingError::Storage(format!("invalid progress bar template: {e}")))?
         .progress_chars("=> ");
-        write_progress.set_style(write_style);
+        process_progress.set_style(process_style);
 
-        for (chunk_index, band_accumulators) in accumulators.iter().enumerate() {
-            for (band, accumulator) in band_accumulators.iter().enumerate() {
-                let dtype = &self.metadata.attributes[band].dtype;
-                let mut bytes = Vec::with_capacity(chunk_size as usize * dtype.byte_size());
+        target_chunk_ids
+            .par_iter()
+            .enumerate()
+            .try_for_each(|(target_chunk_index, target_chunk_id)| {
+                let chunk_zone_id = ZoneId::from_str(target_chunk_id).map_err(|e| {
+                    EncodingError::Storage(format!("invalid chunk id '{target_chunk_id}': {e}"))
+                })?;
 
-                for cell_index in 0..chunk_size as usize {
-                    let value_bytes = if let Some(value) = accumulator.average(cell_index) {
-                        encode_value_from_f64(dtype, value)?
-                    } else {
-                        fill_bytes[band].clone()
-                    };
-                    bytes.extend_from_slice(&value_bytes);
+                let children = grid
+                    .zones_from_parent(relative_depth, chunk_zone_id, Some(ID_ONLY_CONFIG))
+                    .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+                if children.zones.len() > chunk_size as usize {
+                    return Err(EncodingError::Storage(format!(
+                        "chunk {target_chunk_id} has {} children but chunk_size is {}",
+                        children.zones.len(),
+                        chunk_size
+                    )));
                 }
 
-                self.write_chunk(target_level, band as u32, chunk_index as u64, &bytes)?;
-            }
-            write_progress.inc(1);
-        }
-        write_progress.finish_with_message("writing target chunks [done]");
+                let mut cell_index_map: HashMap<ZoneId, usize> = HashMap::with_capacity(children.zones.len());
+                for (cell_index, zone) in children.zones.iter().enumerate() {
+                    cell_index_map.insert(zone.id.clone(), cell_index);
+                }
+
+                let mut band_accumulators = Vec::with_capacity(band_count);
+                for _ in 0..band_count {
+                    band_accumulators.push(BandAccumulator::new(chunk_size as usize));
+                }
+
+                if let Some(src_list) = target_to_sources.get(target_chunk_id) {
+                    for &(source_chunk_index, ref source_chunk_id) in src_list {
+                        let src_chunk_zone_id = ZoneId::from_str(source_chunk_id.as_str()).map_err(|e| {
+                            EncodingError::Storage(format!("invalid chunk id '{source_chunk_id}': {e}"))
+                        })?;
+
+                        let src_children = grid
+                            .zones_from_parent(source_relative_depth, src_chunk_zone_id, Some(ID_ONLY_CONFIG))
+                            .map_err(|e| EncodingError::Grid(e.to_string()))?;
+
+                        let chunks_for_bands: Vec<Vec<u8>> = (0..band_count)
+                            .map(|band| self.read_chunk(source_level, band as u32, source_chunk_index as u64))
+                            .collect::<Result<Vec<_>, _>>()?;
+
+                        for (in_chunk_index, zone) in src_children.zones.iter().enumerate() {
+                            let mut target_zone_id = zone.id.clone();
+                            for _ in 0..level_steps {
+                                let parent = grid
+                                    .primary_parent_from_zone(target_zone_id, Some(ID_ONLY_CONFIG))
+                                    .map_err(|e| EncodingError::Grid(e.to_string()))?;
+                                let parent_zone = parent.zones.first().ok_or_else(|| {
+                                    EncodingError::Grid("primary_parent_from_zone returned no zones".into())
+                                })?;
+                                target_zone_id = parent_zone.id.clone();
+                            }
+
+                            if let Some(&target_cell_index) = cell_index_map.get(&target_zone_id) {
+                                for band in 0..band_count {
+                                    let dtype = &self.metadata.attributes[band].dtype;
+                                    let value_size = dtype.byte_size();
+                                    let chunk = &chunks_for_bands[band];
+                                    let start = in_chunk_index * value_size;
+                                    let end = start + value_size;
+                                    if chunk.len() < end {
+                                        return Err(EncodingError::Storage(format!(
+                                            "chunk {source_chunk_index} at level {source_level} is too small for child index {in_chunk_index}"
+                                        )));
+                                    }
+
+                                    let value = decode_value_to_f64(dtype, &chunk[start..end])?;
+                                    if fill_values[band].is_some_and(|fill_value| fill_value == value) {
+                                        continue;
+                                    }
+
+                                    band_accumulators[band].record(target_cell_index, value);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                for band in 0..band_count {
+                    let dtype = &self.metadata.attributes[band].dtype;
+                    let mut bytes = Vec::with_capacity(chunk_size as usize * dtype.byte_size());
+
+                    for cell_index in 0..chunk_size as usize {
+                        let value_bytes = if let Some(value) = band_accumulators[band].average(cell_index) {
+                            encode_value_from_f64(dtype, value)?
+                        } else {
+                            fill_bytes[band].clone()
+                        };
+                        bytes.extend_from_slice(&value_bytes);
+                    }
+
+                    self.write_chunk(target_level, band as u32, target_chunk_index as u64, &bytes)?;
+                }
+
+                process_progress.inc(1);
+                Ok(())
+            })?;
+        process_progress.finish_with_message("processing and writing target chunks [done]");
 
         self.metadata.levels.push(target_level);
         self.metadata.levels.sort_unstable();

@@ -11,7 +11,6 @@ pub struct BandStats {
     pub max: f64,
     pub sum: f64,
     pub sum_sq: f64,
-    pub histogram: Vec<(String, u64)>,
 }
 
 impl BandStats {
@@ -139,7 +138,6 @@ impl BandStatsCollector {
             },
             sum: self.sum,
             sum_sq: self.sum_sq,
-            histogram: Vec::new(),
         }
     }
 }
