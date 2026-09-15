@@ -23,6 +23,9 @@ pub enum EncodingError {
     #[error("DGGRS Fabric error: {0}")]
     DggrsFabric(#[from] geoplegma::error::factory::FactoryError),
 
+    #[error("DGGRS UID error: {0}")]
+    DggrsUid(#[from] geoplegma::error::factory::DggrsUidError),
+
     #[error("Dataset error: {0}")]
     Dataset(String),
 
