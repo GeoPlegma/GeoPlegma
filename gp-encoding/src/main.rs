@@ -12,8 +12,9 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use geoplegma::types::{DggrsUid, Point, RefinementLevel};
 use gp_encoding::{
-    Compression, StorageBackend, ZarrBackend, convert_dggrs_store_to_backend,
-    convert_to_backend, format_value, query_value_for_point, vector,
+    Compression, StorageBackend, ZarrBackend, compute_source_report,
+    convert_dggrs_store_to_backend, convert_to_backend, format_value, open_raster_dataset,
+    query_value_for_point, vector,
 };
 
 #[derive(Parser, Debug)]
@@ -258,7 +259,18 @@ fn run_convert(args: ConvertArgs) -> Result<(), String> {
                 )
             };
 
-            let (backend, source_report, conversion_report) = if let Some(threads) = args.threads {
+            let source_report = if args.report {
+                let (source_dataset, _) = open_raster_dataset(
+                    &args.input.to_string_lossy(),
+                    args.subdataset.as_deref(),
+                )
+                .map_err(|e| e.to_string())?;
+                Some(compute_source_report(&source_dataset).map_err(|e| e.to_string())?)
+            } else {
+                None
+            };
+
+            let (backend, conversion_report) = if let Some(threads) = args.threads {
                 let pool = rayon::ThreadPoolBuilder::new()
                     .num_threads(threads)
                     .build()
@@ -278,7 +290,9 @@ fn run_convert(args: ConvertArgs) -> Result<(), String> {
             println!("  Levels:          {:?}", backend.levels());
 
             if args.report {
-                print!("{source_report}");
+                if let Some(source_report) = source_report {
+                    print!("{source_report}");
+                }
                 print!("{conversion_report}");
             }
         }
