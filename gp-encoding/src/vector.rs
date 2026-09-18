@@ -201,7 +201,7 @@ fn convert_coordinates(
     Ok(())
 }
 
-pub fn convert_geojson_in_place(
+fn encode_geojson_coordinates_in_place(
     val: &mut Value,
     dggrs: &dyn DggrsApi,
     refinement_level: RefinementLevel,
@@ -218,19 +218,19 @@ pub fn convert_geojson_in_place(
                 "GeometryCollection" => {
                     if let Some(geometries) = obj.get_mut("geometries").and_then(|g| g.as_array_mut()) {
                         for geom in geometries {
-                            convert_geojson_in_place(geom, dggrs, refinement_level)?;
+                            encode_geojson_coordinates_in_place(geom, dggrs, refinement_level)?;
                         }
                     }
                 }
                 "Feature" => {
                     if let Some(geom) = obj.get_mut("geometry") {
-                        convert_geojson_in_place(geom, dggrs, refinement_level)?;
+                        encode_geojson_coordinates_in_place(geom, dggrs, refinement_level)?;
                     }
                 }
                 "FeatureCollection" => {
                     if let Some(features) = obj.get_mut("features").and_then(|f| f.as_array_mut()) {
                         for feat in features {
-                            convert_geojson_in_place(feat, dggrs, refinement_level)?;
+                            encode_geojson_coordinates_in_place(feat, dggrs, refinement_level)?;
                         }
                     }
                 }
@@ -241,7 +241,151 @@ pub fn convert_geojson_in_place(
     Ok(())
 }
 
-pub fn convert_vector_file_to_json(
+fn decode_zone_id_to_coord(
+    val: &Value,
+    dggrs: &dyn DggrsApi,
+) -> Result<Value, EncodingError> {
+    if let Some(s) = val.as_str() {
+        let zone_id = std::str::FromStr::from_str(s)?;
+        let config = geoplegma::api::DggrsApiConfig {
+            region: false,
+            center: true,
+            vertex_count: false,
+            children: false,
+            neighbors: false,
+            area_sqm: false,
+            densify: false,
+        };
+        let zones = dggrs.zone_from_id(zone_id, Some(config))?;
+        let center = zones
+            .zones
+            .into_iter()
+            .next()
+            .and_then(|z| z.center)
+            .ok_or(EncodingError::InvalidCoordinateFormat)?;
+        Ok(json!([center.lon, center.lat]))
+    } else if val.is_array() {
+        Ok(val.clone())
+    } else {
+        Err(EncodingError::InvalidCoordinateFormat)
+    }
+}
+
+fn decode_coordinates(
+    coords: &mut Value,
+    geom_type: &str,
+    dggrs: &dyn DggrsApi,
+) -> Result<(), EncodingError> {
+    match geom_type {
+        "Point" => {
+            *coords = decode_zone_id_to_coord(coords, dggrs)?;
+        }
+        "MultiPoint" | "LineString" => {
+            if let Some(arr) = coords.as_array_mut() {
+                let mut new_arr = Vec::with_capacity(arr.len());
+                for c in arr {
+                    new_arr.push(decode_zone_id_to_coord(c, dggrs)?);
+                }
+                *coords = Value::Array(new_arr);
+            }
+        }
+        "MultiLineString" | "Polygon" => {
+            if let Some(arr2d) = coords.as_array_mut() {
+                for arr1d in arr2d {
+                    if let Some(arr) = arr1d.as_array_mut() {
+                        let mut new_arr = Vec::with_capacity(arr.len());
+                        for c in arr {
+                            new_arr.push(decode_zone_id_to_coord(c, dggrs)?);
+                        }
+                        *arr1d = Value::Array(new_arr);
+                    }
+                }
+            }
+        }
+        "MultiPolygon" => {
+            if let Some(arr3d) = coords.as_array_mut() {
+                for arr2d in arr3d {
+                    if let Some(arr2d_mut) = arr2d.as_array_mut() {
+                        for arr1d in arr2d_mut {
+                            if let Some(arr) = arr1d.as_array_mut() {
+                                let mut new_arr = Vec::with_capacity(arr.len());
+                                for c in arr {
+                                    new_arr.push(decode_zone_id_to_coord(c, dggrs)?);
+                                }
+                                *arr1d = Value::Array(new_arr);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn decode_geojson_coordinates_in_place(
+    val: &mut Value,
+    dggrs: &dyn DggrsApi,
+) -> Result<(), EncodingError> {
+    if let Some(obj) = val.as_object_mut() {
+        let type_val = obj.get("type").and_then(|t| t.as_str().map(|s| s.to_string()));
+        if let Some(type_str) = type_val {
+            match type_str.as_str() {
+                "Point" | "MultiPoint" | "LineString" | "MultiLineString" | "Polygon" | "MultiPolygon" => {
+                    if let Some(coords) = obj.get_mut("coordinates") {
+                        decode_coordinates(coords, &type_str, dggrs)?;
+                    }
+                }
+                "GeometryCollection" => {
+                    if let Some(geometries) = obj.get_mut("geometries").and_then(|g| g.as_array_mut()) {
+                        for geom in geometries {
+                            decode_geojson_coordinates_in_place(geom, dggrs)?;
+                        }
+                    }
+                }
+                "Feature" => {
+                    if let Some(geom) = obj.get_mut("geometry") {
+                        decode_geojson_coordinates_in_place(geom, dggrs)?;
+                    }
+                }
+                "FeatureCollection" => {
+                    if let Some(features) = obj.get_mut("features").and_then(|f| f.as_array_mut()) {
+                        for feat in features {
+                            decode_geojson_coordinates_in_place(feat, dggrs)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    Ok(())
+}
+
+pub fn decode(mut val: Value) -> Result<Value, EncodingError> {
+    let dggrs_uid = if let Some(dggrs_val) = val.get("dggrs").and_then(|v| v.as_str()) {
+        Some(std::str::FromStr::from_str(dggrs_val)?)
+    } else {
+        None
+    };
+
+    if let Some(uid) = dggrs_uid {
+        let grid = geoplegma::get(uid)?;
+        if let Some(layers) = val.get_mut("layers").and_then(|l| l.as_object_mut()) {
+            for (_, layer_val) in layers.iter_mut() {
+                decode_geojson_coordinates_in_place(layer_val, grid.as_ref())?;
+            }
+        } else {
+            decode_geojson_coordinates_in_place(&mut val, grid.as_ref())?;
+        }
+    }
+
+    Ok(val)
+}
+
+
+pub fn encode(
     input_path: &Path,
     output_path: &Path,
     dggrs_uid: DggrsUid,
@@ -281,7 +425,7 @@ pub fn convert_vector_file_to_json(
                 let normalized_geom = normalized_geometry_to_wgs84(gdal_geom, layer_srs.as_ref())?;
                 let geo_geom = normalized_geom.to_geo()?;
                 geom_val = geo_to_geojson_value(&geo_geom);
-                convert_geojson_in_place(&mut geom_val, grid.as_ref(), refinement_level)?;
+                encode_geojson_coordinates_in_place(&mut geom_val, grid.as_ref(), refinement_level)?;
             }
 
             features_arr.push(json!({
@@ -322,7 +466,7 @@ pub fn convert_vector_file_to_json(
                     let normalized_geom = normalized_geometry_to_wgs84(gdal_geom, layer_srs.as_ref())?;
                     let geo_geom = normalized_geom.to_geo()?;
                     geom_val = geo_to_geojson_value(&geo_geom);
-                    convert_geojson_in_place(&mut geom_val, grid.as_ref(), refinement_level)?;
+                    encode_geojson_coordinates_in_place(&mut geom_val, grid.as_ref(), refinement_level)?;
                 }
 
                 features_arr.push(json!({
