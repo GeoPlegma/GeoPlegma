@@ -1,32 +1,31 @@
 use geoplegma::types::{DggrsUid, RefinementLevel};
-use gp_encoding::{convert_geojson_in_place, convert_vector_file_to_json};
+use gp_encoding::vector::{decode, encode};
 use serde_json::json;
 use std::fs;
 
 #[test]
-fn test_convert_geojson_in_place() {
-    let mut val = json!({
+fn test_decode() {
+    let val = json!({
+        "dggrs": "H3",
         "type": "Feature",
         "geometry": {
             "type": "Point",
-            "coordinates": [12.4924, 41.8902]
+            "coordinates": "871e80531ffffff"
         },
         "properties": {
             "name": "Colosseum"
         }
     });
 
-    let grid = geoplegma::get(DggrsUid::H3).unwrap();
-    let refinement = RefinementLevel::from(7u8);
+    let val = decode(val).unwrap();
 
-    convert_geojson_in_place(&mut val, grid.as_ref(), refinement).unwrap();
-
-    let cell_id = val["geometry"]["coordinates"].as_str().unwrap();
-    assert!(!cell_id.is_empty());
+    let coordinates = val["geometry"]["coordinates"].as_array().unwrap();
+    assert_eq!(coordinates.len(), 2);
+    assert!(coordinates.iter().all(|coordinate| coordinate.is_number()));
 }
 
 #[test]
-fn test_convert_vector_file_to_json_end_to_end() {
+fn test_encode_end_to_end() {
     let geojson_content = json!({
         "type": "FeatureCollection",
         "features": [
@@ -50,7 +49,7 @@ fn test_convert_vector_file_to_json_end_to_end() {
 
     fs::write(&input_path, serde_json::to_string(&geojson_content).unwrap()).unwrap();
 
-    convert_vector_file_to_json(
+    encode(
         &input_path,
         &output_path,
         DggrsUid::H3,
