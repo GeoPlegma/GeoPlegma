@@ -59,7 +59,7 @@ fn main() {
     let input_raster = "input.tif";
     let output_zarr = Path::new("output.zarr");
 
-    convert_to_backend::<ZarrBackend>(
+    let (_backend, conversion_report) = convert_to_backend::<ZarrBackend>(
         input_raster,
         None, // optional subdataset
         output_zarr,

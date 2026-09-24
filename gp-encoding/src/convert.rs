@@ -21,7 +21,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 use crate::AttributeSchema;
-use crate::common::{CONFIG, ID_ONLY_CONFIG};
+use crate::common::{CENTER_CONFIG, CONFIG, ID_ONLY_CONFIG};
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
 use crate::stats::{BandStatsCollector, ConversionReport, SourceRasterReport};
@@ -385,18 +385,11 @@ pub fn get_subdataset_short_name(name: &str) -> String {
     last_part.trim_matches(|c| c == '/' || c == '"' || c == '\'' || c == ' ').to_string()
 }
 
-pub fn convert_to_backend<B>(
+/// Open a raster dataset, resolving an optional GDAL subdataset name.
+pub fn open_raster_dataset(
     input_str: &str,
     subdataset: Option<&str>,
-    output_path: &Path,
-    dggrs: DggrsUid,
-    compression: Option<Compression>,
-) -> Result<(B, SourceRasterReport, ConversionReport), EncodingError>
-where
-    B: StorageBackend,
-{
-    let grid = get(dggrs)?;
-
+) -> Result<(Dataset, String), EncodingError> {
     let initial_dataset = Dataset::open(input_str).map_err(|e| {
         EncodingError::Dataset(format!(
             "failed to open input dataset '{}': {e}",
@@ -405,20 +398,21 @@ where
     })?;
 
     let subdatasets = list_subdatasets(&initial_dataset);
-    let (dataset, open_str) = if !subdatasets.is_empty() {
+    if !subdatasets.is_empty() {
         if let Some(sub) = subdataset {
             let matched = subdatasets.iter().find(|(name, _)| {
                 let short_name = get_subdataset_short_name(name);
-                short_name.eq_ignore_ascii_case(sub) || short_name.to_lowercase().contains(&sub.to_lowercase())
+                short_name.eq_ignore_ascii_case(sub)
+                    || short_name.to_lowercase().contains(&sub.to_lowercase())
             });
             if let Some((name, _)) = matched {
-                let ds = Dataset::open(name).map_err(|e| {
+                let dataset = Dataset::open(name).map_err(|e| {
                     EncodingError::Dataset(format!(
                         "failed to open subdataset '{}': {e}",
                         name
                     ))
                 })?;
-                (ds, name.clone())
+                Ok((dataset, name.clone()))
             } else {
                 let mut msg = format!(
                     "Subdataset '{}' not found in input. Available subdatasets:\n",
@@ -428,7 +422,7 @@ where
                     let short_name = get_subdataset_short_name(name);
                     msg.push_str(&format!("  - {} ({})\n", short_name, desc));
                 }
-                return Err(EncodingError::Dataset(msg));
+                Err(EncodingError::Dataset(msg))
             }
         } else {
             let mut msg = format!(
@@ -439,7 +433,7 @@ where
                 let short_name = get_subdataset_short_name(name);
                 msg.push_str(&format!("  - {} ({})\n", short_name, desc));
             }
-            return Err(EncodingError::Dataset(msg));
+            Err(EncodingError::Dataset(msg))
         }
     } else {
         if let Some(sub) = subdataset {
@@ -448,10 +442,23 @@ where
                 sub
             )));
         }
-        (initial_dataset, input_str.to_string())
-    };
+        Ok((initial_dataset, input_str.to_string()))
+    }
+}
 
-    let source_report = compute_source_report(&dataset)?;
+/// Convert a GDAL raster into a DGGS-backed storage backend.
+pub fn convert_to_backend<B>(
+    input_str: &str,
+    subdataset: Option<&str>,
+    output_path: &Path,
+    dggrs: DggrsUid,
+    compression: Option<Compression>,
+) -> Result<(B, ConversionReport), EncodingError>
+where
+    B: StorageBackend,
+{
+    let grid = get(dggrs)?;
+    let (dataset, open_str) = open_raster_dataset(input_str, subdataset)?;
 
     let bands = dataset
         .rasterbands()
@@ -509,7 +516,7 @@ where
         chunk_size * data_type_size_bytes as u64
     );
 
-    let chunk_zones = grid.zones_from_bbox(chunk_level, bbox, Some(CONFIG))?;
+    let chunk_zones = grid.zones_from_bbox(chunk_level, bbox, Some(ID_ONLY_CONFIG))?;
     if chunk_zones.zones.is_empty() {
         return Err(EncodingError::Grid(
             "no zones found intersecting dataset bounding box".into(),
@@ -518,10 +525,6 @@ where
     println!("zones in bbox: {}", chunk_zones.zones.len());
 
     let relative_depth = RelativeDepth::new(refinement_level.get() - chunk_level.get())?;
-    let center_config = DggrsApiConfig {
-        center: true,
-        ..CONFIG
-    };
     let total_chunk_zones = chunk_zones.zones.len();
     let chunk_progress = ProgressBar::new(total_chunk_zones as u64);
     let style = ProgressStyle::with_template(
@@ -615,7 +618,11 @@ where
                     local_collectors.push(BandStatsCollector::new(band_idx as u32, dtype_name.clone()));
                 }
 
-                let children = grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(center_config))?;
+                let children = grid.zones_from_parent(
+                    relative_depth,
+                    chunk_zone.id.clone(),
+                    Some(CENTER_CONFIG),
+                )?;
                 if children.zones.len() > chunk_size as usize {
                     return Err(EncodingError::Grid(format!(
                         "chunk {} has {} children but chunk_size is {}",
@@ -765,7 +772,7 @@ where
         bands: band_stats,
     };
 
-    Ok((backend, source_report, report))
+    Ok((backend, report))
 }
 
 pub fn convert_dggrs_store_to_backend<B>(
