@@ -23,6 +23,9 @@ pub enum EncodingError {
     #[error("DGGRS Fabric error: {0}")]
     DggrsFabric(#[from] geoplegma::error::factory::FactoryError),
 
+    #[error("DGGRS UID error: {0}")]
+    DggrsUid(#[from] geoplegma::error::factory::DggrsUidError),
+
     #[error("Dataset error: {0}")]
     Dataset(String),
 
@@ -37,4 +40,14 @@ pub enum EncodingError {
 
     #[error("Grid error: {0}")]
     Grid(String),
+
+    #[error("Invalid coordinate length (expected at least 2, got {0})")]
+    InvalidCoordinateLength(usize),
+
+    #[error("Invalid coordinate format (expected floats / arrays of floats)")]
+    InvalidCoordinateFormat,
+
+    #[error("No zone found for point {0:?}")]
+    NoZoneFound(geoplegma::types::Point),
 }
+

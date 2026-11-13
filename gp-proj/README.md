@@ -376,6 +376,8 @@ Faces are adjacent if they share **exactly 2 vertices**.
 The icosahedron is laid out on the unit sphere with two vertices being on the poles, and the rest being spread across the equator. Here's a representation in 2D space of the icosahedron:
 ![alt text](src/assets/icosahedron.png)
 
+The numbers inside the triangles are the **face indices used in the code**, 0-19, as listed by `icosahedron::create_faces`. The "Faces" legend on the right is the same table written 1-20, so legend entry *n* is face index *n - 1*. Even-numbered faces point upward in the net and odd-numbered faces downward; the projection relies on that alternation (`is_upward = face % 2 == 0`, `vgc.rs`).
+
 ## Projections
 ### Vertex Great Circle (van Leeuwen or slice-and-dice projection)
 This projection comes from this [article](https://www.tandfonline.com/doi/abs/10.1559/152304006779500687). The projection divides the face of the polyhedron into equilateral triangles by the number of existente vertices, and splits those triangle in two rectangle triangles. From there it finds the point in of those two triangles, and "slices" it to get a point D on the opposite side of the triangle, then it "dices" to get the point P from D. To explain it further what is happening in the code, here's the following:

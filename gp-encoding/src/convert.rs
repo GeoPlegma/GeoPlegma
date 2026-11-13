@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::str::FromStr;
 
-use gdal::raster::GdalDataType;
+use gdal::raster::{GdalDataType, RasterBand};
 use gdal::spatial_ref::{CoordTransform, SpatialRef};
 use gdal::{Dataset, GeoTransformEx, Metadata};
 use geoplegma::api::DggrsApiConfig;
@@ -21,7 +21,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 use crate::AttributeSchema;
-use crate::common::{CONFIG, ID_ONLY_CONFIG};
+use crate::common::{CENTER_CONFIG, CONFIG, ID_ONLY_CONFIG};
 use crate::error::EncodingError;
 use crate::models::{Compression, DataType, DatasetMetadata};
 use crate::stats::{BandStatsCollector, ConversionReport, SourceRasterReport};
@@ -51,6 +51,35 @@ macro_rules! impl_native_bytes {
 impl_native_bytes!(u8, i8, u16, i16, u32, i32, u64, i64, f32, f64);
 
 const ZARR_TARGET_UNCOMPRESSED_CHUNK_BYTES: u64 = 1024 * 1024;
+
+fn attribute_schema_from_band(band: &RasterBand<'_>) -> Result<AttributeSchema, EncodingError> {
+    let band_type = band.band_type();
+    let dtype = match band_type {
+        GdalDataType::UInt8 => DataType::UInt8,
+        GdalDataType::Int8 => DataType::Int8,
+        GdalDataType::Int16 => DataType::Int16,
+        GdalDataType::UInt16 => DataType::UInt16,
+        GdalDataType::Int32 => DataType::Int32,
+        GdalDataType::UInt32 => DataType::UInt32,
+        GdalDataType::Int64 => DataType::Int64,
+        GdalDataType::UInt64 => DataType::UInt64,
+        GdalDataType::Float32 => DataType::Float32,
+        GdalDataType::Float64 => DataType::Float64,
+        _ => {
+            return Err(EncodingError::Dataset(format!(
+                "unsupported GDAL data type: {band_type:?}"
+            )));
+        }
+    };
+
+    Ok(AttributeSchema {
+        dtype,
+        fill_value: band
+            .no_data_value()
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| dtype.default_fill_value()),
+    })
+}
 
 fn get_corners_and_pixel_size(
     dataset: &Dataset,
@@ -356,18 +385,11 @@ pub fn get_subdataset_short_name(name: &str) -> String {
     last_part.trim_matches(|c| c == '/' || c == '"' || c == '\'' || c == ' ').to_string()
 }
 
-pub fn convert_to_backend<B>(
+/// Open a raster dataset, resolving an optional GDAL subdataset name.
+pub fn open_raster_dataset(
     input_str: &str,
     subdataset: Option<&str>,
-    output_path: &Path,
-    dggrs: DggrsUid,
-    compression: Option<Compression>,
-) -> Result<(B, SourceRasterReport, ConversionReport), EncodingError>
-where
-    B: StorageBackend,
-{
-    let grid = get(dggrs)?;
-
+) -> Result<(Dataset, String), EncodingError> {
     let initial_dataset = Dataset::open(input_str).map_err(|e| {
         EncodingError::Dataset(format!(
             "failed to open input dataset '{}': {e}",
@@ -376,20 +398,21 @@ where
     })?;
 
     let subdatasets = list_subdatasets(&initial_dataset);
-    let (dataset, open_str) = if !subdatasets.is_empty() {
+    if !subdatasets.is_empty() {
         if let Some(sub) = subdataset {
             let matched = subdatasets.iter().find(|(name, _)| {
                 let short_name = get_subdataset_short_name(name);
-                short_name.eq_ignore_ascii_case(sub) || short_name.to_lowercase().contains(&sub.to_lowercase())
+                short_name.eq_ignore_ascii_case(sub)
+                    || short_name.to_lowercase().contains(&sub.to_lowercase())
             });
             if let Some((name, _)) = matched {
-                let ds = Dataset::open(name).map_err(|e| {
+                let dataset = Dataset::open(name).map_err(|e| {
                     EncodingError::Dataset(format!(
                         "failed to open subdataset '{}': {e}",
                         name
                     ))
                 })?;
-                (ds, name.clone())
+                Ok((dataset, name.clone()))
             } else {
                 let mut msg = format!(
                     "Subdataset '{}' not found in input. Available subdatasets:\n",
@@ -399,7 +422,7 @@ where
                     let short_name = get_subdataset_short_name(name);
                     msg.push_str(&format!("  - {} ({})\n", short_name, desc));
                 }
-                return Err(EncodingError::Dataset(msg));
+                Err(EncodingError::Dataset(msg))
             }
         } else {
             let mut msg = format!(
@@ -410,7 +433,7 @@ where
                 let short_name = get_subdataset_short_name(name);
                 msg.push_str(&format!("  - {} ({})\n", short_name, desc));
             }
-            return Err(EncodingError::Dataset(msg));
+            Err(EncodingError::Dataset(msg))
         }
     } else {
         if let Some(sub) = subdataset {
@@ -419,41 +442,31 @@ where
                 sub
             )));
         }
-        (initial_dataset, input_str.to_string())
-    };
+        Ok((initial_dataset, input_str.to_string()))
+    }
+}
 
-    let source_report = compute_source_report(&dataset)?;
+/// Convert a GDAL raster into a DGGS-backed storage backend.
+pub fn convert_to_backend<B>(
+    input_str: &str,
+    subdataset: Option<&str>,
+    output_path: &Path,
+    dggrs: DggrsUid,
+    compression: Option<Compression>,
+) -> Result<(B, ConversionReport), EncodingError>
+where
+    B: StorageBackend,
+{
+    let grid = get(dggrs)?;
+    let (dataset, open_str) = open_raster_dataset(input_str, subdataset)?;
 
     let bands = dataset
         .rasterbands()
         .map(|b| b.map(|band| band.band_type()))
         .collect::<Result<Vec<_>, _>>()?;
-    let metadata_bands = bands
-        .iter()
-        .map(|band_type| {
-            let dtype = match band_type {
-                GdalDataType::UInt8 => DataType::UInt8,
-                GdalDataType::Int8 => DataType::Int8,
-                GdalDataType::Int16 => DataType::Int16,
-                GdalDataType::UInt16 => DataType::UInt16,
-                GdalDataType::Int32 => DataType::Int32,
-                GdalDataType::UInt32 => DataType::UInt32,
-                GdalDataType::Int64 => DataType::Int64,
-                GdalDataType::UInt64 => DataType::UInt64,
-                GdalDataType::Float32 => DataType::Float32,
-                GdalDataType::Float64 => DataType::Float64,
-                _ => {
-                    return Err(EncodingError::Dataset(format!(
-                        "unsupported GDAL data type: {band_type:?}"
-                    )));
-                }
-            };
-
-            Ok(AttributeSchema {
-                dtype,
-                fill_value: Some("0.0".to_string()),
-            })
-        })
+    let metadata_bands = dataset
+        .rasterbands()
+        .map(|band| attribute_schema_from_band(&band?))
         .collect::<Result<Vec<_>, EncodingError>>()?;
 
     if metadata_bands.is_empty() {
@@ -503,7 +516,7 @@ where
         chunk_size * data_type_size_bytes as u64
     );
 
-    let chunk_zones = grid.zones_from_bbox(chunk_level, bbox, Some(CONFIG))?;
+    let chunk_zones = grid.zones_from_bbox(chunk_level, bbox, Some(ID_ONLY_CONFIG))?;
     if chunk_zones.zones.is_empty() {
         return Err(EncodingError::Grid(
             "no zones found intersecting dataset bounding box".into(),
@@ -512,10 +525,6 @@ where
     println!("zones in bbox: {}", chunk_zones.zones.len());
 
     let relative_depth = RelativeDepth::new(refinement_level.get() - chunk_level.get())?;
-    let center_config = DggrsApiConfig {
-        center: true,
-        ..CONFIG
-    };
     let total_chunk_zones = chunk_zones.zones.len();
     let chunk_progress = ProgressBar::new(total_chunk_zones as u64);
     let style = ProgressStyle::with_template(
@@ -567,10 +576,7 @@ where
         .attributes
         .iter()
         .map(|attr| {
-            let fill_val = match &attr.fill_value {
-                Some(value) => parse_fill_value_to_f64(&attr.dtype, value)?,
-                None => 0.0,
-            };
+            let fill_val = parse_fill_value_to_f64(&attr.dtype, &attr.fill_value)?;
             encode_value_from_f64(&attr.dtype, fill_val)
         })
         .collect::<Result<_, EncodingError>>()?;
@@ -612,7 +618,11 @@ where
                     local_collectors.push(BandStatsCollector::new(band_idx as u32, dtype_name.clone()));
                 }
 
-                let children = grid.zones_from_parent(relative_depth, chunk_zone.id.clone(), Some(center_config))?;
+                let children = grid.zones_from_parent(
+                    relative_depth,
+                    chunk_zone.id.clone(),
+                    Some(CENTER_CONFIG),
+                )?;
                 if children.zones.len() > chunk_size as usize {
                     return Err(EncodingError::Grid(format!(
                         "chunk {} has {} children but chunk_size is {}",
@@ -762,7 +772,7 @@ where
         bands: band_stats,
     };
 
-    Ok((backend, source_report, report))
+    Ok((backend, report))
 }
 
 pub fn convert_dggrs_store_to_backend<B>(
@@ -975,10 +985,7 @@ where
             .attributes
             .iter()
             .map(|attr| {
-                let fill_val = match &attr.fill_value {
-                    Some(value) => parse_fill_value_to_f64(&attr.dtype, value)?,
-                    None => 0.0,
-                };
+                let fill_val = parse_fill_value_to_f64(&attr.dtype, &attr.fill_value)?;
                 encode_value_from_f64(&attr.dtype, fill_val)
             })
             .collect::<Result<_, EncodingError>>()?;
@@ -1130,6 +1137,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gdal::DriverManager;
     use std::time::{SystemTime, UNIX_EPOCH};
     use std::path::PathBuf;
     use crate::zarr::ZarrBackend;
@@ -1141,6 +1149,33 @@ mod tests {
             .expect("system time")
             .as_nanos();
         std::env::temp_dir().join(format!("gp_encoding_{name}_{nanos}"))
+    }
+
+    #[test]
+    fn test_attribute_schema_uses_declared_no_data() {
+        let driver = DriverManager::get_driver_by_name("MEM").expect("MEM driver");
+        let dataset = driver
+            .create_with_band_type::<f32, _>("", 1, 1, 1)
+            .expect("create in-memory raster");
+        let mut band = dataset.rasterband(1).expect("raster band");
+        band.set_no_data_value(Some(-9999.0)).expect("set no-data");
+
+        let schema = attribute_schema_from_band(&band).expect("attribute schema");
+
+        assert_eq!(schema.fill_value, "-9999");
+    }
+
+    #[test]
+    fn test_attribute_schema_uses_default_when_no_data_is_missing() {
+        let driver = DriverManager::get_driver_by_name("MEM").expect("MEM driver");
+        let dataset = driver
+            .create_with_band_type::<f32, _>("", 1, 1, 1)
+            .expect("create in-memory raster");
+        let band = dataset.rasterband(1).expect("raster band");
+
+        let schema = attribute_schema_from_band(&band).expect("attribute schema");
+
+        assert_eq!(schema.fill_value, "NaN");
     }
 
     #[test]
@@ -1174,7 +1209,7 @@ mod tests {
             dggrs: dggrs_src,
             attributes: vec![AttributeSchema {
                 dtype: DataType::Float32,
-                fill_value: Some("0.0".to_string()),
+                fill_value: "0.0".to_string(),
             }],
             chunk_size: src_chunk_size,
             levels: vec![src_refinement_level.get() as u32],
@@ -1243,5 +1278,3 @@ mod tests {
         assert_eq!(get_subdataset_short_name("HDF5:file.h5:variable_with_spaces "), "variable_with_spaces");
     }
 }
-
-

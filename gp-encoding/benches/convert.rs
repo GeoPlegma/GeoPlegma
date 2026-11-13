@@ -12,7 +12,7 @@ mod config;
 use std::path::{Path, PathBuf};
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main, black_box};
 use geoplegma::types::{DggrsUid, Point, RefinementLevel};
-use gp_encoding::{ZarrBackend, convert_to_backend, StorageBackend};
+use gp_encoding::{StorageBackend, ZarrBackend, convert_to_backend};
 use gp_encoding::query::query_value_for_point;
 use gp_encoding::value::decode_value_to_f64;
 use gdal::{Dataset, GeoTransformEx};
@@ -278,7 +278,7 @@ fn bench_query_accuracy_impl(c: &mut Criterion, dggrs_type: DggrsUid, band_num: 
             None,
         );
 
-        let (backend, _, report) = match conversion_res {
+        let (backend, report) = match conversion_res {
             Ok(res) => res,
             Err(e) => {
                 eprintln!("Warning: Failed to convert {:?} for accuracy benchmark: {:?}", file_path, e);
