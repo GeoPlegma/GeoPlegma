@@ -12,6 +12,7 @@ use crate::sys_api::DggrsSysApi;
 use geoplegma::types::Point;
 use geoplegma::types::RefinementLevel;
 use gp_proj::projections::projections::{traits::Projection, vgc::Vgc};
+use std::mem;
 
 pub struct IVEA3HBary {
     refinement_level: RefinementLevel,
@@ -116,7 +117,7 @@ impl IVEA3HBary {
         }
 
         println!("Winner {:?}", zone_centre);
-        return zone_centre;
+        zone_centre
     }
 
     // Determines face to be enconded in the index for edge cases, i.e. cells/zones spaning two or more
@@ -127,98 +128,95 @@ impl IVEA3HBary {
         let k = self.denominator - i - j;
 
         // top-most row of faces
-        if face < 10 && (face % 2) > 0 {
+        if face < 10 && (face % 2) == 0 {
             if j == self.denominator {
-                face = 1;
+                face = 0;
             }
             // top-most pentagon
             else if k == 0
             // shared cell on the right-edge: moves to right
             {
-                face = face + 2;
-                if face > 9 {
-                    face = 1;
+                face += 2;
+                if face > 8 {
+                    face = 0;
                 } // wrap around
                 i = 0;
             }
         }
         // middle row of faces pointing "downwards"
-        else if face < 11 && (face % 2) == 0 {
+        else if face < 11 && (face % 2) > 0 {
             if j == self.denominator
             // bottom pentagon
             {
-                face = face + 10;
+                face += 10;
                 zero = true;
             } else if k == self.denominator
             // left-most pentagon
             {
-                face = face - 1;
+                face -= 1;
                 zero = true;
             } else if i == self.denominator
             // right-most pentagon
             {
-                face = face + 1;
+                face += 1;
                 if face > 10 {
-                    face = 1;
+                    face = 0;
                 }
                 zero = true;
             } else if j == 0 {
-                face = face - 1;
-            }
-            // top edge
-            else if k == 0
+                // top edge
+                face -= 1;
+            } else if k == 0
             // right edge
             {
-                face = face + 9;
+                face += 9;
                 swap = true;
             }
         }
         // middle row of faces pointing "upwards"
-        else if face < 20 && (face % 2) > 0 {
+        else if face < 20 && (face % 2) == 0 {
             if j == self.denominator
             // top-most pentagon
             {
-                face = face - 8;
+                face -= 8;
                 if face > 9 {
-                    face = 1;
+                    face = 0;
                 } // wrap around
                 zero = true;
             } else if k == 1
             // left-most pentagon
             {
-                face = face + 1;
+                face += 1;
                 zero = true;
             } else if i == self.denominator
             // right-most pentagon
             {
-                face = face + 3;
-                if face > 20 {
-                    face = 12;
+                face += 3;
+                if face > 19 {
+                    face = 11;
                 } // wrap around
                 zero = true;
             } else if j == 0 {
-                face = face + 1;
+                face += 1;
             }
             // bottom edge
             else if k == 0
             // right edge
             {
-                face = face - 7;
+                face -= 7;
                 swap = true;
             }
         } else
         // botom row of faces
         {
             if j == self.denominator {
-                face = 12;
-            }
-            // bottom pentagon
-            else if k == 0
-            // right edge
-            {
-                face = face + 2;
-                if face > 20 {
-                    face = 12;
+                // bottom pentagon
+                face = 11;
+            } else if k == 0 {
+                // right edge
+                face += 2;
+                if face > 19 {
+                    face = 11;
                 } // wrap around
                 i = 0;
             }
@@ -229,11 +227,10 @@ impl IVEA3HBary {
             j = 0;
         }
         if swap {
-            let temp = j;
-            j = i;
-            i = temp;
+            i = mem::replace(&mut j, i);
         }
-        return (i, j, face);
+
+        (i, j, face)
     }
 }
 
@@ -259,7 +256,7 @@ impl DggrsSysApi for IVEA3HBary {
         println!("After edge cases: {:?}", unique);
 
         // Bundle index into 64 bit
-        return IVEA3HBary::bundle_zone_id(self, unique.0, unique.1, unique.2);
+        IVEA3HBary::bundle_zone_id(self, unique.0, unique.1, unique.2)
     }
 }
 
